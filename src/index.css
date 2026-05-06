@@ -1,0 +1,38 @@
+/* 1. Vai buscar a fonte Inter ao Google Fonts em várias espessuras */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; 
+  background-color: #f4f7fe;
+  
+  /* 2. Aplica a fonte Inter. Se falhar, tenta as nativas da Apple e do Windows */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  
+  /* 3. Um truque de CSS da Apple para deixar as letras mais suaves e nítidas nos ecrãs */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Opcional: Deixar a barra de rolagem (scroll) do feed mais elegante */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 10px;
+}

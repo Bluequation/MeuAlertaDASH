@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "waze-do-sertao"
-  }
+  },
+  "targets": {
+    "waze-do-sertao": {
+      "hosting": {
+        "painel": [
+          "cuidai-painel"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

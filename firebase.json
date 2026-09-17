@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "target": "painel",
     "public": "dist",
     "ignore": [
       "firebase.json",

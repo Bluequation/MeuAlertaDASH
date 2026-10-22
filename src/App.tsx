@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  CircleMarker,
+  useMap,
+  useMapEvents
+} from 'react-leaflet';
 import {
   collection,
   limit,
@@ -110,6 +118,33 @@ function CamadaCalor({ alertas, gradiente }: { alertas: Alerta[], gradiente: any
     }).addTo(map);
     return () => { map.removeLayer(heatLayer); };
   }, [map, alertas, gradiente]);
+  return null;
+}
+
+// DADOS METEOROLÓGICOS ESTIMADOS PELA OPEN-METEO
+interface DadosOpenMeteo {
+  temperatura: number;
+  sensacao: number;
+  umidade: number;
+  vento: number;
+  horario: string;
+}
+
+// PERMITE SELECIONAR UM PONTO NO MAPA
+function SelecionarPontoOpenMeteo({
+  onSelecionar
+}: {
+  onSelecionar: (latitude: number, longitude: number) => void;
+}) {
+  useMapEvents({
+    click(evento) {
+      onSelecionar(
+        Number(evento.latlng.lat.toFixed(4)),
+        Number(evento.latlng.lng.toFixed(4))
+      );
+    }
+  });
+
   return null;
 }
 
@@ -342,6 +377,20 @@ function App() {
   const [erroMeteo, setErroMeteo] = useState<string | null>(null);
   const [idEstacaoMeteo, setIdEstacaoMeteo] = useState<string | null>(null);
   const [agoraMeteo, setAgoraMeteo] = useState(Date.now());
+  // PONTO SELECIONADO PARA CONSULTA OPEN-METEO
+  const [pontoOpenMeteo, setPontoOpenMeteo] = useState({
+    latitude: -5.3,
+    longitude: -39.3
+  });
+
+  const [dadosOpenMeteo, setDadosOpenMeteo] =
+    useState<DadosOpenMeteo | null>(null);
+
+  const [carregandoOpenMeteo, setCarregandoOpenMeteo] =
+    useState(false);
+
+  const [erroOpenMeteo, setErroOpenMeteo] =
+    useState<string | null>(null);
   const [historicoMeteo, setHistoricoMeteo] =
     useState<LeituraHistoricaMeteo[]>([]);
 
@@ -648,6 +697,90 @@ function App() {
 
     return () => unsubscribe();
   }, [idEstacaoHistoricoMeteo]);
+
+  // CONSULTA METEOROLÓGICA REGIONAL — OPEN-METEO
+  useEffect(() => {
+    if (abaAtiva !== 'meteorologia') return;
+
+    const controlador = new AbortController();
+
+    const consultar = async () => {
+      setCarregandoOpenMeteo(true);
+      setErroOpenMeteo(null);
+      setDadosOpenMeteo(null);
+
+      try {
+        const parametros = new URLSearchParams({
+          latitude: pontoOpenMeteo.latitude.toString(),
+          longitude: pontoOpenMeteo.longitude.toString(),
+          current:
+            'temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m',
+          timezone: 'America/Fortaleza',
+          wind_speed_unit: 'kmh'
+        });
+
+        const resposta = await fetch(
+          `https://api.open-meteo.com/v1/forecast?${parametros.toString()}`,
+          { signal: controlador.signal }
+        );
+
+        if (!resposta.ok) {
+          throw new Error(`Erro HTTP ${resposta.status}`);
+        }
+
+        const resultado = await resposta.json();
+        const atual = resultado.current;
+
+        const valores = [
+          atual?.temperature_2m,
+          atual?.relative_humidity_2m,
+          atual?.apparent_temperature,
+          atual?.wind_speed_10m
+        ];
+
+        if (
+          !valores.every(
+            valor =>
+              typeof valor === 'number' &&
+              Number.isFinite(valor)
+          ) ||
+          typeof atual?.time !== 'string'
+        ) {
+          throw new Error('Dados meteorológicos incompletos');
+        }
+
+        if (!controlador.signal.aborted) {
+          setDadosOpenMeteo({
+            temperatura: atual.temperature_2m,
+            umidade: atual.relative_humidity_2m,
+            sensacao: atual.apparent_temperature,
+            vento: atual.wind_speed_10m,
+            horario: atual.time
+          });
+        }
+      } catch (erro) {
+        if (!controlador.signal.aborted) {
+          console.error('Erro na Open-Meteo:', erro);
+
+          setErroOpenMeteo(
+            'Não foi possível consultar os dados meteorológicos deste local.'
+          );
+        }
+      } finally {
+        if (!controlador.signal.aborted) {
+          setCarregandoOpenMeteo(false);
+        }
+      }
+    };
+
+    consultar();
+
+    return () => controlador.abort();
+  }, [
+    abaAtiva,
+    pontoOpenMeteo.latitude,
+    pontoOpenMeteo.longitude
+  ]);
 
   const exportarDados = () => {
     if (alertas.length === 0) return;
@@ -1901,6 +2034,162 @@ function App() {
                 </p>
               </div>
 
+              {/* CONSULTA REGIONAL OPEN-METEO */}
+              <div
+                style={{
+                  backgroundColor: '#F5F9FD',
+                  border: '1px solid #E2EBF4',
+                  borderRadius: '18px',
+                  padding: isMobile ? '16px' : '20px'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    marginBottom: '16px'
+                  }}
+                >
+                  <div>
+                    <strong
+                      style={{
+                        fontSize: '15px',
+                        color: '#214563'
+                      }}
+                    >
+                      Condições meteorológicas regionais
+                    </strong>
+
+                    <p
+                      style={{
+                        fontSize: '12px',
+                        color: '#64748B',
+                        margin: '5px 0 0'
+                      }}
+                    >
+                      Clique em qualquer ponto do mapa para consultar.
+                    </p>
+                  </div>
+
+                  <span
+                    style={{
+                      backgroundColor: '#E7F2FC',
+                      color: '#168FC4',
+                      borderRadius: '10px',
+                      padding: '8px 11px',
+                      fontSize: '11px',
+                      fontWeight: '700'
+                    }}
+                  >
+                    Open-Meteo · Modelo meteorológico
+                  </span>
+                </div>
+
+                {carregandoOpenMeteo ? (
+                  <p style={{ color: '#64748B', fontSize: '13px' }}>
+                    Consultando condições meteorológicas...
+                  </p>
+                ) : erroOpenMeteo ? (
+                  <p style={{ color: '#B42318', fontSize: '13px' }}>
+                    {erroOpenMeteo}
+                  </p>
+                ) : dadosOpenMeteo ? (
+                  <>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile
+                          ? 'repeat(2, minmax(0, 1fr))'
+                          : 'repeat(4, minmax(0, 1fr))',
+                        gap: '12px'
+                      }}
+                    >
+                      {[
+                        {
+                          titulo: 'Temperatura',
+                          valor: `${dadosOpenMeteo.temperatura.toFixed(1)} °C`,
+                          cor: '#E58047'
+                        },
+                        {
+                          titulo: 'Sensação térmica',
+                          valor: `${dadosOpenMeteo.sensacao.toFixed(1)} °C`,
+                          cor: '#D15B4B'
+                        },
+                        {
+                          titulo: 'Umidade',
+                          valor: `${dadosOpenMeteo.umidade.toFixed(0)}%`,
+                          cor: '#168FC4'
+                        },
+                        {
+                          titulo: 'Vento',
+                          valor: `${dadosOpenMeteo.vento.toFixed(1)} km/h`,
+                          cor: '#214563'
+                        }
+                      ].map((item) => (
+                        <div
+                          key={item.titulo}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            padding: '15px',
+                            borderRadius: '14px',
+                            minWidth: 0
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: 'block',
+                              color: '#8E8E93',
+                              fontSize: '11px',
+                              marginBottom: '8px'
+                            }}
+                          >
+                            {item.titulo}
+                          </span>
+
+                          <strong
+                            style={{
+                              display: 'block',
+                              color: item.cor,
+                              fontSize: isMobile ? '19px' : '23px'
+                            }}
+                          >
+                            {item.valor}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p
+                      style={{
+                        margin: '14px 0 0',
+                        color: '#64748B',
+                        fontSize: '11px'
+                      }}
+                    >
+                      Ponto consultado: {pontoOpenMeteo.latitude.toFixed(4)},
+                      {' '}{pontoOpenMeteo.longitude.toFixed(4)}
+                      {' • '}
+                      Referência: {dadosOpenMeteo.horario.replace('T', ' às ')}
+                      {' (horário de Fortaleza)'}
+                    </p>
+                  </>
+                ) : null}
+
+                <p
+                  style={{
+                    margin: '12px 0 0',
+                    color: '#8E8E93',
+                    fontSize: '11px'
+                  }}
+                >
+                  Valores estimados por modelos meteorológicos.
+                  Não são medições da Estação CUIDAÍ.
+                </p>
+              </div>
+
               <div
                 style={{
                   height: isMobile ? '400px' : '500px',
@@ -1917,6 +2206,40 @@ function App() {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution="&copy; OpenStreetMap contributors"
                   />
+
+                  {/* SELEÇÃO DE LOCAL PARA CONSULTA OPEN-METEO */}
+                  <SelecionarPontoOpenMeteo
+                    onSelecionar={(latitude, longitude) => {
+                      setPontoOpenMeteo({ latitude, longitude });
+                    }}
+                  />
+
+                  {/* MARCADOR DO PONTO CONSULTADO */}
+                  <CircleMarker
+                    center={[
+                      pontoOpenMeteo.latitude,
+                      pontoOpenMeteo.longitude
+                    ]}
+                    radius={7}
+                    pathOptions={{
+                      color: '#214563',
+                      fillColor: '#FFFFFF',
+                      fillOpacity: 1,
+                      weight: 3
+                    }}
+                  >
+                    <Popup>
+                      <strong>Consulta Open-Meteo</strong>
+                      <p style={{ margin: '5px 0' }}>
+                        Estimativa meteorológica para o ponto selecionado.
+                      </p>
+                      <small>
+                        {pontoOpenMeteo.latitude.toFixed(4)},
+                        {' '}
+                        {pontoOpenMeteo.longitude.toFixed(4)}
+                      </small>
+                    </Popup>
+                  </CircleMarker>
 
                   {estacoesMeteo.map((estacao) => (
                     <Marker
@@ -2007,6 +2330,57 @@ function App() {
                   Evolução das últimas 72 leituras armazenadas
                   da estação selecionada.
                 </p>
+
+                {/* RESUMO DO HISTÓRICO */}
+                {historicoMeteo.length > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '10px',
+                      marginTop: '18px'
+                    }}
+                  >
+                    <span
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '12px',
+                        backgroundColor: '#EAF5FF',
+                        color: '#168FC4',
+                        fontSize: '12px',
+                        fontWeight: '800'
+                      }}
+                    >
+                      {historicoMeteo.length} medições
+                    </span>
+
+                    <span
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '12px',
+                        backgroundColor: '#F2F4F8',
+                        color: '#214563',
+                        fontSize: '12px',
+                        fontWeight: '700'
+                      }}
+                    >
+                      {estacaoSelecionadaMeteo?.nome || 'Estação CUIDAÍ'}
+                    </span>
+
+                    <span
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '12px',
+                        backgroundColor: '#F2F4F8',
+                        color: '#64748B',
+                        fontSize: '12px'
+                      }}
+                    >
+                      Dados observados pelo sensor
+                    </span>
+                  </div>
+                )}
               </div>
 
               {erroHistoricoMeteo ? (
@@ -2049,17 +2423,57 @@ function App() {
                     ].map((grafico) => (
                       <div
                         key={grafico.chave}
-                        style={{ minWidth: 0 }}
+                        style={{
+                          minWidth: 0,
+                          padding: isMobile ? '16px' : '22px',
+                          backgroundColor: '#F8FAFD',
+                          border: '1px solid #E5ECF4',
+                          borderRadius: '22px',
+                          boxShadow: '0 6px 18px rgba(33, 69, 99, 0.04)'
+                        }}
                       >
-                        <h3
+                        <div
                           style={{
-                            fontSize: '15px',
-                            color: '#1C1C1E',
-                            margin: '0 0 15px'
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            marginBottom: '20px'
                           }}
                         >
-                          {grafico.titulo}
-                        </h3>
+                          <div
+                            style={{
+                              width: '10px',
+                              height: '10px',
+                              borderRadius: '50%',
+                              backgroundColor: grafico.cor,
+                              flexShrink: 0
+                            }}
+                          />
+
+                          <div>
+                            <h3
+                              style={{
+                                fontSize: '16px',
+                                color: '#1C1C1E',
+                                fontWeight: '800',
+                                margin: 0
+                              }}
+                            >
+                              {grafico.titulo}
+                            </h3>
+
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                color: '#8E8E93',
+                                display: 'block',
+                                marginTop: '4px'
+                              }}
+                            >
+                              Evolução das medições registradas
+                            </span>
+                          </div>
+                        </div>
 
                         <div style={{ height: '260px', width: '100%' }}>
                           <ResponsiveContainer
@@ -2069,10 +2483,10 @@ function App() {
                             <AreaChart
                               data={historicoMeteo}
                               margin={{
-                                top: 10,
-                                right: 15,
-                                left: -15,
-                                bottom: 5
+                                top: 12,
+                                right: 16,
+                                left: 12,
+                                bottom: 12
                               }}
                             >
                               <CartesianGrid
@@ -2089,26 +2503,48 @@ function App() {
                               />
 
                               <YAxis
-                                tick={{ fontSize: 11 }}
-                                width={48}
+                                tick={{
+                                  fontSize: 10,
+                                  fill: '#64748B'
+                                }}
+                                width={72}
+                                tickMargin={6}
+                                axisLine={false}
+                                tickLine={false}
                                 domain={['auto', 'auto']}
-                                unit={grafico.unidade}
+                                tickFormatter={(valor: number) =>
+                                  grafico.chave === 'temperatura'
+                                    ? `${Number(valor).toLocaleString('pt-BR', {
+                                      maximumFractionDigits: 1
+                                    })}°C`
+                                    : `${Math.round(Number(valor))}%`
+                                }
                               />
 
                               <Tooltip
                                 formatter={(valor: any) => [
-                                  `${Number(valor).toFixed(1)} ${grafico.unidade}`,
+                                  `${Number(valor).toLocaleString('pt-BR', {
+                                    maximumFractionDigits: 1
+                                  })} ${grafico.unidade}`,
                                   grafico.titulo
                                 ]}
+                                contentStyle={{
+                                  backgroundColor: '#FFFFFF',
+                                  border: '1px solid #E5ECF4',
+                                  borderRadius: '14px',
+                                  padding: '12px',
+                                  boxShadow: '0 8px 25px rgba(33, 69, 99, 0.12)',
+                                  fontSize: '12px'
+                                }}
                               />
 
                               <Area
                                 type="linear"
                                 dataKey={grafico.chave}
                                 stroke={grafico.cor}
-                                strokeWidth={2.5}
+                                strokeWidth={3}
                                 fill={grafico.cor}
-                                fillOpacity={0.12}
+                                fillOpacity={0.10}
                                 dot={
                                   historicoMeteo.length <= 15
                                     ? { r: 3 }
@@ -2124,25 +2560,62 @@ function App() {
                     ))}
                   </div>
 
-                  <p
+                  {/* RODAPÉ DO HISTÓRICO */}
+                  <div
                     style={{
-                      color: '#8E8E93',
-                      fontSize: '12px',
-                      margin: 0
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '16px',
+                      paddingTop: '18px',
+                      marginTop: '4px',
+                      borderTop: '1px solid #E5ECF4'
                     }}
                   >
-                    {historicoMeteo.length} medições exibidas.
-                    Período: {' '}
-                    {new Date(
-                      historicoMeteo[0].recebidoEm
-                    ).toLocaleString('pt-BR')}
-                    {' até '}
-                    {new Date(
-                      historicoMeteo[
-                        historicoMeteo.length - 1
-                      ].recebidoEm
-                    ).toLocaleString('pt-BR')}.
-                  </p>
+                    <div>
+                      <span
+                        style={{
+                          display: 'block',
+                          color: '#8E8E93',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          marginBottom: '5px'
+                        }}
+                      >
+                        PERÍODO ANALISADO
+                      </span>
+
+                      <strong
+                        style={{
+                          color: '#214563',
+                          fontSize: '12px'
+                        }}
+                      >
+                        {new Date(
+                          historicoMeteo[0].recebidoEm
+                        ).toLocaleString('pt-BR')}
+                        {' — '}
+                        {new Date(
+                          historicoMeteo[
+                            historicoMeteo.length - 1
+                          ].recebidoEm
+                        ).toLocaleString('pt-BR')}
+                      </strong>
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        color: '#64748B',
+                        backgroundColor: '#F2F6FA',
+                        padding: '9px 12px',
+                        borderRadius: '10px'
+                      }}
+                    >
+                      Fonte: Estação CUIDAÍ · Firebase
+                    </div>
+                  </div>
                 </>
               )}
             </div>

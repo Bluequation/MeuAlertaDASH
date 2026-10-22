@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { collection, onSnapshot } from 'firebase/firestore';
+import {
+  collection,
+  limit,
+  onSnapshot,
+  query,
+  where
+} from 'firebase/firestore';
 import { db } from './firebase';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, CartesianGrid } from 'recharts';
 import L, { divIcon } from 'leaflet';
@@ -13,6 +19,7 @@ import {
   MdMenu,
   MdClose,
   MdMemory,
+  MdCloud,
   MdArrowForward,
   MdArrowBack
 } from 'react-icons/md';
@@ -41,6 +48,20 @@ interface Alerta {
   fotoUrl?: string;
 }
 
+interface EstacaoMeteo {
+  id: string;
+  nome: string;
+  municipio: string;
+  latitude: number;
+  longitude: number;
+  experimental: boolean;
+  ultimaLeitura: {
+    temperatura: number;
+    umidade: number;
+    recebidoEm: number;
+  } | null;
+}
+
 const CORES = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE'];
 
 const GRADIENTES_CALOR: Record<string, any> = {
@@ -49,6 +70,17 @@ const GRADIENTES_CALOR: Record<string, any> = {
   'Energia': { 0.1: '#e9d5ff', 0.39: '#e9d5ff', 0.4: '#c084fc', 0.59: '#c084fc', 0.6: '#a855f7', 0.79: '#a855f7', 0.8: '#7e22ce', 0.99: '#7e22ce', 1.0: '#4c1d95' },
   'Todas': { 0.1: 'rgba(0, 122, 255, 0.4)', 0.39: 'rgba(0, 122, 255, 0.4)', 0.4: 'cyan', 0.59: 'cyan', 0.6: 'lime', 0.79: 'lime', 0.8: 'orange', 0.99: 'orange', 1.0: 'red' },
   'Estrada': { 0.1: '#d9f99d', 0.39: '#d9f99d', 0.4: '#86efac', 0.59: '#86efac', 0.6: '#4ade80', 0.79: '#4ade80', 0.8: '#65a30d', 0.99: '#65a30d', 1.0: '#3f6212' },
+  'Quentura': {
+    0.1: '#ffe7a2',
+    0.39: '#ffe7a2',
+    0.4: '#ffc566',
+    0.59: '#ffc566',
+    0.6: '#f68b45',
+    0.79: '#f68b45',
+    0.8: '#df573b',
+    0.99: '#df573b',
+    1.0: '#a92839'
+  },
 };
 
 const getGradiente = (filtro: string) => {
@@ -56,6 +88,7 @@ const getGradiente = (filtro: string) => {
   if (filtro.includes('Passagem')) return GRADIENTES_CALOR['Passagem'];
   if (filtro.includes('Energia')) return GRADIENTES_CALOR['Energia'];
   if (filtro.includes('Estrada')) return GRADIENTES_CALOR['Estrada'];
+  if (filtro.includes('Quentura')) return GRADIENTES_CALOR['Quentura'];
   return GRADIENTES_CALOR['Todas'];
 };
 
@@ -296,9 +329,14 @@ function PaginaBaixar() {
 
 function App() {
   const [alertas, setAlertas] = useState<Alerta[]>([]);
+  const [estacoesMeteo, setEstacoesMeteo] = useState<EstacaoMeteo[]>([]);
+  const [carregandoMeteo, setCarregandoMeteo] = useState(true);
+  const [erroMeteo, setErroMeteo] = useState<string | null>(null);
+  const [idEstacaoMeteo, setIdEstacaoMeteo] = useState<string | null>(null);
+  const [agoraMeteo, setAgoraMeteo] = useState(Date.now());
   const [minhaLocalizacao, setMinhaLocalizacao] = useState<[number, number] | null>(null);
   const [carregamentoInicial, setCarregamentoInicial] = useState(true);
-  const [abaAtiva, setAbaAtiva] = useState<'visao_geral' | 'mapa_calor' | 'sobre'>('visao_geral');
+  const [abaAtiva, setAbaAtiva] = useState<'visao_geral' | 'mapa_calor' | 'meteorologia' | 'sobre'>('visao_geral');
   const [filtroCalor, setFiltroCalor] = useState<string>('Todas');
   const [filtroCategoria, setFiltroCategoria] = useState<string>('Todas');
   const [online, setOnline] = useState(navigator.onLine);  // 👇 ESTADOS PARA CONTROLAR A RESPONSIVIDADE E O MENU MOBILE
@@ -405,6 +443,101 @@ function App() {
       setAlertas(lista);
     });
     return () => unsubscribe();
+  }, []);
+
+  // ESTAÇÕES METEOROLÓGICAS PUBLICADAS
+  useEffect(() => {
+    const consulta = query(
+      collection(db, 'estacoesMeteorologicas'),
+      where('publicada', '==', true),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(
+      consulta,
+      (snapshot) => {
+        const lista: EstacaoMeteo[] = [];
+
+        snapshot.forEach((documento) => {
+          const dados = documento.data();
+
+          const latitude = dados.latitude;
+          const longitude = dados.longitude;
+
+          if (
+            typeof latitude !== 'number' ||
+            typeof longitude !== 'number' ||
+            !Number.isFinite(latitude) ||
+            !Number.isFinite(longitude) ||
+            Math.abs(latitude) > 90 ||
+            Math.abs(longitude) > 180
+          ) {
+            return;
+          }
+
+          const leitura = dados.ultimaLeitura;
+
+          const recebidoEm =
+            typeof leitura?.recebidoEm?.toMillis === 'function'
+              ? leitura.recebidoEm.toMillis()
+              : leitura?.recebidoEm;
+
+          const leituraValida =
+            typeof leitura?.temperatura === 'number' &&
+            Number.isFinite(leitura.temperatura) &&
+            leitura.temperatura >= -50 &&
+            leitura.temperatura <= 70 &&
+            typeof leitura?.umidade === 'number' &&
+            Number.isFinite(leitura.umidade) &&
+            leitura.umidade >= 0 &&
+            leitura.umidade <= 100 &&
+            typeof recebidoEm === 'number' &&
+            Number.isFinite(recebidoEm) &&
+            recebidoEm > 0 &&
+            recebidoEm <= Date.now() + 5 * 60 * 1000;
+
+          lista.push({
+            id: documento.id,
+            nome: typeof dados.nome === 'string'
+              ? dados.nome
+              : 'Estação CUIDAÍ',
+            municipio: typeof dados.municipio === 'string'
+              ? dados.municipio
+              : 'Não informado',
+            latitude,
+            longitude,
+            experimental: dados.experimental === true,
+            ultimaLeitura: leituraValida
+              ? {
+                temperatura: leitura.temperatura,
+                umidade: leitura.umidade,
+                recebidoEm
+              }
+              : null
+          });
+        });
+
+        setEstacoesMeteo(lista);
+        setCarregandoMeteo(false);
+        setErroMeteo(null);
+      },
+      (erro) => {
+        console.error('Erro nas estações:', erro);
+        setErroMeteo('Não foi possível consultar as estações.');
+        setCarregandoMeteo(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // Atualiza a verificação de leituras recentes a cada minuto
+  useEffect(() => {
+    const intervalo = window.setInterval(() => {
+      setAgoraMeteo(Date.now());
+    }, 60000);
+
+    return () => window.clearInterval(intervalo);
   }, []);
 
   const exportarDados = () => {
@@ -581,6 +714,65 @@ function App() {
       iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -12]
     });
   };
+
+  const estacaoSelecionadaMeteo =
+    estacoesMeteo.find(e => e.id === idEstacaoMeteo) ??
+    estacoesMeteo[0] ??
+    null;
+
+  const leituraSelecionadaMeteo =
+    estacaoSelecionadaMeteo?.ultimaLeitura ?? null;
+
+  const leituraRecenteMeteo =
+    leituraSelecionadaMeteo !== null &&
+    leituraSelecionadaMeteo.recebidoEm <= agoraMeteo &&
+    agoraMeteo - leituraSelecionadaMeteo.recebidoEm <= 30 * 60 * 1000;
+
+  const indicadoresMeteo = [
+    {
+      titulo: 'Temperatura',
+      valor: leituraSelecionadaMeteo
+        ? `${leituraSelecionadaMeteo.temperatura.toFixed(1)} °C`
+        : '—',
+      legenda: leituraRecenteMeteo
+        ? 'Medição recente'
+        : 'Sem medição recente'
+    },
+    {
+      titulo: 'Umidade',
+      valor: leituraSelecionadaMeteo
+        ? `${leituraSelecionadaMeteo.umidade.toFixed(0)}%`
+        : '—',
+      legenda: leituraRecenteMeteo
+        ? 'Medição recente'
+        : 'Sem medição recente'
+    },
+    {
+      titulo: 'Estações CUIDAÍ',
+      valor: carregandoMeteo || erroMeteo
+        ? '—'
+        : String(estacoesMeteo.length),
+      legenda: carregandoMeteo
+        ? 'Consultando Firebase'
+        : erroMeteo
+          ? 'Erro na consulta'
+          : 'Estações publicadas'
+    },
+    {
+      titulo: 'Última atualização',
+      valor: leituraSelecionadaMeteo
+        ? new Date(leituraSelecionadaMeteo.recebidoEm)
+          .toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : '—',
+      legenda: leituraSelecionadaMeteo
+        ? new Date(leituraSelecionadaMeteo.recebidoEm)
+          .toLocaleDateString('pt-BR')
+        : 'Sem leitura disponível'
+    }
+  ];
 
   const cardStyle = {
     backgroundColor: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' as const,
@@ -853,6 +1045,38 @@ function App() {
             Mapa de Calor
           </li>
 
+          {/* METEOROLOGIA */}
+          <li
+            onClick={() => {
+              setAbaAtiva('meteorologia');
+              setMenuAberto(false);
+            }}
+            style={{
+              padding: '12px 16px',
+              backgroundColor:
+                abaAtiva === 'meteorologia' ? '#007AFF' : 'transparent',
+              color:
+                abaAtiva === 'meteorologia'
+                  ? '#FFFFFF'
+                  : 'rgba(255,255,255,0.78)',
+              borderRadius: '12px',
+              marginBottom: '8px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              transition: '0.2s',
+              boxShadow:
+                abaAtiva === 'meteorologia'
+                  ? '0 4px 12px rgba(0,122,255,0.30)'
+                  : 'none'
+            }}
+          >
+            <MdCloud size={20} />
+            Meteorologia
+          </li>
+
           {/* SOBRE O PROJETO */}
           <li
             onClick={() => {
@@ -949,7 +1173,7 @@ function App() {
                 gap: '8px',
                 flexWrap: 'wrap'
               }}>
-                {['Todas', 'Chuvas', 'Passagem', 'Energia', 'Estrada'].map(categoria => (
+                {['Todas', 'Chuvas', 'Passagem', 'Energia', 'Estrada', 'Quentura'].map(categoria => (
                   <button
                     key={categoria}
                     onClick={() => setFiltroCategoria(categoria)}
@@ -1422,6 +1646,236 @@ function App() {
           </>
         )}
 
+        {/* =================== METEOROLOGIA =================== */}
+        {abaAtiva === 'meteorologia' && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px'
+            }}
+          >
+            {/* CABEÇALHO */}
+            <div>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  color: '#168FC4',
+                  letterSpacing: '1px'
+                }}
+              >
+                CUIDAÍ | OBSERVATÓRIO METEOROLÓGICO
+              </span>
+
+              <h1
+                style={{
+                  margin: '8px 0 5px',
+                  color: '#1C1C1E',
+                  fontSize: isMobile ? '26px' : '30px',
+                  fontWeight: '800'
+                }}
+              >
+                Meteorologia
+              </h1>
+
+              <p
+                style={{
+                  color: '#8E8E93',
+                  fontSize: '14px',
+                  margin: 0
+                }}
+              >
+                Monitoramento ambiental, estações meteorológicas
+                e análise climática do território.
+              </p>
+            </div>
+
+            {erroMeteo && (
+              <p style={{ color: '#B42318', fontSize: '13px' }}>
+                {erroMeteo}
+              </p>
+            )}
+
+            {!carregandoMeteo && !erroMeteo && estacoesMeteo.length === 0 && (
+              <p style={{ color: '#8E8E93', fontSize: '13px' }}>
+                Nenhuma estação meteorológica publicada foi encontrada.
+              </p>
+            )}
+
+            {estacaoSelecionadaMeteo && (
+              <div style={{
+                padding: '12px 16px',
+                backgroundColor: '#EAF5FF',
+                borderRadius: '12px',
+                color: '#214563',
+                fontSize: '13px'
+              }}>
+                <strong>Estação selecionada:</strong>{' '}
+                {estacaoSelecionadaMeteo.nome}
+                {' • '}
+                {estacaoSelecionadaMeteo.municipio}
+                {' • '}
+                {leituraRecenteMeteo
+                  ? 'Leitura recente'
+                  : 'Sem leitura recente'}
+              </div>
+            )}
+
+            {/* INDICADORES */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile
+                  ? 'repeat(2, 1fr)'
+                  : 'repeat(4, 1fr)',
+                gap: '16px'
+              }}
+            >
+              {indicadoresMeteo.map((indicador) => (
+                <div key={indicador.titulo} style={cardStyle}>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#8E8E93'
+                    }}
+                  >
+                    {indicador.titulo}
+                  </span>
+
+                  <strong
+                    style={{
+                      fontSize: '25px',
+                      color: '#1C1C1E',
+                      marginTop: '12px'
+                    }}
+                  >
+                    {indicador.valor}
+                  </strong>
+
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: '#8E8E93',
+                      marginTop: '6px'
+                    }}
+                  >
+                    {indicador.legenda}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* MAPA METEOROLÓGICO */}
+            <div style={{ ...cardStyle, gap: '16px' }}>
+              <div>
+                <h2
+                  style={{
+                    fontSize: '19px',
+                    color: '#1C1C1E',
+                    margin: '0 0 6px',
+                    fontWeight: '800'
+                  }}
+                >
+                  Mapa meteorológico
+                </h2>
+
+                <p
+                  style={{
+                    fontSize: '12px',
+                    color: '#8E8E93',
+                    margin: 0
+                  }}
+                >
+                  Visualização territorial das condições meteorológicas.
+                </p>
+              </div>
+
+              <div
+                style={{
+                  height: isMobile ? '400px' : '500px',
+                  borderRadius: '16px',
+                  overflow: 'hidden'
+                }}
+              >
+                <MapContainer
+                  center={[-5.3, -39.3]}
+                  zoom={7}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap contributors"
+                  />
+
+                  {estacoesMeteo.map((estacao) => (
+                    <Marker
+                      key={estacao.id}
+                      position={[estacao.latitude, estacao.longitude]}
+                      icon={criarIconeVazado(
+                        estacao.id === estacaoSelecionadaMeteo?.id
+                          ? '#168FC4'
+                          : '#64748B'
+                      )}
+                      eventHandlers={{
+                        click: () => setIdEstacaoMeteo(estacao.id)
+                      }}
+                    >
+                      <Popup>
+                        <div style={{ minWidth: '180px' }}>
+                          <strong>{estacao.nome}</strong>
+
+                          <p style={{ margin: '6px 0' }}>
+                            {estacao.municipio}
+                          </p>
+
+                          {estacao.ultimaLeitura ? (
+                            <>
+                              <div>
+                                Temperatura: <strong>
+                                  {estacao.ultimaLeitura.temperatura.toFixed(1)} °C
+                                </strong>
+                              </div>
+
+                              <div>
+                                Umidade: <strong>
+                                  {estacao.ultimaLeitura.umidade.toFixed(0)}%
+                                </strong>
+                              </div>
+
+                              <small>
+                                Última leitura:{' '}
+                                {new Date(
+                                  estacao.ultimaLeitura.recebidoEm
+                                ).toLocaleString('pt-BR')}
+                              </small>
+                            </>
+                          ) : (
+                            <p>Sem medição disponível.</p>
+                          )}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+
+                </MapContainer>
+              </div>
+
+              <span
+                style={{
+                  fontSize: '12px',
+                  color: '#8E8E93'
+                }}
+              >
+                Estações CUIDAÍ identificadas no mapa por seus pontos de
+                instalação. A camada regional de temperaturas da Open-Meteo
+                será integrada na próxima etapa.
+              </span>
+            </div>
+          </div>
+        )}
+
         {abaAtiva === 'mapa_calor' && (
           /* =================== MAPA DE CALOR COM FILTROS =================== */
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -1737,6 +2191,7 @@ function App() {
                   className="mapa-cuidai"
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
+
 
                 <CamadaCalor
                   alertas={alertasParaOMapa}

@@ -4,6 +4,7 @@ import {
   collection,
   limit,
   onSnapshot,
+  orderBy,
   query,
   where
 } from 'firebase/firestore';
@@ -60,6 +61,13 @@ interface EstacaoMeteo {
     umidade: number;
     recebidoEm: number;
   } | null;
+}
+interface LeituraHistoricaMeteo {
+  id: string;
+  temperatura: number;
+  umidade: number;
+  recebidoEm: number;
+  momento: string;
 }
 
 const CORES = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE'];
@@ -334,6 +342,19 @@ function App() {
   const [erroMeteo, setErroMeteo] = useState<string | null>(null);
   const [idEstacaoMeteo, setIdEstacaoMeteo] = useState<string | null>(null);
   const [agoraMeteo, setAgoraMeteo] = useState(Date.now());
+  const [historicoMeteo, setHistoricoMeteo] =
+    useState<LeituraHistoricaMeteo[]>([]);
+
+  const [carregandoHistoricoMeteo, setCarregandoHistoricoMeteo] =
+    useState(true);
+
+  const [erroHistoricoMeteo, setErroHistoricoMeteo] =
+    useState<string | null>(null);
+
+  const idEstacaoHistoricoMeteo =
+    estacoesMeteo.find(e => e.id === idEstacaoMeteo)?.id ??
+    estacoesMeteo[0]?.id ??
+    null;
   const [minhaLocalizacao, setMinhaLocalizacao] = useState<[number, number] | null>(null);
   const [carregamentoInicial, setCarregamentoInicial] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState<'visao_geral' | 'mapa_calor' | 'meteorologia' | 'sobre'>('visao_geral');
@@ -539,6 +560,94 @@ function App() {
 
     return () => window.clearInterval(intervalo);
   }, []);
+
+  // HISTÓRICO DA ESTAÇÃO METEOROLÓGICA SELECIONADA
+  useEffect(() => {
+    setHistoricoMeteo([]);
+    setErroHistoricoMeteo(null);
+
+    if (!idEstacaoHistoricoMeteo) {
+      setCarregandoHistoricoMeteo(false);
+      return;
+    }
+
+    setCarregandoHistoricoMeteo(true);
+
+    const consulta = query(
+      collection(
+        db,
+        'estacoesMeteorologicas',
+        idEstacaoHistoricoMeteo,
+        'leituras'
+      ),
+      orderBy('recebidoEm', 'desc'),
+      limit(72)
+    );
+
+    const unsubscribe = onSnapshot(
+      consulta,
+      (snapshot) => {
+        const lista: LeituraHistoricaMeteo[] = [];
+
+        snapshot.forEach((documento) => {
+          const dados = documento.data();
+
+          const recebidoEm =
+            typeof dados.recebidoEm?.toMillis === 'function'
+              ? dados.recebidoEm.toMillis()
+              : dados.recebidoEm;
+
+          if (
+            typeof dados.temperatura !== 'number' ||
+            !Number.isFinite(dados.temperatura) ||
+            dados.temperatura < -50 ||
+            dados.temperatura > 70 ||
+            typeof dados.umidade !== 'number' ||
+            !Number.isFinite(dados.umidade) ||
+            dados.umidade < 0 ||
+            dados.umidade > 100 ||
+            typeof recebidoEm !== 'number' ||
+            !Number.isFinite(recebidoEm) ||
+            recebidoEm <= 0 ||
+            recebidoEm > Date.now() + 300000
+          ) {
+            return;
+          }
+
+          lista.push({
+            id: documento.id,
+            temperatura: dados.temperatura,
+            umidade: dados.umidade,
+            recebidoEm,
+            momento: new Date(recebidoEm).toLocaleString(
+              'pt-BR',
+              {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              }
+            )
+          });
+        });
+
+        lista.sort((a, b) => a.recebidoEm - b.recebidoEm);
+
+        setHistoricoMeteo(lista);
+        setErroHistoricoMeteo(null);
+        setCarregandoHistoricoMeteo(false);
+      },
+      (erro) => {
+        console.error('Erro no histórico meteorológico:', erro);
+        setErroHistoricoMeteo(
+          'Não foi possível consultar o histórico desta estação.'
+        );
+        setCarregandoHistoricoMeteo(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [idEstacaoHistoricoMeteo]);
 
   const exportarDados = () => {
     if (alertas.length === 0) return;
@@ -1872,6 +1981,170 @@ function App() {
                 instalação. A camada regional de temperaturas da Open-Meteo
                 será integrada na próxima etapa.
               </span>
+            </div>
+
+            {/* HISTÓRICO METEOROLÓGICO */}
+            <div style={{ ...cardStyle, gap: '20px' }}>
+              <div>
+                <h2
+                  style={{
+                    margin: '0 0 6px',
+                    fontSize: '19px',
+                    color: '#1C1C1E',
+                    fontWeight: '800'
+                  }}
+                >
+                  Histórico meteorológico
+                </h2>
+
+                <p
+                  style={{
+                    margin: 0,
+                    color: '#8E8E93',
+                    fontSize: '12px'
+                  }}
+                >
+                  Evolução das últimas 72 leituras armazenadas
+                  da estação selecionada.
+                </p>
+              </div>
+
+              {erroHistoricoMeteo ? (
+                <p style={{ color: '#B42318', fontSize: '13px' }}>
+                  {erroHistoricoMeteo}
+                </p>
+              ) : carregandoHistoricoMeteo ? (
+                <p style={{ color: '#8E8E93', fontSize: '13px' }}>
+                  Carregando histórico meteorológico...
+                </p>
+              ) : historicoMeteo.length === 0 ? (
+                <p style={{ color: '#8E8E93', fontSize: '13px' }}>
+                  Ainda não há leituras históricas disponíveis
+                  para esta estação.
+                </p>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: isMobile
+                        ? '1fr'
+                        : 'repeat(2, minmax(0, 1fr))',
+                      gap: '24px'
+                    }}
+                  >
+                    {[
+                      {
+                        titulo: 'Temperatura',
+                        chave: 'temperatura',
+                        cor: '#E58047',
+                        unidade: '°C'
+                      },
+                      {
+                        titulo: 'Umidade relativa',
+                        chave: 'umidade',
+                        cor: '#168FC4',
+                        unidade: '%'
+                      }
+                    ].map((grafico) => (
+                      <div
+                        key={grafico.chave}
+                        style={{ minWidth: 0 }}
+                      >
+                        <h3
+                          style={{
+                            fontSize: '15px',
+                            color: '#1C1C1E',
+                            margin: '0 0 15px'
+                          }}
+                        >
+                          {grafico.titulo}
+                        </h3>
+
+                        <div style={{ height: '260px', width: '100%' }}>
+                          <ResponsiveContainer
+                            width="100%"
+                            height="100%"
+                          >
+                            <AreaChart
+                              data={historicoMeteo}
+                              margin={{
+                                top: 10,
+                                right: 15,
+                                left: -15,
+                                bottom: 5
+                              }}
+                            >
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="#E5E5EA"
+                                vertical={false}
+                              />
+
+                              <XAxis
+                                dataKey="momento"
+                                tick={{ fontSize: 10 }}
+                                minTickGap={30}
+                                interval="preserveStartEnd"
+                              />
+
+                              <YAxis
+                                tick={{ fontSize: 11 }}
+                                width={48}
+                                domain={['auto', 'auto']}
+                                unit={grafico.unidade}
+                              />
+
+                              <Tooltip
+                                formatter={(valor: any) => [
+                                  `${Number(valor).toFixed(1)} ${grafico.unidade}`,
+                                  grafico.titulo
+                                ]}
+                              />
+
+                              <Area
+                                type="linear"
+                                dataKey={grafico.chave}
+                                stroke={grafico.cor}
+                                strokeWidth={2.5}
+                                fill={grafico.cor}
+                                fillOpacity={0.12}
+                                dot={
+                                  historicoMeteo.length <= 15
+                                    ? { r: 3 }
+                                    : false
+                                }
+                                activeDot={{ r: 5 }}
+                                isAnimationActive={false}
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p
+                    style={{
+                      color: '#8E8E93',
+                      fontSize: '12px',
+                      margin: 0
+                    }}
+                  >
+                    {historicoMeteo.length} medições exibidas.
+                    Período: {' '}
+                    {new Date(
+                      historicoMeteo[0].recebidoEm
+                    ).toLocaleString('pt-BR')}
+                    {' até '}
+                    {new Date(
+                      historicoMeteo[
+                        historicoMeteo.length - 1
+                      ].recebidoEm
+                    ).toLocaleString('pt-BR')}.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         )}

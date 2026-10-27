@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -129,6 +129,242 @@ interface DadosOpenMeteo {
   vento: number;
   horario: string;
 }
+
+
+type PontoGradeTermica = {
+  latitude: number;
+  longitude: number;
+  temperatura: number;
+};
+
+// Área preliminar de estudo: Ceará e entorno.
+// Ainda não representa o limite administrativo do estado.
+const LIMITES_GRADE_TERMICA = {
+  sul: -8.1,
+  norte: -2.5,
+  oeste: -41.7,
+  leste: -37.0
+};
+
+// Escala fixa de temperatura em graus Celsius.
+const corTemperatura = (valor: number): number[] => {
+  const faixas = [
+    { t: 20, cor: [80, 142, 203] },
+    { t: 24, cor: [122, 201, 215] },
+    { t: 28, cor: [245, 212, 119] },
+    { t: 32, cor: [246, 160, 87] },
+    { t: 36, cor: [223, 98, 72] },
+    { t: 40, cor: [150, 46, 78] }
+  ];
+
+  if (valor <= 20) return faixas[0].cor;
+
+  for (let i = 1; i < faixas.length; i++) {
+    if (valor <= faixas[i].t) {
+      const anterior = faixas[i - 1];
+      const atual = faixas[i];
+
+      const proporcao =
+        (valor - anterior.t) / (atual.t - anterior.t);
+
+      return anterior.cor.map((canal, indice) =>
+        Math.round(
+          canal +
+          (atual.cor[indice] - canal) * proporcao
+        )
+      );
+    }
+  }
+
+  return faixas[faixas.length - 1].cor;
+};
+
+function CamadaTemperaturaRegional({
+  pontos,
+  poligonosCeara
+}: {
+  pontos: PontoGradeTermica[];
+  poligonosCeara: PoligonosCeara;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (pontos.length < 30 || poligonosCeara.length === 0) return;
+
+    const largura = 300;
+    const altura = 340;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = largura;
+    canvas.height = altura;
+
+    const contexto = canvas.getContext('2d');
+    if (!contexto) return;
+
+    const imagem = contexto.createImageData(largura, altura);
+    const limites = LIMITES_GRADE_TERMICA;
+
+    for (let y = 0; y < altura; y++) {
+      const latitude =
+        limites.norte -
+        (y / (altura - 1)) * (limites.norte - limites.sul);
+
+      for (let x = 0; x < largura; x++) {
+        const longitude =
+          limites.oeste +
+          (x / (largura - 1)) * (limites.leste - limites.oeste);
+
+
+        /*
+         * Interpolação bilinear.
+         * Cada região utiliza somente os quatro
+         * pontos vizinhos da grade Open-Meteo.
+         *
+         * Grade: 5 linhas x 6 colunas.
+         */
+
+        const posicaoLinha = (y / (altura - 1)) * 4;
+        const posicaoColuna = (x / (largura - 1)) * 5;
+
+        const linha = Math.min(3, Math.floor(posicaoLinha));
+        const coluna = Math.min(4, Math.floor(posicaoColuna));
+
+        const fracaoY = posicaoLinha - linha;
+        const fracaoX = posicaoColuna - coluna;
+
+        // Temperaturas dos quatro pontos vizinhos
+        const t00 = pontos[linha * 6 + coluna].temperatura;
+        const t01 = pontos[linha * 6 + coluna + 1].temperatura;
+        const t10 = pontos[(linha + 1) * 6 + coluna].temperatura;
+        const t11 = pontos[(linha + 1) * 6 + coluna + 1].temperatura;
+
+        // Interpolação horizontal
+        const temperaturaSuperior =
+          t00 * (1 - fracaoX) + t01 * fracaoX;
+
+        const temperaturaInferior =
+          t10 * (1 - fracaoX) + t11 * fracaoX;
+
+        // Interpolação vertical
+        const temperatura =
+          temperaturaSuperior * (1 - fracaoY) +
+          temperaturaInferior * fracaoY;
+
+        const cor = corTemperatura(temperatura);
+
+        const indice = (y * largura + x) * 4;
+
+        // Suaviza visualmente as bordas da área estudada.
+        const distanciaBorda = Math.min(
+          x,
+          y,
+          largura - 1 - x,
+          altura - 1 - y
+        );
+
+        const transparencia = Math.min(
+          1,
+          distanciaBorda / 16
+        );
+
+        imagem.data[indice] = cor[0];
+        imagem.data[indice + 1] = cor[1];
+        imagem.data[indice + 2] = cor[2];
+        imagem.data[indice + 3] =
+          Math.round(115 * transparencia);
+      }
+    }
+
+    contexto.putImageData(imagem, 0, 0);
+
+    // RECORTE DA CAMADA PELO CONTORNO DO CEARÁ
+    contexto.save();
+    contexto.globalCompositeOperation = 'destination-in';
+    contexto.fillStyle = '#000000';
+    contexto.beginPath();
+
+    for (const poligono of poligonosCeara) {
+      for (const anel of poligono) {
+        anel.forEach((coordenada, indice) => {
+          const longitude = coordenada[0];
+          const latitude = coordenada[1];
+
+          const x =
+            ((longitude - limites.oeste) /
+              (limites.leste - limites.oeste)) *
+            (largura - 1);
+
+          const y =
+            ((limites.norte - latitude) /
+              (limites.norte - limites.sul)) *
+            (altura - 1);
+
+          if (indice === 0) {
+            contexto.moveTo(x, y);
+          } else {
+            contexto.lineTo(x, y);
+          }
+        });
+
+        contexto.closePath();
+      }
+    }
+
+    // Preserva o preenchimento dos polígonos e seus vazios.
+    contexto.fill('evenodd');
+    contexto.restore();
+
+    const camada = L.imageOverlay(
+      canvas.toDataURL('image/png'),
+      [
+        [limites.sul, limites.oeste],
+        [limites.norte, limites.leste]
+      ],
+      {
+        opacity: 0.8,
+        interactive: false
+      }
+    );
+
+    camada.addTo(map);
+
+    // Ajusta a transparência conforme a aproximação.
+    const ajustarOpacidade = () => {
+      const zoom = map.getZoom();
+
+      if (zoom >= 10) {
+        // Visão local: preservar ruas e detalhes
+        camada.setOpacity(0.48);
+      } else if (zoom >= 8) {
+        // Visão intermediária
+        camada.setOpacity(0.62);
+      } else {
+        // Visão regional
+        camada.setOpacity(0.80);
+      }
+    };
+
+    ajustarOpacidade();
+
+    map.on('zoomend', ajustarOpacidade);
+
+    return () => {
+      map.off('zoomend', ajustarOpacidade);
+      map.removeLayer(camada);
+    };
+
+    camada.addTo(map);
+
+    return () => {
+      map.removeLayer(camada);
+    };
+  }, [map, pontos, poligonosCeara]);
+
+  return null;
+}
+
+// Cada polígono contém anéis de coordenadas [longitude, latitude].
+type PoligonosCeara = number[][][][];
 
 // PERMITE SELECIONAR UM PONTO NO MAPA
 function SelecionarPontoOpenMeteo({
@@ -391,6 +627,32 @@ function App() {
 
   const [erroOpenMeteo, setErroOpenMeteo] =
     useState<string | null>(null);
+
+  const [pontosGradeTermica, setPontosGradeTermica] =
+    useState<PontoGradeTermica[]>([]);
+
+  const [carregandoGradeTermica, setCarregandoGradeTermica] =
+    useState(false);
+
+  const [erroGradeTermica, setErroGradeTermica] =
+    useState<string | null>(null);
+
+  const [mostrarGradeTermica, setMostrarGradeTermica] =
+    useState(true);
+
+  const [poligonosCeara, setPoligonosCeara] =
+    useState<PoligonosCeara>([]);
+
+  const [erroContornoCeara, setErroContornoCeara] =
+    useState<string | null>(null);
+
+  // Evita repetir a consulta ao mudar de página.
+  // O cache vale por 30 minutos enquanto o painel estiver aberto.
+  const cacheGradeTermica = useRef<{
+    pontos: PontoGradeTermica[];
+    atualizadoEm: number;
+  } | null>(null);
+
   const [historicoMeteo, setHistoricoMeteo] =
     useState<LeituraHistoricaMeteo[]>([]);
 
@@ -477,10 +739,44 @@ function App() {
     };
   }, []);
 
+  // LOCALIZAÇÃO INICIAL DO DISPOSITIVO
   useEffect(() => {
+    const localizacaoPadrao: [number, number] = [-5.3, -39.3];
+
+    if (!navigator.geolocation) {
+      setMinhaLocalizacao(localizacaoPadrao);
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
-      (posicao) => setMinhaLocalizacao([posicao.coords.latitude, posicao.coords.longitude]),
-      () => setMinhaLocalizacao([-7.2307, -39.4121])
+      (posicao) => {
+        const latitude = Number(
+          posicao.coords.latitude.toFixed(4)
+        );
+
+        const longitude = Number(
+          posicao.coords.longitude.toFixed(4)
+        );
+
+        // Localização inicial dos mapas
+        setMinhaLocalizacao([latitude, longitude]);
+
+        // A consulta Open-Meteo começa na mesma região
+        setPontoOpenMeteo({
+          latitude,
+          longitude
+        });
+      },
+      () => {
+        // Se o usuário não autorizar a localização,
+        // o painel utiliza uma referência regional.
+        setMinhaLocalizacao(localizacaoPadrao);
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 12000,
+        maximumAge: 60000
+      }
     );
   }, []);
 
@@ -781,6 +1077,183 @@ function App() {
     pontoOpenMeteo.latitude,
     pontoOpenMeteo.longitude
   ]);
+
+  // CARREGA O CONTORNO DO CEARÁ SALVO NO PROJETO
+  useEffect(() => {
+    const controlador = new AbortController();
+
+    const carregarContorno = async () => {
+      try {
+        const resposta = await fetch('/ceara.geojson', {
+          signal: controlador.signal
+        });
+
+        if (!resposta.ok) {
+          throw new Error('Arquivo geográfico não encontrado');
+        }
+
+        const geojson = await resposta.json();
+
+        const geometria =
+          geojson.type === 'FeatureCollection'
+            ? geojson.features?.[0]?.geometry
+            : geojson.type === 'Feature'
+              ? geojson.geometry
+              : geojson;
+
+        let poligonos: PoligonosCeara;
+
+        if (geometria?.type === 'MultiPolygon') {
+          poligonos = geometria.coordinates;
+        } else if (geometria?.type === 'Polygon') {
+          poligonos = [geometria.coordinates];
+        } else {
+          throw new Error('Formato geográfico não reconhecido');
+        }
+
+        if (!Array.isArray(poligonos) || poligonos.length === 0) {
+          throw new Error('Contorno estadual vazio');
+        }
+
+        if (!controlador.signal.aborted) {
+          setPoligonosCeara(poligonos);
+          setErroContornoCeara(null);
+        }
+      } catch (erro) {
+        if (!controlador.signal.aborted) {
+          console.error('Erro no contorno do Ceará:', erro);
+          setErroContornoCeara(
+            'Não foi possível carregar o contorno do Ceará.'
+          );
+        }
+      }
+    };
+
+    carregarContorno();
+
+    return () => controlador.abort();
+  }, []);
+
+  // GRADE REGIONAL DE TEMPERATURA — OPEN-METEO
+  useEffect(() => {
+    if (abaAtiva !== 'meteorologia') return;
+
+    const cache = cacheGradeTermica.current;
+
+    if (
+      cache &&
+      Date.now() - cache.atualizadoEm < 30 * 60 * 1000
+    ) {
+      setPontosGradeTermica(cache.pontos);
+      setCarregandoGradeTermica(false);
+      return;
+    }
+
+    const controlador = new AbortController();
+
+    const consultarGrade = async () => {
+      setCarregandoGradeTermica(true);
+      setErroGradeTermica(null);
+
+      const limites = LIMITES_GRADE_TERMICA;
+      const coordenadas: {
+        latitude: number;
+        longitude: number;
+      }[] = [];
+
+      // Grade de 5 linhas por 6 colunas: 30 pontos.
+      for (let linha = 0; linha < 5; linha++) {
+        for (let coluna = 0; coluna < 6; coluna++) {
+          coordenadas.push({
+            latitude:
+              limites.norte -
+              (linha / 4) * (limites.norte - limites.sul),
+            longitude:
+              limites.oeste +
+              (coluna / 5) * (limites.leste - limites.oeste)
+          });
+        }
+      }
+
+      try {
+        const parametros = new URLSearchParams({
+          latitude: coordenadas
+            .map(ponto => ponto.latitude.toFixed(4))
+            .join(','),
+          longitude: coordenadas
+            .map(ponto => ponto.longitude.toFixed(4))
+            .join(','),
+          current: 'temperature_2m',
+          timezone: 'America/Fortaleza'
+        });
+
+        const resposta = await fetch(
+          `https://api.open-meteo.com/v1/forecast?${parametros.toString()}`,
+          { signal: controlador.signal }
+        );
+
+        if (!resposta.ok) {
+          throw new Error(`HTTP ${resposta.status}`);
+        }
+
+        const resultados = await resposta.json();
+
+        if (
+          !Array.isArray(resultados) ||
+          resultados.length !== coordenadas.length
+        ) {
+          throw new Error('Grade meteorológica incompleta');
+        }
+
+        const pontos: PontoGradeTermica[] =
+          resultados.map((resultado, indice) => {
+            const temperatura =
+              resultado?.current?.temperature_2m;
+
+            if (
+              typeof temperatura !== 'number' ||
+              !Number.isFinite(temperatura) ||
+              temperatura < -50 ||
+              temperatura > 60
+            ) {
+              throw new Error('Temperatura inválida na grade');
+            }
+
+            return {
+              ...coordenadas[indice],
+              temperatura
+            };
+          });
+
+        if (!controlador.signal.aborted) {
+          setPontosGradeTermica(pontos);
+
+          cacheGradeTermica.current = {
+            pontos,
+            atualizadoEm: Date.now()
+          };
+        }
+      } catch (erro) {
+        if (!controlador.signal.aborted) {
+          console.error('Erro na grade Open-Meteo:', erro);
+
+          setErroGradeTermica(
+            'Não foi possível carregar a camada de temperaturas.'
+          );
+          setPontosGradeTermica([]);
+        }
+      } finally {
+        if (!controlador.signal.aborted) {
+          setCarregandoGradeTermica(false);
+        }
+      }
+    };
+
+    consultarGrade();
+
+    return () => controlador.abort();
+  }, [abaAtiva]);
+
 
   const exportarDados = () => {
     if (alertas.length === 0) return;
@@ -2190,6 +2663,180 @@ function App() {
                 </p>
               </div>
 
+
+              {/* CONTROLES DA CAMADA TÉRMICA */}
+              <div
+                style={{
+                  backgroundColor: '#F8FAFD',
+                  border: '1px solid #E5ECF4',
+                  borderRadius: '16px',
+                  padding: '16px'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}
+                >
+                  <div>
+                    <strong
+                      style={{
+                        display: 'block',
+                        fontSize: '14px',
+                        color: '#214563'
+                      }}
+                    >
+                      Distribuição regional da temperatura
+                    </strong>
+
+                    <span
+                      style={{
+                        color: '#8E8E93',
+                        fontSize: '11px'
+                      }}
+                    >
+                      Camada interpolada com estimativas da Open-Meteo
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMostrarGradeTermica(atual => !atual)
+                    }
+                    style={{
+                      border: '1px solid #DCE6F0',
+                      borderRadius: '12px',
+                      padding: '9px 14px',
+                      backgroundColor: mostrarGradeTermica
+                        ? '#168FC4'
+                        : '#FFFFFF',
+                      color: mostrarGradeTermica
+                        ? '#FFFFFF'
+                        : '#214563',
+                      fontWeight: '700',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {mostrarGradeTermica
+                      ? 'Ocultar camada'
+                      : 'Mostrar camada'}
+                  </button>
+                </div>
+
+                {carregandoGradeTermica && (
+                  <p style={{ color: '#64748B', fontSize: '12px' }}>
+                    Carregando mapa de temperaturas...
+                  </p>
+                )}
+
+                {erroGradeTermica && (
+                  <p style={{ color: '#B42318', fontSize: '12px' }}>
+                    {erroGradeTermica}
+                  </p>
+                )}
+
+                {erroContornoCeara && (
+                  <p style={{ color: '#B42318', fontSize: '12px' }}>
+                    {erroContornoCeara}
+                  </p>
+                )}
+
+                <div style={{ marginTop: '16px' }}>
+                  <div
+                    style={{
+                      height: '12px',
+                      borderRadius: '8px',
+                      background:
+                        'linear-gradient(to right, #508ECB, #7AC9D7, #F5D477, #F6A057, #DF6248, #962E4E)'
+                    }}
+                  />
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '5px',
+                      marginTop: '7px',
+                      color: '#64748B',
+                      fontSize: '10px',
+                      fontWeight: '700'
+                    }}
+                  >
+                    <span>≤20 °C</span>
+                    <span>24 °C</span>
+                    <span>28 °C</span>
+                    <span>32 °C</span>
+                    <span>36 °C</span>
+                    <span>≥40 °C</span>
+                  </div>
+                </div>
+
+
+                {/* VARIAÇÃO OBSERVADA NA GRADE OPEN-METEO */}
+                {pontosGradeTermica.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: '14px',
+                      padding: '10px 14px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #E5ECF4',
+                      borderRadius: '12px',
+                      color: '#214563',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <strong>Temperaturas estimadas na grade:</strong>{' '}
+                    {Math.min(
+                      ...pontosGradeTermica.map(p => p.temperatura)
+                    ).toFixed(1)} °C
+                    {' até '}
+                    {Math.max(
+                      ...pontosGradeTermica.map(p => p.temperatura)
+                    ).toFixed(1)} °C
+
+                    <span
+                      style={{
+                        display: 'block',
+                        color: '#8E8E93',
+                        marginTop: '4px'
+                      }}
+                    >
+                      30 pontos consultados no Ceará e entorno.
+                    </span>
+                  </div>
+                )}
+
+
+                <p
+                  style={{
+                    color: '#8E8E93',
+                    fontSize: '11px',
+                    lineHeight: '1.5',
+                    margin: '12px 0 0'
+                  }}
+                >
+                  Visualização experimental em grade regional.
+                  As cores são estimativas interpoladas, não medições
+                  locais. A área será refinada para o limite do Ceará.
+                  {' '}Fonte:{' '}
+                  <a
+                    href="https://open-meteo.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#168FC4' }}
+                  >
+                    Open-Meteo
+                  </a>.
+                </p>
+              </div>
+
+
               <div
                 style={{
                   height: isMobile ? '400px' : '500px',
@@ -2198,14 +2845,24 @@ function App() {
                 }}
               >
                 <MapContainer
-                  center={[-5.3, -39.3]}
-                  zoom={7}
+                  center={minhaLocalizacao}
+                  zoom={15}
                   style={{ height: '100%', width: '100%' }}
                 >
                   <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution="&copy; OpenStreetMap contributors"
                   />
+
+                  {/* CAMADA COLORIDA RECORTADA PELO CEARÁ */}
+                  {mostrarGradeTermica &&
+                    pontosGradeTermica.length > 0 &&
+                    poligonosCeara.length > 0 && (
+                      <CamadaTemperaturaRegional
+                        pontos={pontosGradeTermica}
+                        poligonosCeara={poligonosCeara}
+                      />
+                    )}
 
                   {/* SELEÇÃO DE LOCAL PARA CONSULTA OPEN-METEO */}
                   <SelecionarPontoOpenMeteo
@@ -2300,9 +2957,9 @@ function App() {
                   color: '#8E8E93'
                 }}
               >
-                Estações CUIDAÍ identificadas no mapa por seus pontos de
-                instalação. A camada regional de temperaturas da Open-Meteo
-                será integrada na próxima etapa.
+                A camada colorida representa estimativas regionais da
+                Open-Meteo. Os marcadores das estações CUIDAÍ indicam
+                locais de medições físicas, apresentados separadamente.
               </span>
             </div>
 

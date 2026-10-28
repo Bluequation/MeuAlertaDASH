@@ -460,13 +460,14 @@ export default function AtlasBrasil() {
 
                 {/* DASHBOARD ESTATÍSTICO À DIREITA */}
                 <aside className="atlas-layout__painel">
-                    {municipio && pontoReferenciaMunicipio && (
+                    {municipio && pontoReferenciaMunicipio && geometriaMunicipio && (
                         <ObservatorioMunicipal
                             key={municipio.codigo}
                             municipio={municipio.nome}
                             uf={estado?.sigla ?? 'CE'}
                             latitude={pontoReferenciaMunicipio.latitude}
                             longitude={pontoReferenciaMunicipio.longitude}
+                            geometria={geometriaMunicipio.geometry}
                         />
                     )}
                 </aside>

@@ -1,5 +1,11 @@
 
 import { useEffect, useState } from 'react';
+import type { Geometry } from 'geojson';
+
+import {
+    consultarPerfilTermicoMunicipal,
+    type PerfilTermicoMunicipal
+} from './perfilTermicoMunicipal';
 
 type AbaObservatorio =
     | 'agora'
@@ -12,6 +18,7 @@ type Props = {
     uf: string;
     latitude: number;
     longitude: number;
+    geometria: Geometry;
 };
 
 type DadosMeteorologicosAtuais = {
@@ -40,7 +47,8 @@ export default function ObservatorioMunicipal({
     municipio,
     uf,
     latitude,
-    longitude
+    longitude,
+    geometria
 }: Props) {
     const [aba, setAba] =
         useState<AbaObservatorio>('agora');
@@ -131,6 +139,57 @@ export default function ObservatorioMunicipal({
 
         return () => controlador.abort();
     }, [latitude, longitude]);
+
+
+    // PERFIL TÉRMICO — AMOSTRAGEM MUNICIPAL
+    const [perfilTermico, setPerfilTermico] =
+        useState<PerfilTermicoMunicipal | null>(null);
+
+    const [carregandoPerfil, setCarregandoPerfil] =
+        useState(true);
+
+    const [erroPerfil, setErroPerfil] =
+        useState<string | null>(null);
+
+    useEffect(() => {
+        const controlador = new AbortController();
+
+        setCarregandoPerfil(true);
+        setErroPerfil(null);
+        setPerfilTermico(null);
+
+        void consultarPerfilTermicoMunicipal(
+            geometria,
+            controlador.signal
+        )
+            .then(resultado => {
+                if (!controlador.signal.aborted) {
+                    setPerfilTermico(resultado);
+                }
+            })
+            .catch(erro => {
+                if (!controlador.signal.aborted) {
+                    console.error(
+                        'Erro no perfil térmico municipal:',
+                        erro
+                    );
+
+                    setErroPerfil(
+                        'Não foi possível calcular o perfil térmico.'
+                    );
+                }
+            })
+            .finally(() => {
+                if (!controlador.signal.aborted) {
+                    setCarregandoPerfil(false);
+                }
+            });
+
+        return () => controlador.abort();
+    }, [geometria]);
+
+    const formatarTemperatura = (valor: number) =>
+        `${valor.toFixed(1).replace('.', ',')} °C`;
 
 
     return (
@@ -270,35 +329,93 @@ export default function ObservatorioMunicipal({
                         </div>
 
 
+
                         <article className="obs-bloco">
                             <div className="obs-bloco-cabecalho">
                                 <h4>Perfil térmico</h4>
-                                <span>Análise territorial</span>
+                                <span>Análise espacial</span>
                             </div>
 
                             <div className="obs-estatisticas">
                                 <div>
-                                    <small>Mínima</small>
-                                    <strong>—</strong>
+                                    <small>Mínima amostral</small>
+                                    <strong>
+                                        {perfilTermico
+                                            ? formatarTemperatura(perfilTermico.minima)
+                                            : '—'}
+                                    </strong>
                                 </div>
 
                                 <div>
-                                    <small>Média</small>
-                                    <strong>—</strong>
+                                    <small>Média amostral</small>
+                                    <strong>
+                                        {perfilTermico
+                                            ? formatarTemperatura(perfilTermico.media)
+                                            : '—'}
+                                    </strong>
                                 </div>
 
                                 <div>
-                                    <small>Máxima</small>
-                                    <strong>—</strong>
+                                    <small>Máxima amostral</small>
+                                    <strong>
+                                        {perfilTermico
+                                            ? formatarTemperatura(perfilTermico.maxima)
+                                            : '—'}
+                                    </strong>
                                 </div>
                             </div>
 
-                            <p>
-                                Aqui serão apresentadas estatísticas
-                                calculadas a partir dos pontos
-                                meteorológicos amostrados no município.
-                            </p>
+                            {carregandoPerfil && (
+                                <p>Calculando a distribuição térmica do município...</p>
+                            )}
+
+                            {!carregandoPerfil && erroPerfil && (
+                                <p role="alert">{erroPerfil}</p>
+                            )}
+
+                            {!carregandoPerfil && perfilTermico && (
+                                <>
+                                    <div
+                                        style={{
+                                            marginTop: '14px',
+                                            padding: '12px 14px',
+                                            background: '#F4F9FD',
+                                            borderRadius: '10px',
+                                            fontSize: '12px',
+                                            color: '#48657D'
+                                        }}
+                                    >
+                                        <strong>Amplitude espacial estimada: </strong>
+                                        {formatarTemperatura(
+                                            perfilTermico.maxima - perfilTermico.minima
+                                        )}
+                                    </div>
+
+                                    <p>
+                                        <strong>
+                                            {perfilTermico.amostras} pontos amostrados
+                                        </strong>
+                                        {' dentro dos limites municipais.'}
+                                    </p>
+
+                                    <p>
+                                        Referência: {' '}
+                                        {perfilTermico.horario.replace('T', ' às ')}
+                                        {' • Horário de Fortaleza.'}
+                                    </p>
+
+                                    <p>
+                                        Valores estimados pela Open-Meteo.
+                                        A média é calculada sobre os pontos
+                                        amostrados e não representa uma
+                                        medição oficial de todo o território.
+                                        Os pontos podem compartilhar células
+                                        do mesmo modelo meteorológico.
+                                    </p>
+                                </>
+                            )}
                         </article>
+
                     </>
                 )}
 

@@ -227,6 +227,24 @@ export default function AtlasBrasil() {
         )
         : null;
 
+    // PONTO DE REFERÊNCIA METEOROLÓGICA DO MUNICÍPIO
+    const pontoReferenciaMunicipio = useMemo(() => {
+        if (!geometriaMunicipio) return null;
+
+        const limites = L.geoJSON(
+            geometriaMunicipio
+        ).getBounds();
+
+        if (!limites.isValid()) return null;
+
+        const centro = limites.getCenter();
+
+        return {
+            latitude: centro.lat,
+            longitude: centro.lng
+        };
+    }, [geometriaMunicipio]);
+
     const geometriaAtual = estaNoCeara && municipios
         ? geometriaMunicipio ?? municipios
         : geometriaEstado ?? dados;
@@ -442,10 +460,13 @@ export default function AtlasBrasil() {
 
                 {/* DASHBOARD ESTATÍSTICO À DIREITA */}
                 <aside className="atlas-layout__painel">
-                    {municipio && (
+                    {municipio && pontoReferenciaMunicipio && (
                         <ObservatorioMunicipal
+                            key={municipio.codigo}
                             municipio={municipio.nome}
                             uf={estado?.sigla ?? 'CE'}
+                            latitude={pontoReferenciaMunicipio.latitude}
+                            longitude={pontoReferenciaMunicipio.longitude}
                         />
                     )}
                 </aside>

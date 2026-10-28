@@ -44,3 +44,451 @@ body,
 .mapa-cuidai {
   filter: grayscale(35%) brightness(1.08) saturate(70%);
 }
+
+/* ATLAS CUIDAÍ — remove a moldura preta de foco do SVG */
+.atlas-cuidai .leaflet-interactive:focus {
+  outline: none !important;
+}
+
+/* Preserva uma indicação visual para navegação por teclado */
+.atlas-cuidai .leaflet-interactive:focus-visible {
+  outline: none !important;
+  filter: drop-shadow(0 0 3px #087CDB);
+}
+
+/* ATLAS CUIDAÍ — entrada suave dos territórios */
+@keyframes atlasAparecer {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.atlas-cuidai .leaflet-overlay-pane path.leaflet-interactive {
+  animation: atlasAparecer 350ms ease-out;
+}
+
+/* Remove a moldura de foco do navegador */
+.atlas-cuidai .leaflet-interactive:focus {
+  outline: none !important;
+}
+
+
+/* =========================================
+   CUIDAÍ — ATLAS + OBSERVATÓRIO MUNICIPAL
+   ========================================= */
+
+.atlas-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0fr);
+  gap: 0;
+  align-items: stretch;
+  transition:
+    grid-template-columns 420ms cubic-bezier(.22, 1, .36, 1),
+    gap 420ms ease;
+}
+
+.atlas-layout--municipio {
+  grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+  gap: 20px;
+}
+
+.atlas-layout__mapa {
+  min-width: 0;
+}
+
+.atlas-layout__painel {
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms ease;
+}
+
+.atlas-layout--municipio .atlas-layout__painel {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 150ms;
+}
+
+/* CONTAINER PRINCIPAL */
+
+.obs-municipal {
+  box-sizing: border-box;
+  background: #FFFFFF;
+  border: 1px solid #DEE8F1;
+  border-radius: 20px;
+  height: 100%;
+  max-height: min(85vh, 850px);
+  overflow-y: auto;
+  padding: 24px;
+  color: #192942;
+  scrollbar-width: thin;
+  scrollbar-color: #CAD9E8 transparent;
+}
+
+/* CABEÇALHO */
+
+.obs-sobretitulo {
+  color: #168FC4;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  font-weight: 800;
+}
+
+.obs-cabecalho h3 {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 8px 0 4px;
+  letter-spacing: -0.6px;
+}
+
+.obs-cabecalho p {
+  margin: 0;
+  font-size: 12px;
+  color: #8190A2;
+}
+
+.obs-situacao {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #EEF5FB;
+  color: #50728D;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+/* ABAS */
+
+.obs-abas {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 5px;
+  margin: 22px 0;
+  border-radius: 13px;
+  background: #F0F4F8;
+}
+
+.obs-aba {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 11px 4px;
+  color: #7A8A9A;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 180ms, color 180ms;
+}
+
+.obs-aba:hover {
+  color: #168FC4;
+}
+
+.obs-aba--ativa {
+  background: #FFFFFF;
+  color: #087CDB;
+  box-shadow: 0 2px 8px rgba(25, 55, 85, .08);
+}
+
+.obs-conteudo {
+  min-height: 300px;
+}
+
+/* TÍTULOS DAS ÁREAS */
+
+.obs-secao-titulo,
+.obs-bloco-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.obs-secao-titulo h4,
+.obs-bloco h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #192942;
+}
+
+.obs-secao-titulo span,
+.obs-bloco-cabecalho span {
+  font-size: 10px;
+  color: #168FC4;
+  font-weight: 750;
+}
+
+/* INDICADORES */
+
+.obs-grade-indicadores {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.obs-indicador {
+  background: #F6F9FC;
+  border: 1px solid #EBF0F5;
+  border-radius: 14px;
+  padding: 17px;
+}
+
+.obs-indicador-titulo {
+  font-size: 11px;
+  color: #79889B;
+  font-weight: 650;
+}
+
+.obs-indicador-valor {
+  margin: 12px 0 8px;
+  font-size: 29px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1;
+}
+
+.obs-indicador-valor small {
+  font-size: 13px;
+  color: #9BA7B5;
+  margin-left: 5px;
+}
+
+.obs-indicador-nota {
+  font-size: 10px;
+  color: #9BA7B5;
+}
+
+/* BLOCOS ANALÍTICOS */
+
+.obs-bloco {
+  border: 1px solid #E4EDF5;
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 14px;
+}
+
+.obs-bloco p {
+  color: #8390A0;
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 12px 0 0;
+}
+
+.obs-estatisticas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.obs-estatisticas>div {
+  background: #F6F9FC;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.obs-estatisticas small {
+  display: block;
+  color: #8794A3;
+  font-size: 10px;
+}
+
+.obs-estatisticas strong {
+  display: block;
+  font-size: 22px;
+  margin-top: 6px;
+}
+
+/* ESTADOS VAZIOS */
+
+.obs-estado-vazio {
+  text-align: center;
+  padding: 28px 10px;
+}
+
+.obs-icone-vazio {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 5px;
+  height: 38px;
+  margin-bottom: 15px;
+}
+
+.obs-icone-vazio span {
+  width: 8px;
+  border-radius: 5px;
+  background: #B6DAF2;
+}
+
+.obs-icone-vazio span:nth-child(1) {
+  height: 15px;
+}
+
+.obs-icone-vazio span:nth-child(2) {
+  height: 31px;
+  background: #168FC4;
+}
+
+.obs-icone-vazio span:nth-child(3) {
+  height: 22px;
+}
+
+.obs-estado-vazio p {
+  max-width: 320px;
+  margin: 12px auto 0;
+}
+
+/* HISTÓRICO */
+
+.obs-grafico-vazio {
+  position: relative;
+  height: 195px;
+  background: #F8FAFC;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.obs-grafico-grade {
+  position: absolute;
+  inset: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.obs-grafico-grade span {
+  border-top: 1px dashed #DFE8F1;
+}
+
+.obs-grafico-mensagem {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 35px;
+  font-size: 12px;
+  color: #8494A7;
+}
+
+/* COMPARAÇÃO */
+
+.obs-comparacao {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.obs-comparacao-local {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #E3ECF4;
+  border-radius: 13px;
+  padding: 15px;
+}
+
+.obs-comparacao-local small {
+  color: #8190A2;
+  font-size: 11px;
+}
+
+.obs-comparacao-local strong {
+  font-size: 15px;
+}
+
+.obs-ponto-azul,
+.obs-ponto-laranja {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #168FC4;
+}
+
+.obs-ponto-laranja {
+  background: #EF9D3A;
+}
+
+/* FONTES */
+
+.obs-rodape {
+  border-top: 1px solid #E7EEF5;
+  margin-top: 22px;
+  padding-top: 17px;
+}
+
+.obs-rodape strong {
+  font-size: 11px;
+}
+
+.obs-rodape p {
+  color: #8A97A6;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+/* RESPONSIVIDADE */
+
+@media (max-width: 1100px) {
+
+  .atlas-layout,
+  .atlas-layout--municipio {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .atlas-layout__painel {
+    display: none;
+  }
+
+  .atlas-layout--municipio .atlas-layout__painel {
+    display: block;
+  }
+
+  .obs-municipal {
+    height: auto;
+    max-height: none;
+  }
+}
+
+@media (max-width: 650px) {
+  .atlas-layout__mapa {
+    height: 430px !important;
+    min-height: 430px !important;
+  }
+
+  .obs-municipal {
+    padding: 16px;
+  }
+
+  .obs-cabecalho h3 {
+    font-size: 21px;
+  }
+
+  .obs-aba {
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .atlas-layout,
+  .atlas-layout__painel {
+    transition: none;
+  }
+}

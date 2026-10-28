@@ -5,9 +5,15 @@ import {
   Marker,
   Popup,
   CircleMarker,
+  GeoJSON,
+  Pane,
   useMap,
   useMapEvents
 } from 'react-leaflet';
+import type {
+  Feature,
+  FeatureCollection
+} from 'geojson';
 import {
   collection,
   limit,
@@ -16,6 +22,7 @@ import {
   query,
   where
 } from 'firebase/firestore';
+import AtlasBrasil from './AtlasBrasil';
 import { db } from './firebase';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, CartesianGrid } from 'recharts';
 import L, { divIcon } from 'leaflet';
@@ -135,7 +142,21 @@ type PontoGradeTermica = {
   latitude: number;
   longitude: number;
   temperatura: number;
+  horarioModelo: number;
 };
+
+type PontoGradeLocal = {
+  latitude: number;
+  longitude: number;
+  temperatura: number;
+};
+
+// RESOLUÇÃO DA GRADE METEOROLÓGICA
+const LINHAS_GRADE_TERMICA = 9;
+const COLUNAS_GRADE_TERMICA = 11;
+
+const TOTAL_PONTOS_GRADE_TERMICA =
+  LINHAS_GRADE_TERMICA * COLUNAS_GRADE_TERMICA;
 
 // Área preliminar de estudo: Ceará e entorno.
 // Ainda não representa o limite administrativo do estado.
@@ -146,53 +167,281 @@ const LIMITES_GRADE_TERMICA = {
   leste: -37.0
 };
 
-// Escala fixa de temperatura em graus Celsius.
-const corTemperatura = (valor: number): number[] => {
-  const faixas = [
-    { t: 20, cor: [80, 142, 203] },
-    { t: 24, cor: [122, 201, 215] },
-    { t: 28, cor: [245, 212, 119] },
-    { t: 32, cor: [246, 160, 87] },
-    { t: 36, cor: [223, 98, 72] },
-    { t: 40, cor: [150, 46, 78] }
-  ];
 
-  if (valor <= 20) return faixas[0].cor;
+type EscalaTermica = {
+  minimo: number;
+  maximo: number;
+};
 
-  for (let i = 1; i < faixas.length; i++) {
-    if (valor <= faixas[i].t) {
-      const anterior = faixas[i - 1];
-      const atual = faixas[i];
+// Determina a escala com base nas temperaturas recebidas.
+function obterEscalaTermica(
+  pontos: PontoGradeTermica[]
+): EscalaTermica {
+  if (pontos.length === 0) {
+    return { minimo: 20, maximo: 40 };
+  }
 
-      const proporcao =
-        (valor - anterior.t) / (atual.t - anterior.t);
+  const temperaturas = pontos.map(p => p.temperatura);
 
-      return anterior.cor.map((canal, indice) =>
-        Math.round(
-          canal +
-          (atual.cor[indice] - canal) * proporcao
-        )
-      );
+  const minimo = Math.floor(Math.min(...temperaturas));
+  const maximo = Math.ceil(Math.max(...temperaturas));
+
+  if (minimo === maximo) {
+    return {
+      minimo: minimo - 1,
+      maximo: maximo + 1
+    };
+  }
+
+  return { minimo, maximo };
+}
+
+// Converte temperatura em uma cor da escala atual.
+
+// Faixas de temperatura com intervalos de 2 °C.
+
+// FAIXAS DE TEMPERATURA DE 1 EM 1 °C
+
+/*
+ * ESCALA DE CORES DO MAPA CUIDAÍ
+ *
+ * ALTERE SOMENTE OS CÓDIGOS HEX (#)
+ * PARA PERSONALIZAR AS CORES.
+ *
+ * Intervalos fixos de 2 °C.
+ */
+const ESCALA_TERMICA_CUIDAI = [
+  {
+    inicio: -Infinity,
+    rotulo: 'Abaixo de 24 °C',
+    hex: '#2467D0'
+  },
+  {
+    inicio: 24,
+    rotulo: '24 a 26 °C',
+    hex: '#2176D2'
+  },
+  {
+    inicio: 26,
+    rotulo: '26 a 28 °C',
+    hex: '#16B7D6'
+  },
+  {
+    inicio: 28,
+    rotulo: '28 a 30 °C',
+    hex: '#27C782'
+  },
+  {
+    inicio: 30,
+    rotulo: '30 a 32 °C',
+    hex: '#5bdb20'
+  },
+  {
+    inicio: 32,
+    rotulo: '32 a 34 °C',
+    hex: '#fff021'
+  },
+  {
+    inicio: 34,
+    rotulo: '34 a 36 °C',
+    hex: '#FF9B21'
+  },
+  {
+    inicio: 36,
+    rotulo: '36 a 38 °C',
+    hex: '#FF521E'
+  },
+  {
+    inicio: 38,
+    rotulo: '38 a 40 °C',
+    hex: '#C90018'
+  },
+  {
+    inicio: 40,
+    rotulo: '40 °C ou mais',
+    hex: '#A80010'
+  }
+];
+
+// RETORNA A COR CONFORME A TEMPERATURA
+
+const corTemperatura = (
+  valor: number,
+  _minimo: number,
+  _maximo: number
+): number[] => {
+
+  // CONTROLE DE SUAVIZAÇÃO DAS FRONTEIRAS
+  const suavizacao = 0;
+
+  // Converte uma cor HEX para RGB
+  const converterHex = (hex: string): number[] => {
+    const codigo = hex.replace('#', '');
+
+    return [
+      parseInt(codigo.substring(0, 2), 16),
+      parseInt(codigo.substring(2, 4), 16),
+      parseInt(codigo.substring(4, 6), 16)
+    ];
+  };
+
+  // Cria transições suaves entre faixas de temperatura
+  if (suavizacao > 0) {
+    for (
+      let i = 1;
+      i < ESCALA_TERMICA_CUIDAI.length;
+      i++
+    ) {
+      const limite = ESCALA_TERMICA_CUIDAI[i].inicio;
+
+      if (Math.abs(valor - limite) <= suavizacao) {
+        const anterior = converterHex(
+          ESCALA_TERMICA_CUIDAI[i - 1].hex
+        );
+
+        const seguinte = converterHex(
+          ESCALA_TERMICA_CUIDAI[i].hex
+        );
+
+        const proporcao =
+          (valor - limite + suavizacao) /
+          (2 * suavizacao);
+
+        const t =
+          proporcao * proporcao *
+          (3 - 2 * proporcao);
+
+        return anterior.map((canal, indice) =>
+          Math.round(
+            canal * (1 - t) +
+            seguinte[indice] * t
+          )
+        );
+      }
     }
   }
 
-  return faixas[faixas.length - 1].cor;
+  // Mantém as cores HEX escolhidas para cada faixa
+  const faixa = [...ESCALA_TERMICA_CUIDAI]
+    .reverse()
+    .find(item => valor >= item.inicio)
+    ?? ESCALA_TERMICA_CUIDAI[0];
+
+  return converterHex(faixa.hex);
 };
+
+
+
+
+
+
+// INTERPOLAÇÃO SUAVE DA SUPERFÍCIE METEOROLÓGICA
+// Produz contornos mais arredondados entre os pontos da grade.
+function interpolarTemperaturaCurva(
+  pontos: PontoGradeTermica[],
+  posicaoLinha: number,
+  posicaoColuna: number
+): number {
+
+  const linhaBase = Math.floor(posicaoLinha);
+  const colunaBase = Math.floor(posicaoColuna);
+
+  const fracaoY = posicaoLinha - linhaBase;
+  const fracaoX = posicaoColuna - colunaBase;
+
+  const amostrar = (linha: number, coluna: number) => {
+    const l = Math.max(
+      0,
+      Math.min(LINHAS_GRADE_TERMICA - 1, linha)
+    );
+
+    const c = Math.max(
+      0,
+      Math.min(COLUNAS_GRADE_TERMICA - 1, coluna)
+    );
+
+    return pontos[l * COLUNAS_GRADE_TERMICA + c]
+      .temperatura;
+  };
+
+  // Interpolação cúbica Catmull-Rom
+  const curva = (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    t: number
+  ) => {
+    return b + 0.5 * t * (
+      c - a +
+      t * (
+        2 * a - 5 * b + 4 * c - d +
+        t * (3 * (b - c) + d - a)
+      )
+    );
+  };
+
+  const valores: number[] = [];
+
+  for (let i = -1; i <= 2; i++) {
+    const linha = linhaBase + i;
+
+    valores.push(
+      curva(
+        amostrar(linha, colunaBase - 1),
+        amostrar(linha, colunaBase),
+        amostrar(linha, colunaBase + 1),
+        amostrar(linha, colunaBase + 2),
+        fracaoX
+      )
+    );
+  }
+
+  const temperatura = curva(
+    valores[0],
+    valores[1],
+    valores[2],
+    valores[3],
+    fracaoY
+  );
+
+  // Evita criar extremos acima ou abaixo dos
+  // quatro valores observados ao redor da célula.
+  const vizinhos = [
+    amostrar(linhaBase, colunaBase),
+    amostrar(linhaBase, colunaBase + 1),
+    amostrar(linhaBase + 1, colunaBase),
+    amostrar(linhaBase + 1, colunaBase + 1)
+  ];
+
+  return Math.max(
+    Math.min(...vizinhos),
+    Math.min(Math.max(...vizinhos), temperatura)
+  );
+}
+
+
 
 function CamadaTemperaturaRegional({
   pontos,
-  poligonosCeara
+  poligonosCeara,
+  gradeLocalDisponivel
 }: {
   pontos: PontoGradeTermica[];
   poligonosCeara: PoligonosCeara;
+  gradeLocalDisponivel: boolean;
 }) {
   const map = useMap();
 
   useEffect(() => {
-    if (pontos.length < 30 || poligonosCeara.length === 0) return;
+    if (
+      pontos.length !== TOTAL_PONTOS_GRADE_TERMICA ||
+      poligonosCeara.length === 0
+    ) return;
 
-    const largura = 300;
-    const altura = 340;
+    // RESOLUÇÃO DA CAMADA METEOROLÓGICA
+    const largura = 900;
+    const altura = 1020;
 
     const canvas = document.createElement('canvas');
     canvas.width = largura;
@@ -203,58 +452,37 @@ function CamadaTemperaturaRegional({
 
     const imagem = contexto.createImageData(largura, altura);
     const limites = LIMITES_GRADE_TERMICA;
+    const { minimo, maximo } = obterEscalaTermica(pontos);
 
+    // DESENHA A CAMADA REGIONAL DE TEMPERATURA
     for (let y = 0; y < altura; y++) {
-      const latitude =
-        limites.norte -
-        (y / (altura - 1)) * (limites.norte - limites.sul);
-
       for (let x = 0; x < largura; x++) {
-        const longitude =
-          limites.oeste +
-          (x / (largura - 1)) * (limites.leste - limites.oeste);
 
+        const posicaoLinha =
+          (y / (altura - 1)) *
+          (LINHAS_GRADE_TERMICA - 1);
 
-        /*
-         * Interpolação bilinear.
-         * Cada região utiliza somente os quatro
-         * pontos vizinhos da grade Open-Meteo.
-         *
-         * Grade: 5 linhas x 6 colunas.
-         */
+        const posicaoColuna =
+          (x / (largura - 1)) *
+          (COLUNAS_GRADE_TERMICA - 1);
 
-        const posicaoLinha = (y / (altura - 1)) * 4;
-        const posicaoColuna = (x / (largura - 1)) * 5;
+        // Temperatura calculada pela interpolação cúbica
+        const temperatura = interpolarTemperaturaCurva(
+          pontos,
+          posicaoLinha,
+          posicaoColuna
+        );
 
-        const linha = Math.min(3, Math.floor(posicaoLinha));
-        const coluna = Math.min(4, Math.floor(posicaoColuna));
-
-        const fracaoY = posicaoLinha - linha;
-        const fracaoX = posicaoColuna - coluna;
-
-        // Temperaturas dos quatro pontos vizinhos
-        const t00 = pontos[linha * 6 + coluna].temperatura;
-        const t01 = pontos[linha * 6 + coluna + 1].temperatura;
-        const t10 = pontos[(linha + 1) * 6 + coluna].temperatura;
-        const t11 = pontos[(linha + 1) * 6 + coluna + 1].temperatura;
-
-        // Interpolação horizontal
-        const temperaturaSuperior =
-          t00 * (1 - fracaoX) + t01 * fracaoX;
-
-        const temperaturaInferior =
-          t10 * (1 - fracaoX) + t11 * fracaoX;
-
-        // Interpolação vertical
-        const temperatura =
-          temperaturaSuperior * (1 - fracaoY) +
-          temperaturaInferior * fracaoY;
-
-        const cor = corTemperatura(temperatura);
+        // Converte a temperatura na cor HEX configurada
+        const cor = corTemperatura(
+          temperatura,
+          minimo,
+          maximo
+        );
 
         const indice = (y * largura + x) * 4;
 
-        // Suaviza visualmente as bordas da área estudada.
+        // Suavização da borda externa da imagem
         const distanciaBorda = Math.min(
           x,
           y,
@@ -267,14 +495,93 @@ function CamadaTemperaturaRegional({
           distanciaBorda / 16
         );
 
+        // Preenche os pixels da imagem
         imagem.data[indice] = cor[0];
         imagem.data[indice + 1] = cor[1];
         imagem.data[indice + 2] = cor[2];
         imagem.data[indice + 3] =
-          Math.round(115 * transparencia);
+          Math.round(255 * transparencia);
+
       }
     }
 
+
+
+    // ANTIALIASING — REMOVE O SERRILHADO DAS FRONTEIRAS
+    // Atua apenas nos pixels próximos a mudanças de cor.
+    // O interior de cada faixa permanece com sua cor original.
+
+    const pixelsOriginais = new Uint8ClampedArray(imagem.data);
+
+    const amostras = [
+      [-0.25, -0.25],
+      [0.25, -0.25],
+      [-0.25, 0.25],
+      [0.25, 0.25]
+    ];
+
+    for (let y = 1; y < altura - 1; y++) {
+      for (let x = 1; x < largura - 1; x++) {
+
+        const indice = (y * largura + x) * 4;
+
+        const vizinhos = [
+          indice - 4,
+          indice + 4,
+          indice - largura * 4,
+          indice + largura * 4
+        ];
+
+        // Só processa pixels próximos à fronteira de duas cores.
+        const estaNaFronteira = vizinhos.some(vizinho =>
+          pixelsOriginais[vizinho] !== pixelsOriginais[indice] ||
+          pixelsOriginais[vizinho + 1] !== pixelsOriginais[indice + 1] ||
+          pixelsOriginais[vizinho + 2] !== pixelsOriginais[indice + 2]
+        );
+
+        if (!estaNaFronteira) continue;
+
+        let vermelho = 0;
+        let verde = 0;
+        let azul = 0;
+
+        // Quatro amostras dentro do pixel de fronteira.
+        for (const [dx, dy] of amostras) {
+
+          const posicaoLinha =
+            ((y + dy) / (altura - 1)) *
+            (LINHAS_GRADE_TERMICA - 1);
+
+          const posicaoColuna =
+            ((x + dx) / (largura - 1)) *
+            (COLUNAS_GRADE_TERMICA - 1);
+
+          const temperatura = interpolarTemperaturaCurva(
+            pontos,
+            posicaoLinha,
+            posicaoColuna
+          );
+
+          const cor = corTemperatura(
+            temperatura,
+            minimo,
+            maximo
+          );
+
+          vermelho += cor[0];
+          verde += cor[1];
+          azul += cor[2];
+        }
+
+        // Corrige somente este pixel da borda.
+        imagem.data[indice] = Math.round(vermelho / 4);
+        imagem.data[indice + 1] = Math.round(verde / 4);
+        imagem.data[indice + 2] = Math.round(azul / 4);
+      }
+    }
+
+
+    // Aplica as cores calculadas ao Canvas
     contexto.putImageData(imagem, 0, 0);
 
     // RECORTE DA CAMADA PELO CONTORNO DO CEARÁ
@@ -328,43 +635,701 @@ function CamadaTemperaturaRegional({
 
     camada.addTo(map);
 
-    // Ajusta a transparência conforme a aproximação.
-    const ajustarOpacidade = () => {
+    // ==============================================
+    // AQUARELA TÉRMICA CUIDAÍ
+    // ==============================================
+
+    // Áreas que o visitante já revelou.
+    const areasPintadas: L.LatLng[] = [];
+
+    // Posição temporária da janela que segue o mouse.
+    let janelaAtual: L.LatLng | null = null;
+
+    // Raio visual da janela, em pixels.
+    const RAIO_JANELA = 125;
+
+    // Limita a quantidade de áreas para preservar desempenho.
+    const MAX_AREAS = 10;
+
+    // Atualiza a parte visível da camada meteorológica.
+    const atualizarAquarela = () => {
+      const imagemCamada = camada.getElement();
+      if (!imagemCamada) return;
+
       const zoom = map.getZoom();
 
-      if (zoom >= 10) {
-        // Visão local: preservar ruas e detalhes
-        camada.setOpacity(0.48);
-      } else if (zoom >= 8) {
-        // Visão intermediária
-        camada.setOpacity(0.62);
-      } else {
-        // Visão regional
-        camada.setOpacity(0.80);
+      // No zoom regional, o mapa continua totalmente colorido.
+      if (zoom < 10) {
+        imagemCamada.style.maskImage = 'none';
+        imagemCamada.style.setProperty(
+          '-webkit-mask-image',
+          'none'
+        );
+
+        camada.setOpacity(0.65);
+        return;
       }
+
+      // No zoom local, a pintura fica mais intensa
+      // apenas dentro das áreas reveladas.
+      camada.setOpacity(0.72);
+
+      const posicoes = [
+        ...areasPintadas,
+        ...(janelaAtual ? [janelaAtual] : [])
+      ];
+
+      // Se ainda não explorou nada, o mapa fica limpo.
+      if (posicoes.length === 0) {
+        const mascaraVazia =
+          'linear-gradient(transparent, transparent)';
+
+        imagemCamada.style.maskImage = mascaraVazia;
+        imagemCamada.style.setProperty(
+          '-webkit-mask-image',
+          mascaraVazia
+        );
+        return;
+      }
+
+      const retanguloMapa =
+        map.getContainer().getBoundingClientRect();
+
+      const retanguloImagem =
+        imagemCamada.getBoundingClientRect();
+
+      // Cada região revelada ganha uma abertura circular.
+      const mascaras = posicoes.map(posicao => {
+        const ponto = map.latLngToContainerPoint(posicao);
+
+        const x =
+          ponto.x -
+          (retanguloImagem.left - retanguloMapa.left);
+
+        const y =
+          ponto.y -
+          (retanguloImagem.top - retanguloMapa.top);
+
+        return `radial-gradient(
+      circle ${RAIO_JANELA}px at ${x}px ${y}px,
+      black 0%,
+      black 85%,
+      transparent 100%
+    )`;
+      });
+
+      const mascaraFinal = mascaras.join(', ');
+
+      imagemCamada.style.maskImage = mascaraFinal;
+      imagemCamada.style.setProperty(
+        '-webkit-mask-image',
+        mascaraFinal
+      );
     };
 
-    ajustarOpacidade();
+    // A janela acompanha o cursor.
+    const aoMoverMouse = (evento: L.LeafletMouseEvent) => {
+      if (map.getZoom() < 10) return;
 
-    map.on('zoomend', ajustarOpacidade);
+      janelaAtual = evento.latlng;
+      atualizarAquarela();
+    };
 
+    // O clique fixa uma nova região colorida.
+    const aoClicarMapa = (evento: L.LeafletMouseEvent) => {
+      if (map.getZoom() < 10) return;
+
+      areasPintadas.push(evento.latlng);
+
+      if (areasPintadas.length > MAX_AREAS) {
+        areasPintadas.shift();
+      }
+
+      atualizarAquarela();
+    };
+
+    // Quando o mouse sai do mapa, a prévia desaparece.
+    const aoSairMapa = () => {
+      janelaAtual = null;
+      atualizarAquarela();
+    };
+
+    // Mantém as manchas nas coordenadas corretas
+    // depois de mover ou aproximar o mapa.
+    const aoMudarMapa = () => {
+      atualizarAquarela();
+    };
+
+    map.on('mousemove', aoMoverMouse);
+    map.on('click', aoClicarMapa);
+    map.on('zoomend moveend resize', aoMudarMapa);
+
+    map.getContainer().addEventListener(
+      'mouseleave',
+      aoSairMapa
+    );
+
+    // BOTÃO PARA LIMPAR AS ÁREAS REVELADAS
+    const controle = new L.Control({
+      position: 'topright'
+    });
+
+    const botao = L.DomUtil.create(
+      'button',
+      'leaflet-bar'
+    ) as HTMLButtonElement;
+
+    botao.type = 'button';
+    botao.textContent = 'Limpar aquarela';
+    botao.title = 'Remover as áreas reveladas';
+
+    botao.style.cssText = `
+  background: white;
+  border: 1px solid #DCE8F3;
+  border-radius: 9px;
+  padding: 10px 13px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #214563;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+`;
+
+    L.DomEvent.disableClickPropagation(botao);
+
+    botao.addEventListener('click', evento => {
+      evento.preventDefault();
+      evento.stopPropagation();
+
+      areasPintadas.length = 0;
+      janelaAtual = null;
+
+      atualizarAquarela();
+    });
+
+    controle.onAdd = () => botao;
+    controle.addTo(map);
+
+    // Configuração inicial.
+    atualizarAquarela();
+
+    // LIMPEZA DOS EVENTOS
     return () => {
-      map.off('zoomend', ajustarOpacidade);
+      map.off('mousemove', aoMoverMouse);
+      map.off('click', aoClicarMapa);
+      map.off('zoomend moveend resize', aoMudarMapa);
+
+      map.getContainer().removeEventListener(
+        'mouseleave',
+        aoSairMapa
+      );
+
+      controle.remove();
       map.removeLayer(camada);
     };
 
-    camada.addTo(map);
-
-    return () => {
-      map.removeLayer(camada);
-    };
-  }, [map, pontos, poligonosCeara]);
+  }, [map, pontos, poligonosCeara, gradeLocalDisponivel]);
 
   return null;
 }
 
 // Cada polígono contém anéis de coordenadas [longitude, latitude].
 type PoligonosCeara = number[][][][];
+
+
+const RAIO_AJUSTE_CUIDAI_METROS = 500;
+
+// Consulta a temperatura interpolada da grade Open-Meteo.
+// A grade possui 5 linhas e 6 colunas.
+
+function estimarTemperaturaNaGrade(
+  pontos: PontoGradeTermica[],
+  latitude: number,
+  longitude: number
+): number | null {
+
+  if (
+    pontos.length !== TOTAL_PONTOS_GRADE_TERMICA
+  ) {
+    return null;
+  }
+
+  const limites = LIMITES_GRADE_TERMICA;
+
+  if (
+    latitude < limites.sul ||
+    latitude > limites.norte ||
+    longitude < limites.oeste ||
+    longitude > limites.leste
+  ) {
+    return null;
+  }
+
+  const posicaoY =
+    ((limites.norte - latitude) /
+      (limites.norte - limites.sul)) *
+    (LINHAS_GRADE_TERMICA - 1);
+
+  const posicaoX =
+    ((longitude - limites.oeste) /
+      (limites.leste - limites.oeste)) *
+    (COLUNAS_GRADE_TERMICA - 1);
+
+  return interpolarTemperaturaCurva(
+    pontos,
+    posicaoY,
+    posicaoX
+  );
+}
+
+
+function CamadaTemperaturaLocal({
+  pontos,
+  poligonosCeara
+}: {
+  pontos: PontoGradeLocal[];
+  poligonosCeara: PoligonosCeara;
+}) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+
+  useEffect(() => {
+    const atualizarZoom = () => setZoom(map.getZoom());
+
+    map.on('zoomend', atualizarZoom);
+
+    return () => {
+      map.off('zoomend', atualizarZoom);
+    };
+  }, [map]);
+
+  useEffect(() => {
+    if (
+      zoom < 10 ||
+      pontos.length !== 25 ||
+      poligonosCeara.length === 0
+    ) {
+      return;
+    }
+
+    // A consulta local possui 5 linhas e 5 colunas.
+    const sul = pontos[0].latitude;
+    const norte = pontos[24].latitude;
+    const oeste = pontos[0].longitude;
+    const leste = pontos[24].longitude;
+
+    const largura = 480;
+    const altura = 480;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = largura;
+    canvas.height = altura;
+
+    const contexto = canvas.getContext('2d');
+    if (!contexto) return;
+
+    const imagem = contexto.createImageData(
+      largura,
+      altura
+    );
+
+    for (let y = 0; y < altura; y++) {
+      for (let x = 0; x < largura; x++) {
+        // A primeira linha da consulta é a mais ao sul.
+        const posicaoLinha =
+          (1 - y / (altura - 1)) * 4;
+
+        const posicaoColuna =
+          (x / (largura - 1)) * 4;
+
+        const linha = Math.min(
+          3,
+          Math.floor(posicaoLinha)
+        );
+
+        const coluna = Math.min(
+          3,
+          Math.floor(posicaoColuna)
+        );
+
+        const fy = posicaoLinha - linha;
+        const fx = posicaoColuna - coluna;
+
+        const t00 =
+          pontos[linha * 5 + coluna].temperatura;
+
+        const t01 =
+          pontos[linha * 5 + coluna + 1].temperatura;
+
+        const t10 =
+          pontos[(linha + 1) * 5 + coluna].temperatura;
+
+        const t11 =
+          pontos[(linha + 1) * 5 + coluna + 1]
+            .temperatura;
+
+        const superior =
+          t00 * (1 - fx) + t01 * fx;
+
+        const inferior =
+          t10 * (1 - fx) + t11 * fx;
+
+        const temperatura =
+          superior * (1 - fy) + inferior * fy;
+
+        // Utiliza a mesma paleta HEX do mapa regional.
+        const cor = corTemperatura(
+          temperatura,
+          0,
+          0
+        );
+
+        const indice = (y * largura + x) * 4;
+
+        imagem.data[indice] = cor[0];
+        imagem.data[indice + 1] = cor[1];
+        imagem.data[indice + 2] = cor[2];
+        imagem.data[indice + 3] = 255;
+      }
+    }
+
+    contexto.putImageData(imagem, 0, 0);
+
+    // Recorta a nova camada pelo contorno do Ceará.
+    contexto.save();
+    contexto.globalCompositeOperation = 'destination-in';
+    contexto.fillStyle = '#000000';
+    contexto.beginPath();
+
+    for (const poligono of poligonosCeara) {
+      for (const anel of poligono) {
+        anel.forEach(([longitude, latitude], indice) => {
+          const px =
+            ((longitude - oeste) / (leste - oeste)) *
+            (largura - 1);
+
+          const py =
+            ((norte - latitude) / (norte - sul)) *
+            (altura - 1);
+
+          if (indice === 0) {
+            contexto.moveTo(px, py);
+          } else {
+            contexto.lineTo(px, py);
+          }
+        });
+
+        contexto.closePath();
+      }
+    }
+
+    contexto.fill('evenodd');
+    contexto.restore();
+
+    const camada = L.imageOverlay(
+      canvas.toDataURL('image/png'),
+      [
+        [sul, oeste],
+        [norte, leste]
+      ],
+      {
+        opacity: zoom >= 13 ? 0.18 : 0.58,
+        interactive: false
+      }
+    );
+
+    camada.addTo(map);
+
+    return () => {
+      map.removeLayer(camada);
+    };
+  }, [map, zoom, pontos, poligonosCeara]);
+
+  return null;
+}
+
+
+// CAMADA DE AJUSTE LOCAL DAS ESTAÇÕES CUIDAÍ
+function CamadaAjusteLocalCuidai({
+  pontos,
+  estacoes
+}: {
+  pontos: PontoGradeTermica[];
+  estacoes: EstacaoMeteo[];
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (
+      pontos.length !== TOTAL_PONTOS_GRADE_TERMICA ||
+      estacoes.length === 0
+    ) {
+      return;
+    }
+
+    const { minimo, maximo } = obterEscalaTermica(pontos);
+    const camadas: L.Layer[] = [];
+    const raio = RAIO_AJUSTE_CUIDAI_METROS;
+    const tamanho = 160;
+
+    for (const estacao of estacoes) {
+      const leitura = estacao.ultimaLeitura;
+
+      if (!leitura) continue;
+
+      const modeloNaEstacao = estimarTemperaturaNaGrade(
+        pontos,
+        estacao.latitude,
+        estacao.longitude
+      );
+
+      if (modeloNaEstacao === null) continue;
+
+      // Diferença entre medição local e estimativa regional.
+      const diferenca =
+        leitura.temperatura - modeloNaEstacao;
+
+      // Converte 500 metros em limites geográficos.
+      const latitudeRad =
+        estacao.latitude * Math.PI / 180;
+
+      const deltaLat = raio / 111320;
+      const deltaLon =
+        raio /
+        (111320 * Math.max(0.2, Math.cos(latitudeRad)));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = tamanho;
+      canvas.height = tamanho;
+
+      const contexto = canvas.getContext('2d');
+      if (!contexto) continue;
+
+      const imagem = contexto.createImageData(
+        tamanho,
+        tamanho
+      );
+
+      for (let y = 0; y < tamanho; y++) {
+        const latitude =
+          estacao.latitude +
+          deltaLat * (1 - 2 * y / (tamanho - 1));
+
+        for (let x = 0; x < tamanho; x++) {
+          const longitude =
+            estacao.longitude +
+            deltaLon * (2 * x / (tamanho - 1) - 1);
+
+          const distanciaLat =
+            (latitude - estacao.latitude) * 111320;
+
+          const distanciaLon =
+            (longitude - estacao.longitude) *
+            111320 * Math.cos(latitudeRad);
+
+          const distancia = Math.sqrt(
+            distanciaLat ** 2 + distanciaLon ** 2
+          );
+
+          if (distancia >= raio) continue;
+
+          const proporcao = distancia / raio;
+
+          // Influência máxima no sensor e zero aos 500 m.
+          const peso = Math.pow(
+            1 - proporcao * proporcao,
+            2
+          );
+
+          const temperaturaRegional =
+            estimarTemperaturaNaGrade(
+              pontos,
+              latitude,
+              longitude
+            );
+
+          if (temperaturaRegional === null) continue;
+
+          const temperaturaAjustada =
+            temperaturaRegional + diferenca * peso;
+
+          const cor = corTemperatura(
+            temperaturaAjustada,
+            minimo,
+            maximo
+          );
+
+          const indice = (y * tamanho + x) * 4;
+
+          imagem.data[indice] = cor[0];
+          imagem.data[indice + 1] = cor[1];
+          imagem.data[indice + 2] = cor[2];
+
+          // Transparência para preservar detalhes do mapa.
+          imagem.data[indice + 3] =
+            Math.round(125 * peso);
+        }
+      }
+
+      contexto.putImageData(imagem, 0, 0);
+
+      const camada = L.imageOverlay(
+        canvas.toDataURL('image/png'),
+        [
+          [
+            estacao.latitude - deltaLat,
+            estacao.longitude - deltaLon
+          ],
+          [
+            estacao.latitude + deltaLat,
+            estacao.longitude + deltaLon
+          ]
+        ],
+        {
+          opacity: 1,
+          interactive: false
+        }
+      );
+
+      camada.addTo(map);
+      camadas.push(camada);
+
+      // Contorno discreto do raio experimental.
+      const contorno = L.circle(
+        [estacao.latitude, estacao.longitude],
+        {
+          radius: raio,
+          color: '#168FC4',
+          weight: 1,
+          opacity: 0.6,
+          dashArray: '4 5',
+          fillOpacity: 0,
+          interactive: false
+        }
+      );
+
+      contorno.addTo(map);
+      camadas.push(contorno);
+    }
+
+    return () => {
+      camadas.forEach(camada => {
+        map.removeLayer(camada);
+      });
+    };
+  }, [map, pontos, estacoes]);
+
+  return null;
+}
+
+
+type MunicipioFoco = {
+  codigo: string;
+  nome: string;
+};
+
+function CamadaMunicipiosCuidai({
+  dados,
+  selecionado,
+  onSelecionar
+}: {
+  dados: FeatureCollection;
+  selecionado: MunicipioFoco | null;
+  onSelecionar: (
+    municipio: MunicipioFoco,
+    latitude: number,
+    longitude: number
+  ) => void;
+}) {
+  const map = useMap();
+
+  const estiloMunicipio = (
+    feature?: Feature
+  ): L.PathOptions => {
+    const ativo =
+      String(feature?.properties?.id) ===
+      selecionado?.codigo;
+
+    return {
+      color: ativo ? '#087CDB' : '#93A8B9',
+      weight: ativo ? 3 : 0.9,
+      opacity: ativo ? 1 : 0.65,
+      fillColor: ativo ? '#168FC4' : '#FFFFFF',
+      fillOpacity: ativo
+        ? 0.24
+        : selecionado
+          ? 0.35
+          : 0.02,
+      bubblingMouseEvents: false
+    };
+  };
+
+  return (
+    <Pane
+      name="territorios-cuidai"
+      style={{ zIndex: 430 }}
+    >
+      <GeoJSON
+        key={selecionado?.codigo ?? 'visao-geral'}
+        data={dados}
+        pane="territorios-cuidai"
+        style={estiloMunicipio}
+        onEachFeature={(feature, layer) => {
+          const codigo = String(
+            feature.properties?.id ?? ''
+          );
+
+          const nome = String(
+            feature.properties?.name ?? ''
+          );
+
+          if (!codigo || !nome) return;
+
+          const caminho = layer as L.Path;
+
+          layer.bindTooltip(nome, {
+            sticky: true,
+            direction: 'top'
+          });
+
+          layer.on('mouseover', () => {
+            if (codigo !== selecionado?.codigo) {
+              caminho.setStyle({
+                color: '#168FC4',
+                weight: 2.5,
+                opacity: 1,
+                fillOpacity: 0.15
+              });
+            }
+          });
+
+          layer.on('mouseout', () => {
+            caminho.setStyle(estiloMunicipio(feature));
+          });
+
+          layer.on('click', evento => {
+            const clique = evento as L.LeafletMouseEvent;
+
+            onSelecionar(
+              { codigo, nome },
+              Number(clique.latlng.lat.toFixed(4)),
+              Number(clique.latlng.lng.toFixed(4))
+            );
+
+            const poligono = layer as L.Polygon;
+
+            map.flyToBounds(poligono.getBounds(), {
+              padding: [30, 30],
+              maxZoom: 10,
+              duration: 0.7
+            });
+          });
+        }}
+      />
+    </Pane>
+  );
+}
+
 
 // PERMITE SELECIONAR UM PONTO NO MAPA
 function SelecionarPontoOpenMeteo({
@@ -628,6 +1593,22 @@ function App() {
   const [erroOpenMeteo, setErroOpenMeteo] =
     useState<string | null>(null);
 
+  const [pontosGradeLocal, setPontosGradeLocal] =
+    useState<PontoGradeLocal[]>([]);
+
+  const [amplitudeLocalMeteo, setAmplitudeLocalMeteo] =
+    useState<{
+      minimo: number;
+      maximo: number;
+      quantidade: number;
+    } | null>(null);
+
+  const [carregandoAmplitudeLocal, setCarregandoAmplitudeLocal] =
+    useState(false);
+
+  const [erroAmplitudeLocal, setErroAmplitudeLocal] =
+    useState<string | null>(null);
+
   const [pontosGradeTermica, setPontosGradeTermica] =
     useState<PontoGradeTermica[]>([]);
 
@@ -638,10 +1619,16 @@ function App() {
     useState<string | null>(null);
 
   const [mostrarGradeTermica, setMostrarGradeTermica] =
-    useState(true);
+    useState(false);
 
   const [poligonosCeara, setPoligonosCeara] =
     useState<PoligonosCeara>([]);
+
+  const [municipiosGeoJson, setMunicipiosGeoJson] =
+    useState<FeatureCollection | null>(null);
+
+  const [municipioSelecionado, setMunicipioSelecionado] =
+    useState<MunicipioFoco | null>(null);
 
   const [erroContornoCeara, setErroContornoCeara] =
     useState<string | null>(null);
@@ -1077,6 +2064,48 @@ function App() {
     pontoOpenMeteo.latitude,
     pontoOpenMeteo.longitude
   ]);
+  // CARREGA OS LIMITES MUNICIPAIS DO CEARÁ
+  useEffect(() => {
+    const controlador = new AbortController();
+
+    const carregarMunicipios = async () => {
+      try {
+        const resposta = await fetch(
+          '/municipios-ceara.geojson',
+          { signal: controlador.signal }
+        );
+
+        if (!resposta.ok) {
+          throw new Error('Arquivo municipal não encontrado');
+        }
+
+        const dados =
+          (await resposta.json()) as FeatureCollection;
+
+        if (
+          dados.type !== 'FeatureCollection' ||
+          !Array.isArray(dados.features)
+        ) {
+          throw new Error('GeoJSON municipal inválido');
+        }
+
+        if (!controlador.signal.aborted) {
+          setMunicipiosGeoJson(dados);
+        }
+      } catch (erro) {
+        if (!controlador.signal.aborted) {
+          console.error(
+            'Erro ao carregar municípios:',
+            erro
+          );
+        }
+      }
+    };
+
+    carregarMunicipios();
+
+    return () => controlador.abort();
+  }, []);
 
   // CARREGA O CONTORNO DO CEARÁ SALVO NO PROJETO
   useEffect(() => {
@@ -1161,16 +2190,29 @@ function App() {
         longitude: number;
       }[] = [];
 
-      // Grade de 5 linhas por 6 colunas: 30 pontos.
-      for (let linha = 0; linha < 5; linha++) {
-        for (let coluna = 0; coluna < 6; coluna++) {
+      // Grade regional de 9 linhas por 11 colunas.
+      for (
+        let linha = 0;
+        linha < LINHAS_GRADE_TERMICA;
+        linha++
+      ) {
+        for (
+          let coluna = 0;
+          coluna < COLUNAS_GRADE_TERMICA;
+          coluna++
+        ) {
           coordenadas.push({
             latitude:
               limites.norte -
-              (linha / 4) * (limites.norte - limites.sul),
+              (
+                linha / (LINHAS_GRADE_TERMICA - 1)
+              ) * (limites.norte - limites.sul),
+
             longitude:
               limites.oeste +
-              (coluna / 5) * (limites.leste - limites.oeste)
+              (
+                coluna / (COLUNAS_GRADE_TERMICA - 1)
+              ) * (limites.leste - limites.oeste)
           });
         }
       }
@@ -1184,7 +2226,8 @@ function App() {
             .map(ponto => ponto.longitude.toFixed(4))
             .join(','),
           current: 'temperature_2m',
-          timezone: 'America/Fortaleza'
+          timezone: 'America/Fortaleza',
+          timeformat: 'unixtime'
         });
 
         const resposta = await fetch(
@@ -1219,9 +2262,19 @@ function App() {
               throw new Error('Temperatura inválida na grade');
             }
 
+            const horarioModelo = resultado?.current?.time;
+
+            if (
+              typeof horarioModelo !== 'number' ||
+              !Number.isFinite(horarioModelo)
+            ) {
+              throw new Error('Horário meteorológico inválido');
+            }
+
             return {
               ...coordenadas[indice],
-              temperatura
+              temperatura,
+              horarioModelo: horarioModelo * 1000
             };
           });
 
@@ -1253,6 +2306,121 @@ function App() {
 
     return () => controlador.abort();
   }, [abaAtiva]);
+
+
+  // ANÁLISE LOCAL — 25 PONTOS OPEN-METEO
+  useEffect(() => {
+    if (abaAtiva !== 'meteorologia') return;
+
+    const controlador = new AbortController();
+
+    const consultarAreaLocal = async () => {
+      setCarregandoAmplitudeLocal(true);
+      setErroAmplitudeLocal(null);
+      setAmplitudeLocalMeteo(null);
+      setPontosGradeLocal([]);
+
+      // Amostragem aproximada em uma área de
+      // 45 km x 45 km ao redor do ponto selecionado.
+      const coordenadas: {
+        latitude: number;
+        longitude: number;
+      }[] = [];
+
+      for (let linha = 0; linha < 5; linha++) {
+        for (let coluna = 0; coluna < 5; coluna++) {
+          coordenadas.push({
+            latitude:
+              pontoOpenMeteo.latitude + (linha - 2) * 0.1,
+            longitude:
+              pontoOpenMeteo.longitude + (coluna - 2) * 0.1
+          });
+        }
+      }
+
+      try {
+        const parametros = new URLSearchParams({
+          latitude: coordenadas
+            .map(p => p.latitude.toFixed(4))
+            .join(','),
+          longitude: coordenadas
+            .map(p => p.longitude.toFixed(4))
+            .join(','),
+          current: 'temperature_2m',
+          timezone: 'America/Fortaleza',
+          forecast_days: '1'
+        });
+
+        const resposta = await fetch(
+          `https://api.open-meteo.com/v1/forecast?${parametros}`,
+          { signal: controlador.signal }
+        );
+
+        if (!resposta.ok) {
+          throw new Error(`HTTP ${resposta.status}`);
+        }
+
+        const resultados = await resposta.json();
+
+        if (
+          !Array.isArray(resultados) ||
+          resultados.length !== coordenadas.length
+        ) {
+          throw new Error('Resposta local incompleta');
+        }
+
+        const temperaturas = resultados.map(resultado => {
+          const valor = resultado?.current?.temperature_2m;
+
+          if (
+            typeof valor !== 'number' ||
+            !Number.isFinite(valor)
+          ) {
+            throw new Error('Temperatura local inválida');
+          }
+
+          return valor as number;
+        });
+
+        if (!controlador.signal.aborted) {
+          setPontosGradeLocal(
+            coordenadas.map((coordenada, indice) => ({
+              ...coordenada,
+              temperatura: temperaturas[indice]
+            }))
+          );
+          setAmplitudeLocalMeteo({
+            minimo: Math.min(...temperaturas),
+            maximo: Math.max(...temperaturas),
+            quantidade: temperaturas.length
+          });
+        }
+      } catch (erro) {
+        if (!controlador.signal.aborted) {
+          console.error('Erro na análise local:', erro);
+          setErroAmplitudeLocal(
+            'Não foi possível consultar a grade local.'
+          );
+        }
+      } finally {
+        if (!controlador.signal.aborted) {
+          setCarregandoAmplitudeLocal(false);
+        }
+      }
+    };
+
+    // Evita disparar imediatamente uma consulta a cada clique.
+    const espera = window.setTimeout(consultarAreaLocal, 600);
+
+    return () => {
+      window.clearTimeout(espera);
+      controlador.abort();
+    };
+  }, [
+    abaAtiva,
+    pontoOpenMeteo.latitude,
+    pontoOpenMeteo.longitude
+  ]);
 
 
   const exportarDados = () => {
@@ -1449,9 +2617,11 @@ function App() {
       valor: leituraSelecionadaMeteo
         ? `${leituraSelecionadaMeteo.temperatura.toFixed(1)} °C`
         : '—',
-      legenda: leituraRecenteMeteo
-        ? 'Medição recente'
-        : 'Sem medição recente'
+      legenda: leituraSelecionadaMeteo
+        ? leituraRecenteMeteo
+          ? 'Medição recente da estação'
+          : 'Última medição histórica'
+        : 'Sem leitura disponível'
     },
     {
       titulo: 'Umidade',
@@ -1488,6 +2658,71 @@ function App() {
         : 'Sem leitura disponível'
     }
   ];
+
+  // ESTAÇÕES ELEGÍVEIS PARA O MAPA HÍBRIDO
+  const horarioModeloHibrido =
+    pontosGradeTermica[0]?.horarioModelo ?? 0;
+
+  const estacoesAptasHibrido = estacoesMeteo.filter(
+    (estacao) => {
+      const leitura = estacao.ultimaLeitura;
+
+      if (!leitura || !horarioModeloHibrido) {
+        return false;
+      }
+
+      return (
+        leitura.recebidoEm <= agoraMeteo &&
+        agoraMeteo - leitura.recebidoEm <= 30 * 60 * 1000 &&
+        horarioModeloHibrido <= agoraMeteo + 5 * 60 * 1000 &&
+        Math.abs(
+          agoraMeteo - horarioModeloHibrido
+        ) <= 60 * 60 * 1000 &&
+        Math.abs(
+          leitura.recebidoEm - horarioModeloHibrido
+        ) <= 30 * 60 * 1000
+      );
+    }
+  );
+
+  // COMPARAÇÃO ENTRE MODELO E ESTAÇÃO SELECIONADA
+  const temperaturaModeloEstacao =
+    estacaoSelecionadaMeteo &&
+      pontosGradeTermica.length === TOTAL_PONTOS_GRADE_TERMICA
+      ? estimarTemperaturaNaGrade(
+        pontosGradeTermica,
+        estacaoSelecionadaMeteo.latitude,
+        estacaoSelecionadaMeteo.longitude
+      )
+      : null;
+
+  const estacaoComparavelAgora =
+    estacaoSelecionadaMeteo !== null &&
+    estacoesAptasHibrido.some(
+      estacao => estacao.id === estacaoSelecionadaMeteo.id
+    ) &&
+    temperaturaModeloEstacao !== null;
+
+  const diferencaTemperaturaMeteo =
+    estacaoComparavelAgora &&
+      temperaturaModeloEstacao !== null &&
+      leituraSelecionadaMeteo !== null
+      ? leituraSelecionadaMeteo.temperatura -
+      temperaturaModeloEstacao
+      : null;
+
+  const escalaTermicaAtual =
+    obterEscalaTermica(pontosGradeTermica);
+
+  // TEMPERATURA INTERPOLADA REPRESENTADA NO MAPA
+  const temperaturaCorMapa =
+    pontosGradeTermica.length === TOTAL_PONTOS_GRADE_TERMICA
+      ? estimarTemperaturaNaGrade(
+        pontosGradeTermica,
+        pontoOpenMeteo.latitude,
+        pontoOpenMeteo.longitude
+      )
+      : null;
 
   const cardStyle = {
     backgroundColor: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' as const,
@@ -2437,6 +3672,169 @@ function App() {
               </div>
             )}
 
+
+            {/* ANÁLISE COMPARATIVA DAS FONTES */}
+            {estacaoSelecionadaMeteo && (
+              <div
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '22px',
+                  padding: isMobile ? '18px' : '24px',
+                  boxShadow: '0 8px 28px rgba(33, 69, 99, 0.06)',
+                  border: '1px solid #E5ECF4'
+                }}
+              >
+                <div style={{ marginBottom: '18px' }}>
+                  <h2
+                    style={{
+                      color: '#214563',
+                      fontSize: '18px',
+                      fontWeight: '800',
+                      margin: '0 0 6px'
+                    }}
+                  >
+                    Análise das fontes meteorológicas
+                  </h2>
+
+                  <p
+                    style={{
+                      color: '#8E8E93',
+                      fontSize: '12px',
+                      margin: 0
+                    }}
+                  >
+                    {estacaoSelecionadaMeteo.nome}
+                    {' • '}
+                    {estacaoSelecionadaMeteo.municipio}
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile
+                      ? '1fr'
+                      : 'repeat(3, minmax(0, 1fr))',
+                    gap: '14px'
+                  }}
+                >
+                  {[
+                    {
+                      titulo: 'Open-Meteo',
+                      valor: temperaturaModeloEstacao !== null
+                        ? `${temperaturaModeloEstacao.toFixed(1)} °C`
+                        : '—',
+                      subtitulo: horarioModeloHibrido
+                        ? `Estimativa da grade • ${new Date(
+                          horarioModeloHibrido
+                        ).toLocaleString('pt-BR')}`
+                        : 'Estimativa não disponível',
+                      cor: '#E58047'
+                    },
+                    {
+                      titulo: 'Estação CUIDAÍ',
+                      valor: leituraSelecionadaMeteo
+                        ? `${leituraSelecionadaMeteo.temperatura.toFixed(1)} °C`
+                        : '—',
+                      subtitulo: leituraSelecionadaMeteo
+                        ? `Leitura de ${new Date(
+                          leituraSelecionadaMeteo.recebidoEm
+                        ).toLocaleString('pt-BR')}`
+                        : 'Sem leitura registrada',
+                      cor: '#168FC4'
+                    },
+                    {
+                      titulo: 'Diferença entre fontes',
+                      valor: diferencaTemperaturaMeteo !== null
+                        ? `${diferencaTemperaturaMeteo > 0 ? '+' : ''}${diferencaTemperaturaMeteo.toFixed(1)} °C`
+                        : '—',
+                      subtitulo: diferencaTemperaturaMeteo !== null
+                        ? 'Medições temporalmente compatíveis'
+                        : 'Comparação atual indisponível',
+                      cor: '#214563'
+                    }
+                  ].map(item => (
+                    <div
+                      key={item.titulo}
+                      style={{
+                        minWidth: 0,
+                        backgroundColor: '#F8FAFD',
+                        border: '1px solid #E8EDF4',
+                        borderRadius: '16px',
+                        padding: '18px'
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'block',
+                          color: '#64748B',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          marginBottom: '10px'
+                        }}
+                      >
+                        {item.titulo}
+                      </span>
+
+                      <strong
+                        style={{
+                          color: item.cor,
+                          fontSize: '24px',
+                          fontWeight: '800',
+                          display: 'block',
+                          marginBottom: '10px'
+                        }}
+                      >
+                        {item.valor}
+                      </strong>
+
+                      <span
+                        style={{
+                          display: 'block',
+                          color: '#8E8E93',
+                          fontSize: '11px',
+                          lineHeight: '1.5'
+                        }}
+                      >
+                        {item.subtitulo}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: '16px',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    backgroundColor: '#EAF5FF',
+                    fontSize: '12px',
+                    color: '#45627A',
+                    lineHeight: '1.6'
+                  }}
+                >
+                  {estacaoComparavelAgora
+                    ? 'A estação possui uma leitura recente, temporalmente compatível com a grade meteorológica. O ajuste local experimental está habilitado para esta estação.'
+                    : 'Esta estação não possui uma leitura recente compatível com o modelo. Sua última medição permanece disponível para análise histórica, mas não modifica o mapa climático atual.'}
+                </div>
+
+                <p
+                  style={{
+                    color: '#8E8E93',
+                    fontSize: '11px',
+                    lineHeight: '1.6',
+                    margin: '12px 0 0'
+                  }}
+                >
+                  A temperatura Open-Meteo apresentada é interpolada
+                  a partir da grade regional de {pontosGradeTermica.length} pontos. A diferença
+                  entre fontes é uma comparação experimental e deve
+                  considerar a incerteza do sensor e do modelo.
+                </p>
+              </div>
+            )}
+
+
             {/* INDICADORES */}
             <div
               style={{
@@ -2480,6 +3878,11 @@ function App() {
                   </span>
                 </div>
               ))}
+            </div>
+
+            {/* NOVO ATLAS TERRITORIAL — TESTE */}
+            <div style={{ marginBottom: '24px' }}>
+              <AtlasBrasil />
             </div>
 
             {/* MAPA METEOROLÓGICO */}
@@ -2648,6 +4051,91 @@ function App() {
                       Referência: {dadosOpenMeteo.horario.replace('T', ' às ')}
                       {' (horário de Fortaleza)'}
                     </p>
+
+                    {/* COMPARAÇÃO ENTRE COR DO MAPA E CONSULTA PONTUAL */}
+                    {temperaturaCorMapa !== null && (
+                      <div
+                        style={{
+                          marginTop: '14px',
+                          padding: '14px 16px',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #DCE8F3',
+                          borderRadius: '12px',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '24px',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              color: '#64748B',
+                              display: 'block',
+                              marginBottom: '5px'
+                            }}
+                          >
+                            Temperatura usada na cor do mapa
+                          </span>
+
+                          <strong
+                            style={{
+                              color: '#214563',
+                              fontSize: '19px'
+                            }}
+                          >
+                            {temperaturaCorMapa.toFixed(1)} °C
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              color: '#64748B',
+                              display: 'block',
+                              marginBottom: '5px'
+                            }}
+                          >
+                            Consulta direta Open-Meteo
+                          </span>
+
+                          <strong
+                            style={{
+                              color: '#168FC4',
+                              fontSize: '19px'
+                            }}
+                          >
+                            {dadosOpenMeteo.temperatura.toFixed(1)} °C
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              color: '#64748B',
+                              display: 'block',
+                              marginBottom: '5px'
+                            }}
+                          >
+                            Diferença absoluta
+                          </span>
+
+                          <strong
+                            style={{
+                              color: '#214563',
+                              fontSize: '19px'
+                            }}
+                          >
+                            {Math.abs(
+                              temperaturaCorMapa - dadosOpenMeteo.temperatura
+                            ).toFixed(1)} °C
+                          </strong>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : null}
 
@@ -2661,6 +4149,193 @@ function App() {
                   Valores estimados por modelos meteorológicos.
                   Não são medições da Estação CUIDAÍ.
                 </p>
+              </div>
+
+
+              {/* INTEGRAÇÃO AUTOMÁTICA DAS FONTES METEOROLÓGICAS */}
+              <div
+                style={{
+                  backgroundColor: '#F5F9FD',
+                  border: '1px solid #DCE8F3',
+                  borderRadius: '16px',
+                  padding: '16px 18px'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '10px'
+                  }}
+                >
+                  <strong
+                    style={{
+                      fontSize: '14px',
+                      color: '#214563'
+                    }}
+                  >
+                    Mapa climático integrado CUIDAÍ
+                  </strong>
+
+                  <span
+                    style={{
+                      backgroundColor: '#E5F2FA',
+                      color: '#168FC4',
+                      padding: '7px 11px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: '700'
+                    }}
+                  >
+                    Integração automática
+                  </span>
+                </div>
+
+                <p
+                  style={{
+                    color: '#64748B',
+                    fontSize: '12px',
+                    lineHeight: '1.6',
+                    margin: '12px 0'
+                  }}
+                >
+                  A Open-Meteo fornece as estimativas regionais de temperatura.
+                  As estações CUIDAÍ acrescentam observações locais que podem
+                  ajustar o mapa em suas proximidades, quando houver medições
+                  recentes compatíveis.
+                </p>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '8px'
+                  }}
+                >
+                  <span
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      color: '#214563',
+                      padding: '9px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid #E2EBF4',
+                      fontSize: '12px',
+                      fontWeight: '700'
+                    }}
+                  >
+                    Open-Meteo · Referência regional
+                  </span>
+
+                  <span
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      color: '#214563',
+                      padding: '9px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid #E2EBF4',
+                      fontSize: '12px',
+                      fontWeight: '700'
+                    }}
+                  >
+                    {estacoesMeteo.length} estações publicadas
+                  </span>
+
+                  <span
+                    style={{
+                      backgroundColor: estacoesAptasHibrido.length > 0
+                        ? '#E7F5EF'
+                        : '#F2F4F7',
+                      color: estacoesAptasHibrido.length > 0
+                        ? '#287856'
+                        : '#64748B',
+                      padding: '9px 12px',
+                      borderRadius: '10px',
+                      fontSize: '12px',
+                      fontWeight: '700'
+                    }}
+                  >
+                    {estacoesAptasHibrido.length} contribuindo agora
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: '12px',
+                    color: '#64748B',
+                    fontSize: '11px',
+                    lineHeight: '1.6'
+                  }}
+                >
+                  {estacoesAptasHibrido.length > 0
+                    ? `As medições de ${estacoesAptasHibrido.length} estação(ões)
+         estão sendo consideradas no ajuste local experimental
+         de até 500 metros.`
+                    : 'Nenhuma estação possui leitura recente compatível neste momento. O mapa utiliza somente as estimativas regionais da Open-Meteo.'}
+                </div>
+              </div>
+
+
+              {/* DIAGNÓSTICO DA VARIAÇÃO LOCAL */}
+              <div
+                style={{
+                  padding: '16px 18px',
+                  backgroundColor: '#F5F9FD',
+                  border: '1px solid #DCE8F3',
+                  borderRadius: '16px'
+                }}
+              >
+                <strong
+                  style={{
+                    fontSize: '14px',
+                    color: '#214563'
+                  }}
+                >
+                  Variação térmica próxima ao ponto selecionado
+                </strong>
+
+                {carregandoAmplitudeLocal ? (
+                  <p style={{ color: '#64748B', fontSize: '12px' }}>
+                    Consultando temperaturas da região...
+                  </p>
+                ) : erroAmplitudeLocal ? (
+                  <p style={{ color: '#B42318', fontSize: '12px' }}>
+                    {erroAmplitudeLocal}
+                  </p>
+                ) : amplitudeLocalMeteo ? (
+                  <div style={{ marginTop: '12px' }}>
+                    <div
+                      style={{
+                        fontSize: '23px',
+                        fontWeight: '800',
+                        color: '#214563'
+                      }}
+                    >
+                      {amplitudeLocalMeteo.minimo.toFixed(1)} °C
+                      {' — '}
+                      {amplitudeLocalMeteo.maximo.toFixed(1)} °C
+                    </div>
+
+                    <p
+                      style={{
+                        fontSize: '12px',
+                        color: '#64748B',
+                        margin: '8px 0 0'
+                      }}
+                    >
+                      {amplitudeLocalMeteo.quantidade} pontos consultados
+                      em uma região de aproximadamente 45 km de largura.
+                      {' '}
+                      Amplitude térmica:
+                      {' '}
+                      {(
+                        amplitudeLocalMeteo.maximo -
+                        amplitudeLocalMeteo.minimo
+                      ).toFixed(1)} °C.
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
 
@@ -2690,7 +4365,7 @@ function App() {
                         color: '#214563'
                       }}
                     >
-                      Distribuição regional da temperatura
+                      Temperatura no território
                     </strong>
 
                     <span
@@ -2699,7 +4374,7 @@ function App() {
                         fontSize: '11px'
                       }}
                     >
-                      Camada interpolada com estimativas da Open-Meteo
+                      Estimativas regionais da Open-Meteo com integração automática das estações CUIDAÍ
                     </span>
                   </div>
 
@@ -2747,35 +4422,83 @@ function App() {
                   </p>
                 )}
 
-                <div style={{ marginTop: '16px' }}>
-                  <div
-                    style={{
-                      height: '12px',
-                      borderRadius: '8px',
-                      background:
-                        'linear-gradient(to right, #508ECB, #7AC9D7, #F5D477, #F6A057, #DF6248, #962E4E)'
-                    }}
-                  />
 
-                  <div
+
+                {/* LEGENDA AUTOMÁTICA COM CORES HEX */}
+                <div style={{ marginTop: '16px' }}>
+                  {pontosGradeTermica.length > 0 ? (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'nowrap',
+                        gap: '6px',
+                        overflowX: 'auto',
+                        paddingBottom: '8px'
+                      }}
+                    >
+                      {ESCALA_TERMICA_CUIDAI
+                        .filter((faixa, indice) => {
+                          const proximaFaixa =
+                            ESCALA_TERMICA_CUIDAI[indice + 1];
+
+                          const limiteSuperior =
+                            proximaFaixa?.inicio ?? Infinity;
+
+                          return (
+                            escalaTermicaAtual.minimo < limiteSuperior &&
+                            escalaTermicaAtual.maximo >= faixa.inicio
+                          );
+                        })
+                        .map(faixa => (
+                          <div
+                            key={faixa.rotulo}
+                            style={{
+                              flex: '1 0 100px',
+                              minWidth: '100px'
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: '17px',
+                                borderRadius: '5px',
+                                backgroundColor: faixa.hex
+                              }}
+                            />
+
+                            <span
+                              style={{
+                                display: 'block',
+                                marginTop: '6px',
+                                color: '#64748B',
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                textAlign: 'center'
+                              }}
+                            >
+                              {faixa.rotulo}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: '#64748B', fontSize: '12px' }}>
+                      Aguardando temperaturas da Open-Meteo...
+                    </span>
+                  )}
+
+                  <p
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: '5px',
-                      marginTop: '7px',
-                      color: '#64748B',
-                      fontSize: '10px',
-                      fontWeight: '700'
+                      fontSize: '11px',
+                      color: '#8E8E93',
+                      margin: '10px 0 0'
                     }}
                   >
-                    <span>≤20 °C</span>
-                    <span>24 °C</span>
-                    <span>28 °C</span>
-                    <span>32 °C</span>
-                    <span>36 °C</span>
-                    <span>≥40 °C</span>
-                  </div>
+                    Escala fixa de 2 °C, do azul ao vermelho.
+                    As cores são personalizáveis e não alteram
+                    os valores de temperatura.
+                  </p>
                 </div>
+
 
 
                 {/* VARIAÇÃO OBSERVADA NA GRADE OPEN-METEO */}
@@ -2807,7 +4530,7 @@ function App() {
                         marginTop: '4px'
                       }}
                     >
-                      30 pontos consultados no Ceará e entorno.
+                      {pontosGradeTermica.length} pontos consultados no Ceará e entorno.
                     </span>
                   </div>
                 )}
@@ -2821,9 +4544,9 @@ function App() {
                     margin: '12px 0 0'
                   }}
                 >
-                  Visualização experimental em grade regional.
-                  As cores são estimativas interpoladas, não medições
-                  locais. A área será refinada para o limite do Ceará.
+                  Escala fixa de temperatura, com faixas de 2 °C.
+                  As cores são aplicadas com transparência para
+                  preservar os detalhes geográficos.
                   {' '}Fonte:{' '}
                   <a
                     href="https://open-meteo.com/"
@@ -2834,6 +4557,67 @@ function App() {
                     Open-Meteo
                   </a>.
                 </p>
+              </div>
+
+
+
+              {/* IDENTIFICAÇÃO DO TERRITÓRIO SELECIONADO */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  padding: '14px 18px',
+                  marginBottom: '12px',
+                  borderRadius: '14px',
+                  background: '#EFF6FD',
+                  border: '1px solid #DCE8F3'
+                }}
+              >
+                <div>
+                  <strong
+                    style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      color: '#214563'
+                    }}
+                  >
+                    {municipioSelecionado
+                      ? `${municipioSelecionado.nome} — CE`
+                      : 'Ceará — Visão territorial'}
+                  </strong>
+
+                  <span
+                    style={{
+                      color: '#64748B',
+                      fontSize: '12px'
+                    }}
+                  >
+                    {municipioSelecionado
+                      ? 'Município selecionado para investigação'
+                      : 'Clique em um município para investigar'}
+                  </span>
+                </div>
+
+                {municipioSelecionado && (
+                  <button
+                    type="button"
+                    onClick={() => setMunicipioSelecionado(null)}
+                    style={{
+                      border: '1px solid #BED8EF',
+                      background: '#FFFFFF',
+                      borderRadius: '10px',
+                      padding: '9px 12px',
+                      color: '#087CDB',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Limpar seleção
+                  </button>
+                )}
               </div>
 
 
@@ -2849,9 +4633,11 @@ function App() {
                   zoom={15}
                   style={{ height: '100%', width: '100%' }}
                 >
+                  {/* MAPA-BASE SEM NOMES */}
                   <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution="&copy; OpenStreetMap contributors"
+                    url={`https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png?key=${import.meta.env.VITE_CARTO_KEY}`}
+                    subdomains="abcd"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                   />
 
                   {/* CAMADA COLORIDA RECORTADA PELO CEARÁ */}
@@ -2861,15 +4647,73 @@ function App() {
                       <CamadaTemperaturaRegional
                         pontos={pontosGradeTermica}
                         poligonosCeara={poligonosCeara}
+                        gradeLocalDisponivel={pontosGradeLocal.length === 25}
                       />
                     )}
 
-                  {/* SELEÇÃO DE LOCAL PARA CONSULTA OPEN-METEO */}
-                  <SelecionarPontoOpenMeteo
-                    onSelecionar={(latitude, longitude) => {
-                      setPontoOpenMeteo({ latitude, longitude });
+                  {/* CAMADA DE TEMPERATURA PARA VISÃO LOCAL */}
+                  {mostrarGradeTermica &&
+                    pontosGradeLocal.length === 25 &&
+                    poligonosCeara.length > 0 && (
+                      <CamadaTemperaturaLocal
+                        pontos={pontosGradeLocal}
+                        poligonosCeara={poligonosCeara}
+                      />
+                    )}
+
+                  {/* AJUSTE LOCAL AUTOMÁTICO DAS ESTAÇÕES CUIDAÍ */}
+                  {mostrarGradeTermica &&
+                    pontosGradeTermica.length === TOTAL_PONTOS_GRADE_TERMICA &&
+                    estacoesAptasHibrido.length > 0 && (
+                      <CamadaAjusteLocalCuidai
+                        pontos={pontosGradeTermica}
+                        estacoes={estacoesAptasHibrido}
+                      />
+                    )}
+
+                  {/* NOMES DAS CIDADES E RUAS ACIMA DAS CORES */}
+                  <Pane
+                    name="rotulos-meteorologia"
+                    style={{
+                      zIndex: 450,
+                      pointerEvents: 'none'
                     }}
-                  />
+                  >
+                    <TileLayer
+                      url={`https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png?key=${import.meta.env.VITE_CARTO_KEY}`}
+                      subdomains="abcd"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    />
+                  </Pane>
+
+                  {/* SELEÇÃO DE LOCAL PARA CONSULTA OPEN-METEO */}
+
+                  {/* SELEÇÃO DE MUNICÍPIOS — TERRITÓRIO EM FOCO */}
+                  {municipiosGeoJson && (
+                    <CamadaMunicipiosCuidai
+                      dados={municipiosGeoJson}
+                      selecionado={municipioSelecionado}
+                      onSelecionar={(municipio, latitude, longitude) => {
+                        setMunicipioSelecionado(municipio);
+
+                        // Atualiza a estimativa para o ponto clicado.
+                        setPontoOpenMeteo({
+                          latitude,
+                          longitude
+                        });
+                      }}
+                    />
+                  )}
+
+                  {/* CONSULTA LIVRE CASO A MALHA NÃO CARREGUE */}
+                  {!municipiosGeoJson && (
+                    <SelecionarPontoOpenMeteo
+                      onSelecionar={(latitude, longitude) => {
+                        setPontoOpenMeteo({ latitude, longitude });
+                      }}
+                    />
+                  )}
+
 
                   {/* MARCADOR DO PONTO CONSULTADO */}
                   <CircleMarker
@@ -2885,17 +4729,129 @@ function App() {
                       weight: 3
                     }}
                   >
+
                     <Popup>
-                      <strong>Consulta Open-Meteo</strong>
-                      <p style={{ margin: '5px 0' }}>
-                        Estimativa meteorológica para o ponto selecionado.
-                      </p>
-                      <small>
-                        {pontoOpenMeteo.latitude.toFixed(4)},
-                        {' '}
-                        {pontoOpenMeteo.longitude.toFixed(4)}
-                      </small>
+                      <div
+                        style={{
+                          minWidth: '220px',
+                          padding: '5px',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        <strong
+                          style={{
+                            display: 'block',
+                            color: '#214563',
+                            fontSize: '14px',
+                            marginBottom: '12px'
+                          }}
+                        >
+                          Condições meteorológicas
+                        </strong>
+
+                        {carregandoOpenMeteo ? (
+                          <span style={{ color: '#64748B', fontSize: '12px' }}>
+                            Consultando Open-Meteo...
+                          </span>
+                        ) : erroOpenMeteo ? (
+                          <span style={{ color: '#B42318', fontSize: '12px' }}>
+                            {erroOpenMeteo}
+                          </span>
+                        ) : dadosOpenMeteo ? (
+                          <>
+                            <div
+                              style={{
+                                fontSize: '28px',
+                                fontWeight: '800',
+                                color: '#E58047',
+                                marginBottom: '12px'
+                              }}
+                            >
+                              {dadosOpenMeteo.temperatura
+                                .toFixed(1)
+                                .replace('.', ',')} °C
+                            </div>
+
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '12px',
+                                marginBottom: '12px'
+                              }}
+                            >
+                              <div>
+                                <span
+                                  style={{
+                                    display: 'block',
+                                    color: '#8E8E93',
+                                    fontSize: '11px'
+                                  }}
+                                >
+                                  Sensação térmica
+                                </span>
+                                <strong style={{ color: '#214563' }}>
+                                  {dadosOpenMeteo.sensacao
+                                    .toFixed(1)
+                                    .replace('.', ',')} °C
+                                </strong>
+                              </div>
+
+                              <div>
+                                <span
+                                  style={{
+                                    display: 'block',
+                                    color: '#8E8E93',
+                                    fontSize: '11px'
+                                  }}
+                                >
+                                  Umidade
+                                </span>
+                                <strong style={{ color: '#168FC4' }}>
+                                  {dadosOpenMeteo.umidade.toFixed(0)}%
+                                </strong>
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                borderTop: '1px solid #E5ECF4',
+                                paddingTop: '9px',
+                                color: '#64748B',
+                                fontSize: '11px'
+                              }}
+                            >
+                              Vento: {dadosOpenMeteo.vento.toFixed(1)} km/h
+                              <div style={{ marginTop: '5px' }}>
+                                Referência: {dadosOpenMeteo.horario.replace('T', ' às ')}
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: '#64748B' }}>
+                            Aguardando dados meteorológicos...
+                          </span>
+                        )}
+
+                        <div
+                          style={{
+                            borderTop: '1px solid #E5ECF4',
+                            marginTop: '12px',
+                            paddingTop: '9px',
+                            color: '#8E8E93',
+                            fontSize: '10px'
+                          }}
+                        >
+                          {pontoOpenMeteo.latitude.toFixed(4)},
+                          {' '}
+                          {pontoOpenMeteo.longitude.toFixed(4)}
+                          <div style={{ marginTop: '4px' }}>
+                            Fonte: Open-Meteo · Estimativa meteorológica
+                          </div>
+                        </div>
+                      </div>
                     </Popup>
+
                   </CircleMarker>
 
                   {estacoesMeteo.map((estacao) => (

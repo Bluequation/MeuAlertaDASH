@@ -3882,7 +3882,12 @@ function App() {
 
             {/* NOVO ATLAS TERRITORIAL — TESTE */}
             <div style={{ marginBottom: '24px' }}>
-              <AtlasBrasil />
+              <AtlasBrasil
+                estacoes={estacoesMeteo}
+                carregandoEstacoes={carregandoMeteo}
+                erroEstacoes={erroMeteo}
+                instanteAtual={agoraMeteo}
+              />
             </div>
 
             {/* MAPA METEOROLÓGICO */}

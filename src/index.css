@@ -492,3 +492,252 @@ body,
     transition: none;
   }
 }
+
+
+/* ========================================
+   ATLAS — PONTOS DE AMOSTRAGEM TÉRMICA
+   ======================================== */
+
+.atlas-layout__mapa {
+  position: relative;
+}
+
+.atlas-amostras-controle {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 900;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+
+  max-width: calc(100% - 32px);
+  pointer-events: none;
+}
+
+.atlas-amostras-botao {
+  pointer-events: auto;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  border: 1px solid #DCE7F0;
+  background: rgba(255, 255, 255, 0.97);
+  color: #31536D;
+
+  padding: 11px 15px;
+  border-radius: 12px;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 4px 16px rgba(25, 41, 66, 0.09);
+
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.atlas-amostras-botao:hover:not(:disabled) {
+  border-color: #168FC4;
+  color: #087CDB;
+}
+
+.atlas-amostras-botao--ativo {
+  border-color: #168FC4;
+  background: #EAF5FC;
+  color: #087CDB;
+}
+
+.atlas-amostras-botao:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.atlas-amostras-simbolo {
+  font-size: 17px;
+  line-height: 1;
+  color: #168FC4;
+}
+
+.atlas-amostras-legenda {
+  pointer-events: auto;
+
+  box-sizing: border-box;
+  width: 245px;
+  max-width: 100%;
+
+  padding: 14px 15px;
+  border: 1px solid #E0EAF2;
+  border-radius: 13px;
+
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow:
+    0 5px 18px rgba(25, 41, 66, 0.09);
+
+  color: #192942;
+}
+
+.atlas-amostras-legenda strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.atlas-amostras-escala {
+  height: 7px;
+  border-radius: 99px;
+
+  background: linear-gradient(90deg,
+      rgb(54, 161, 201),
+      rgb(145, 145, 137),
+      rgb(236, 128, 72));
+}
+
+.atlas-amostras-extremos {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.atlas-amostras-legenda small {
+  display: block;
+  margin-top: 11px;
+
+  color: #8090A0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.atlas-cuidai .leaflet-interactive.atlas-ponto-amostral:hover {
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.18));
+}
+
+
+/* OBSERVATÓRIO — ESTAÇÕES MUNICIPAIS */
+
+.obs-lista-estacoes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.obs-estacoes-resumo {
+  font-size: 12px;
+  color: #718096;
+  margin: 0 0 3px;
+}
+
+.obs-estacao-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #E0EAF3;
+  border-radius: 15px;
+  background: #F8FAFD;
+  color: #192942;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 180ms, background 180ms;
+}
+
+.obs-estacao-card:hover,
+.obs-estacao-card--ativa {
+  border-color: #168FC4;
+  background: #F1F8FE;
+}
+
+.obs-estacao-card:focus-visible {
+  outline: 3px solid #168FC4;
+  outline-offset: 2px;
+}
+
+.obs-estacao-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.obs-estacao-topo>strong {
+  font-size: 14px;
+}
+
+.obs-estacao-status {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 750;
+  padding: 6px 8px;
+  border-radius: 7px;
+  color: #64748B;
+  background: #E9EEF4;
+}
+
+.obs-estacao-status--recente {
+  color: #287856;
+  background: #E7F5EE;
+}
+
+.obs-estacao-experimental {
+  color: #957023;
+  font-size: 11px;
+}
+
+.obs-estacao-valores {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.obs-estacao-valores>span {
+  background: #FFFFFF;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.obs-estacao-valores small {
+  font-size: 11px;
+  color: #8190A2;
+}
+
+.obs-estacao-valores strong {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.obs-estacao-rodape {
+  font-size: 11px;
+  color: #7A8D9E;
+  line-height: 1.5;
+}
+
+.obs-estacao-acao {
+  font-size: 11px;
+  color: #087CDB;
+  font-weight: 750;
+}
+
+.obs-estacoes-nota {
+  margin: 16px 2px 0;
+  font-size: 11px;
+  color: #8190A2;
+  line-height: 1.7;
+}

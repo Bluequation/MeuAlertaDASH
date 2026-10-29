@@ -1,10 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    estacaoDentroDoMunicipio,
+    type EstacaoPublica
+} from './estacoesMunicipais';
 import ObservatorioMunicipal from './ObservatorioMunicipal';
+import type { PerfilTermicoMunicipal } from './perfilTermicoMunicipal';
 import {
     MapContainer,
     GeoJSON,
     TileLayer,
     Polygon,
+    CircleMarker,
+    Tooltip,
+    Popup,
     useMap
 } from 'react-leaflet';
 import L from 'leaflet';
@@ -54,6 +62,36 @@ function chaveRegiao(nome: string) {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, ' ')
         .trim();
+}
+
+
+// Paleta relativa às temperaturas da amostra.
+// Azul: valor mais baixo. Laranja: valor mais alto.
+function corPontoTermico(
+    temperatura: number,
+    minima: number,
+    maxima: number
+): string {
+    const amplitude = maxima - minima;
+
+    const proporcao = amplitude > 0
+        ? Math.max(
+            0,
+            Math.min(1, (temperatura - minima) / amplitude)
+        )
+        : 0.5;
+
+    const fria = [54, 161, 201];
+    const quente = [236, 128, 72];
+
+    const canais = fria.map((valor, indice) =>
+        Math.round(
+            valor +
+            (quente[indice] - valor) * proporcao
+        )
+    );
+
+    return `rgb(${canais.join(',')})`;
 }
 
 
@@ -133,7 +171,19 @@ function EnquadramentoAtlas({
 
 
 
-export default function AtlasBrasil() {
+type PropsAtlas = {
+    estacoes: EstacaoPublica[];
+    carregandoEstacoes: boolean;
+    erroEstacoes: string | null;
+    instanteAtual: number;
+};
+
+export default function AtlasBrasil({
+    estacoes,
+    carregandoEstacoes,
+    erroEstacoes,
+    instanteAtual
+}: PropsAtlas) {
     const [dados, setDados] = useState<FeatureCollection | null>(null);
     const [estado, setEstado] = useState<EstadoAtlas | null>(null);
     const [municipios, setMunicipios] = useState<FeatureCollection | null>(null);
@@ -141,6 +191,44 @@ export default function AtlasBrasil() {
     const [regioesPorMunicipio, setRegioesPorMunicipio] = useState<Record<string, string>>({});
     const [carregandoMunicipios, setCarregandoMunicipios] = useState(false);
     const [erro, setErro] = useState('');
+    const [idEstacaoSelecionada, setIdEstacaoSelecionada] =
+        useState<string | null>(null);
+
+
+    // VISUALIZAÇÃO DAS AMOSTRAS TÉRMICAS
+    const [mostrarAmostras, setMostrarAmostras] =
+        useState(false);
+
+    const [perfilMapa, setPerfilMapa] =
+        useState<{
+            codigo: string;
+            perfil: PerfilTermicoMunicipal;
+        } | null>(null);
+
+    const codigoMunicipioSelecionado =
+        municipio?.codigo ?? null;
+
+    // Recebe os resultados calculados pelo Observatório.
+    const receberPerfilTermico = useCallback(
+        (perfil: PerfilTermicoMunicipal | null) => {
+            setPerfilMapa(
+                perfil && codigoMunicipioSelecionado
+                    ? {
+                        codigo: codigoMunicipioSelecionado,
+                        perfil
+                    }
+                    : null
+            );
+        },
+        [codigoMunicipioSelecionado]
+    );
+
+    // Garante que pontos de outro município não apareçam.
+    const perfilMunicipio =
+        perfilMapa?.codigo === codigoMunicipioSelecionado
+            ? perfilMapa.perfil
+            : null;
+
 
     useEffect(() => {
         const controlador = new AbortController();
@@ -225,6 +313,24 @@ export default function AtlasBrasil() {
         ? municipios.features.find(
             feature => String(feature.properties?.id) === municipio.codigo
         )
+        : null;
+    // Estações efetivamente localizadas no município.
+    const estacoesDoMunicipio = useMemo(() => {
+        if (!geometriaMunicipio) return [];
+
+        return estacoes.filter(estacao =>
+            estacaoDentroDoMunicipio(
+                geometriaMunicipio.geometry,
+                estacao.latitude,
+                estacao.longitude
+            )
+        );
+    }, [estacoes, geometriaMunicipio]);
+
+    const idEstacaoAtiva = estacoesDoMunicipio.some(
+        estacao => estacao.id === idEstacaoSelecionada
+    )
+        ? idEstacaoSelecionada
         : null;
 
     // PONTO DE REFERÊNCIA METEOROLÓGICA DO MUNICÍPIO
@@ -448,14 +554,212 @@ export default function AtlasBrasil() {
                                                 });
                                             } else if (estaNoCeara && municipios) {
                                                 if (!codigo) return;
+                                                setMostrarAmostras(false);
+                                                setPerfilMapa(null);
                                                 setMunicipio({ codigo, nome });
                                             }
                                         });
                                     }}
                                 />
+
+
+                                {/* PONTOS DA AMOSTRAGEM TÉRMICA MUNICIPAL */}
+                                {municipio &&
+                                    mostrarAmostras &&
+                                    perfilMunicipio &&
+                                    perfilMunicipio.pontos.map((ponto, indice) => (
+                                        <CircleMarker
+                                            key={`${municipio.codigo}-amostra-${indice}`}
+                                            center={[ponto.latitude, ponto.longitude]}
+                                            radius={6}
+                                            pathOptions={{
+                                                color: '#FFFFFF',
+                                                weight: 2,
+                                                fillColor: corPontoTermico(
+                                                    ponto.temperatura,
+                                                    perfilMunicipio.minima,
+                                                    perfilMunicipio.maxima
+                                                ),
+                                                fillOpacity: 0.95
+                                            }}
+                                        >
+                                            <Tooltip
+                                                direction="top"
+                                                offset={[0, -8]}
+                                                opacity={1}
+                                            >
+                                                <div style={{ lineHeight: 1.5 }}>
+                                                    <strong>Amostra {indice + 1}</strong>
+                                                    <div>
+                                                        {ponto.temperatura.toFixed(1)
+                                                            .replace('.', ',')} °C
+                                                    </div>
+                                                </div>
+                                            </Tooltip>
+
+                                            <Popup>
+                                                <div style={{ lineHeight: 1.7 }}>
+                                                    <strong>Amostra {indice + 1}</strong>
+
+                                                    <div>
+                                                        Temperatura estimada:{' '}
+                                                        <strong>
+                                                            {ponto.temperatura.toFixed(1)
+                                                                .replace('.', ',')} °C
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        Latitude: {ponto.latitude.toFixed(5)}
+                                                    </div>
+
+                                                    <div>
+                                                        Longitude: {ponto.longitude.toFixed(5)}
+                                                    </div>
+
+                                                    <div>
+                                                        Fonte: Open-Meteo
+                                                    </div>
+                                                </div>
+                                            </Popup>
+                                        </CircleMarker>
+                                    ))
+                                }
+
                             </>
                         )}
+
+                        {/* ESTAÇÕES CUIDAÍ DO MUNICÍPIO */}
+                        {municipio && estacoesDoMunicipio.map(estacao => {
+                            const leitura = estacao.ultimaLeitura;
+
+                            const recente =
+                                leitura !== null &&
+                                instanteAtual >= leitura.recebidoEm &&
+                                instanteAtual - leitura.recebidoEm <=
+                                30 * 60 * 1000;
+
+                            const selecionada =
+                                idEstacaoAtiva === estacao.id;
+
+                            return (
+                                <CircleMarker
+                                    key={`estacao-cuidai-${estacao.id}`}
+                                    center={[
+                                        estacao.latitude,
+                                        estacao.longitude
+                                    ]}
+                                    radius={selecionada ? 11 : 8}
+                                    pathOptions={{
+                                        color: selecionada
+                                            ? '#192942'
+                                            : '#FFFFFF',
+                                        weight: 3,
+                                        fillColor: recente
+                                            ? '#087CDB'
+                                            : '#718399',
+                                        fillOpacity: 1
+                                    }}
+                                    eventHandlers={{
+                                        click: () =>
+                                            setIdEstacaoSelecionada(estacao.id)
+                                    }}
+                                >
+                                    <Tooltip direction="top">
+                                        {estacao.nome} • Estação CUIDAÍ
+                                    </Tooltip>
+
+                                    <Popup>
+                                        <div style={{ minWidth: '180px' }}>
+                                            <strong>{estacao.nome}</strong>
+
+                                            <p>
+                                                {recente
+                                                    ? 'Leitura recente'
+                                                    : 'Sem leitura recente'}
+                                            </p>
+
+                                            {leitura ? (
+                                                <>
+                                                    <div>
+                                                        Temperatura:{' '}
+                                                        {leitura.temperatura.toFixed(1)} °C
+                                                    </div>
+                                                    <div>
+                                                        Umidade:{' '}
+                                                        {leitura.umidade.toFixed(0)}%
+                                                    </div>
+                                                    <small>
+                                                        {new Date(
+                                                            leitura.recebidoEm
+                                                        ).toLocaleString('pt-BR')}
+                                                    </small>
+                                                </>
+                                            ) : (
+                                                <p>Sem medição disponível.</p>
+                                            )}
+                                        </div>
+                                    </Popup>
+                                </CircleMarker>
+                            );
+                        })}
+
                     </MapContainer>
+
+
+                    {/* CONTROLE DE VISUALIZAÇÃO DAS AMOSTRAS */}
+                    {municipio && (
+                        <div className="atlas-amostras-controle">
+                            <button
+                                type="button"
+                                className={
+                                    mostrarAmostras
+                                        ? 'atlas-amostras-botao atlas-amostras-botao--ativo'
+                                        : 'atlas-amostras-botao'
+                                }
+                                disabled={!perfilMunicipio}
+                                aria-pressed={mostrarAmostras}
+                                onClick={() =>
+                                    setMostrarAmostras(valor => !valor)
+                                }
+                            >
+                                <span className="atlas-amostras-simbolo">
+                                    {mostrarAmostras ? '●' : '○'}
+                                </span>
+
+                                {perfilMunicipio
+                                    ? mostrarAmostras
+                                        ? 'Ocultar pontos'
+                                        : `Mostrar ${perfilMunicipio.amostras} pontos`
+                                    : 'Preparando amostras...'}
+                            </button>
+
+                            {mostrarAmostras && perfilMunicipio && (
+                                <div className="atlas-amostras-legenda">
+                                    <strong>Temperaturas estimadas</strong>
+
+                                    <div className="atlas-amostras-escala" />
+
+                                    <div className="atlas-amostras-extremos">
+                                        <span>
+                                            {perfilMunicipio.minima.toFixed(1)
+                                                .replace('.', ',')} °C
+                                        </span>
+                                        <span>
+                                            {perfilMunicipio.maxima.toFixed(1)
+                                                .replace('.', ',')} °C
+                                        </span>
+                                    </div>
+
+                                    <small>
+                                        Escala relativa aos pontos do município.
+                                        Fonte: Open-Meteo.
+                                    </small>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                 </div>
 
                 {/* DASHBOARD ESTATÍSTICO À DIREITA */}
@@ -468,6 +772,15 @@ export default function AtlasBrasil() {
                             latitude={pontoReferenciaMunicipio.latitude}
                             longitude={pontoReferenciaMunicipio.longitude}
                             geometria={geometriaMunicipio.geometry}
+                            onPerfilTermico={receberPerfilTermico}
+                            estacoesMunicipais={estacoesDoMunicipio}
+                            carregandoEstacoes={carregandoEstacoes}
+                            erroEstacoes={erroEstacoes}
+                            instanteAtual={instanteAtual}
+                            idEstacaoSelecionada={idEstacaoAtiva}
+                            onSelecionarEstacao={setIdEstacaoSelecionada}
+                            codigoMunicipio={municipio.codigo}
+                            municipiosCeara={municipios}
                         />
                     )}
                 </aside>

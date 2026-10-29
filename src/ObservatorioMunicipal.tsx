@@ -1,11 +1,20 @@
 
 import { useEffect, useState } from 'react';
-import type { Geometry } from 'geojson';
-
+import type {
+    Geometry,
+    FeatureCollection
+} from 'geojson';
+import HistoricoEstacoes from './HistoricoEstacoes';
+import type {
+    EstacaoPublica
+} from './estacoesMunicipais';
+import ComparacaoMunicipal from './ComparacaoMunicipal';
 import {
     consultarPerfilTermicoMunicipal,
     type PerfilTermicoMunicipal
 } from './perfilTermicoMunicipal';
+
+
 
 type AbaObservatorio =
     | 'agora'
@@ -18,7 +27,18 @@ type Props = {
     uf: string;
     latitude: number;
     longitude: number;
+    codigoMunicipio: string;
+    municipiosCeara: FeatureCollection | null;
     geometria: Geometry;
+    onPerfilTermico: (
+        perfil: PerfilTermicoMunicipal | null
+    ) => void;
+    estacoesMunicipais: EstacaoPublica[];
+    carregandoEstacoes: boolean;
+    erroEstacoes: string | null;
+    instanteAtual: number;
+    idEstacaoSelecionada: string | null;
+    onSelecionarEstacao: (id: string) => void;
 };
 
 type DadosMeteorologicosAtuais = {
@@ -47,8 +67,17 @@ export default function ObservatorioMunicipal({
     municipio,
     uf,
     latitude,
+    estacoesMunicipais,
+    carregandoEstacoes,
+    erroEstacoes,
+    instanteAtual,
+    idEstacaoSelecionada,
+    codigoMunicipio,
+    municipiosCeara,
+    onSelecionarEstacao,
     longitude,
-    geometria
+    geometria,
+    onPerfilTermico
 }: Props) {
     const [aba, setAba] =
         useState<AbaObservatorio>('agora');
@@ -188,8 +217,21 @@ export default function ObservatorioMunicipal({
         return () => controlador.abort();
     }, [geometria]);
 
+    // Compartilha os dados já consultados com o mapa.
+    useEffect(() => {
+        onPerfilTermico(perfilTermico);
+    }, [perfilTermico, onPerfilTermico]);
+
     const formatarTemperatura = (valor: number) =>
         `${valor.toFixed(1).replace('.', ',')} °C`;
+
+    // Ao selecionar uma estação no mapa,
+    // abre automaticamente a aba Estações.
+    useEffect(() => {
+        if (idEstacaoSelecionada) {
+            setAba('estacoes');
+        }
+    }, [idEstacaoSelecionada]);
 
 
     return (
@@ -393,9 +435,29 @@ export default function ObservatorioMunicipal({
 
                                     <p>
                                         <strong>
-                                            {perfilTermico.amostras} pontos amostrados
+                                            {perfilTermico.amostras} pontos representativos
                                         </strong>
                                         {' dentro dos limites municipais.'}
+                                    </p>
+
+                                    <p>
+                                        <strong>
+                                            {perfilTermico.coordenadasConsultadas}
+                                            {' coordenadas consultadas'}
+                                        </strong>
+                                        {' • '}
+                                        {perfilTermico.celulasIdentificadas
+                                            ? 'Pontos repetidos da mesma célula meteorológica foram agrupados.'
+                                            : 'Nem todas as células meteorológicas puderam ser identificadas.'}
+                                    </p>
+
+                                    <p>
+                                        <p>
+                                            Amostragem espacial exploratória:
+                                            espaçamento-alvo aproximado de 3 km,
+                                            com refinamento para territórios pequenos
+                                            e limite de 90 coordenadas por consulta.
+                                        </p>
                                     </p>
 
                                     <p>
@@ -419,62 +481,239 @@ export default function ObservatorioMunicipal({
                     </>
                 )}
 
+
                 {aba === 'estacoes' && (
                     <>
                         <div className="obs-secao-titulo">
                             <h4>Rede de observação</h4>
-                            <span>Firebase</span>
+                            <span>Estações CUIDAÍ • Firebase</span>
                         </div>
 
-                        <div className="obs-bloco">
-                            <div className="obs-estado-vazio">
-                                <div className="obs-icone-vazio">
-                                    <span />
-                                    <span />
-                                    <span />
+                        {carregandoEstacoes ? (
+                            <article className="obs-bloco">
+                                <p>Consultando estações meteorológicas...</p>
+                            </article>
+                        ) : erroEstacoes ? (
+                            <article className="obs-bloco">
+                                <p role="alert">{erroEstacoes}</p>
+                            </article>
+                        ) : estacoesMunicipais.length === 0 ? (
+                            <article className="obs-bloco">
+                                <div className="obs-estado-vazio">
+                                    <h4>Nenhuma estação localizada</h4>
+                                    <p>
+                                        Ainda não há estações CUIDAÍ
+                                        publicadas com localização dentro
+                                        dos limites de {municipio}.
+                                    </p>
+                                    <p>
+                                        As estimativas meteorológicas
+                                        continuam disponíveis na aba Agora.
+                                    </p>
                                 </div>
+                            </article>
+                        ) : (
+                            <>
+                                <article className="obs-bloco">
+                                    <strong>
+                                        {estacoesMunicipais.length}
+                                        {' '}
+                                        {estacoesMunicipais.length === 1
+                                            ? 'estação localizada'
+                                            : 'estações localizadas'}
+                                    </strong>
+                                    <p>
+                                        Selecione uma estação para
+                                        destacá-la no mapa municipal.
+                                    </p>
+                                </article>
 
-                                <h4>Estações no território</h4>
+                                {estacoesMunicipais.map(estacao => {
+                                    const leitura = estacao.ultimaLeitura;
 
-                                <p>
-                                    As estações CUIDAÍ localizadas em
-                                    {` ${municipio}`} serão exibidas aqui,
-                                    com disponibilidade, temperatura,
-                                    umidade e horário da última leitura.
-                                </p>
-                            </div>
-                        </div>
+                                    const recente =
+                                        leitura !== null &&
+                                        instanteAtual >= leitura.recebidoEm &&
+                                        instanteAtual - leitura.recebidoEm <=
+                                        30 * 60 * 1000;
+
+                                    const selecionada =
+                                        idEstacaoSelecionada === estacao.id;
+
+                                    return (
+                                        <button
+                                            key={estacao.id}
+                                            type="button"
+                                            onClick={() =>
+                                                onSelecionarEstacao(estacao.id)
+                                            }
+                                            style={{
+                                                width: '100%',
+                                                display: 'block',
+                                                textAlign: 'left',
+                                                padding: '18px',
+                                                marginBottom: '12px',
+                                                borderRadius: '16px',
+                                                border: selecionada
+                                                    ? '2px solid #168FC4'
+                                                    : '1px solid #DCE8F3',
+                                                background: selecionada
+                                                    ? '#F0F8FF'
+                                                    : '#FFFFFF',
+                                                color: '#192942',
+                                                fontFamily: 'inherit',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    flexWrap: 'wrap'
+                                                }}
+                                            >
+                                                <strong>
+                                                    {estacao.nome}
+                                                </strong>
+
+                                                <span
+                                                    style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: 700,
+                                                        color: recente
+                                                            ? '#287856'
+                                                            : '#64748B'
+                                                    }}
+                                                >
+                                                    {recente
+                                                        ? 'Leitura recente'
+                                                        : leitura
+                                                            ? 'Leitura antiga'
+                                                            : 'Sem medição'}
+                                                </span>
+                                            </div>
+
+                                            {estacao.experimental && (
+                                                <p
+                                                    style={{
+                                                        fontSize: '11px',
+                                                        color: '#94701E'
+                                                    }}
+                                                >
+                                                    Estação experimental
+                                                </p>
+                                            )}
+
+                                            <div
+                                                style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: '1fr 1fr',
+                                                    gap: '12px',
+                                                    marginTop: '16px'
+                                                }}
+                                            >
+                                                <div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: '11px',
+                                                            color: '#8190A2'
+                                                        }}
+                                                    >
+                                                        Temperatura
+                                                    </div>
+
+                                                    <strong
+                                                        style={{
+                                                            fontSize: '24px'
+                                                        }}
+                                                    >
+                                                        {leitura
+                                                            ? `${leitura.temperatura.toFixed(1).replace('.', ',')} °C`
+                                                            : '—'}
+                                                    </strong>
+                                                </div>
+
+                                                <div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: '11px',
+                                                            color: '#8190A2'
+                                                        }}
+                                                    >
+                                                        Umidade
+                                                    </div>
+
+                                                    <strong
+                                                        style={{
+                                                            fontSize: '24px'
+                                                        }}
+                                                    >
+                                                        {leitura
+                                                            ? `${leitura.umidade.toFixed(0)}%`
+                                                            : '—'}
+                                                    </strong>
+                                                </div>
+                                            </div>
+
+                                            <p
+                                                style={{
+                                                    fontSize: '11px',
+                                                    color: '#8190A2',
+                                                    marginTop: '14px'
+                                                }}
+                                            >
+                                                {leitura
+                                                    ? `Última leitura: ${new Date(
+                                                        leitura.recebidoEm
+                                                    ).toLocaleString('pt-BR')}`
+                                                    : 'Nenhuma leitura válida disponível.'}
+                                            </p>
+
+                                            <div
+                                                style={{
+                                                    fontSize: '12px',
+                                                    fontWeight: 700,
+                                                    color: '#087CDB'
+                                                }}
+                                            >
+                                                Selecionar no mapa
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </>
+                        )}
+
+                        <p
+                            style={{
+                                fontSize: '11px',
+                                lineHeight: 1.6,
+                                color: '#8190A2'
+                            }}
+                        >
+                            As medições das estações são diferentes
+                            das estimativas da Open-Meteo.
+                            A ausência de uma leitura recente não
+                            significa necessariamente que a estação
+                            esteja desligada.
+                        </p>
                     </>
                 )}
+
 
                 {aba === 'historico' && (
                     <>
                         <div className="obs-secao-titulo">
                             <h4>Evolução meteorológica</h4>
-                            <span>Séries temporais</span>
+                            <span>Dados históricos • Firebase</span>
                         </div>
 
-                        <article className="obs-bloco">
-                            <div className="obs-grafico-vazio">
-                                <div className="obs-grafico-grade">
-                                    <span />
-                                    <span />
-                                    <span />
-                                    <span />
-                                </div>
-
-                                <div className="obs-grafico-mensagem">
-                                    Selecione uma estação com histórico
-                                    disponível para visualizar as medições.
-                                </div>
-                            </div>
-
-                            <p>
-                                Os gráficos utilizarão leituras reais
-                                armazenadas no Firebase, respeitando
-                                os períodos disponíveis.
-                            </p>
-                        </article>
+                        <HistoricoEstacoes
+                            estacoes={estacoesMunicipais}
+                            idEstacaoSelecionada={idEstacaoSelecionada}
+                        />
                     </>
                 )}
 
@@ -482,38 +721,16 @@ export default function ObservatorioMunicipal({
                     <>
                         <div className="obs-secao-titulo">
                             <h4>Comparação territorial</h4>
-                            <span>Dois municípios</span>
+                            <span>Dois municípios • Open-Meteo</span>
                         </div>
 
-                        <div className="obs-comparacao">
-                            <div className="obs-comparacao-local">
-                                <span className="obs-ponto-azul" />
-                                <small>Município A</small>
-                                <strong>{municipio}</strong>
-                            </div>
-
-                            <div className="obs-comparacao-local">
-                                <span className="obs-ponto-laranja" />
-                                <small>Município B</small>
-                                <strong>A selecionar</strong>
-                            </div>
-                        </div>
-
-                        <article className="obs-bloco">
-                            <h4>Compare dois territórios</h4>
-
-                            <p>
-                                Nesta área aparecerão as diferenças
-                                de temperatura, umidade e vento entre
-                                dois municípios, utilizando dados
-                                referentes a horários compatíveis.
-                            </p>
-
-                            <p>
-                                A seleção do segundo município será
-                                conectada ao Atlas na próxima etapa.
-                            </p>
-                        </article>
+                        <ComparacaoMunicipal
+                            municipioAtual={municipio}
+                            codigoAtual={codigoMunicipio}
+                            latitudeAtual={latitude}
+                            longitudeAtual={longitude}
+                            municipios={municipiosCeara}
+                        />
                     </>
                 )}
             </div>

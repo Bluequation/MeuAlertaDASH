@@ -1,12 +1,21 @@
 
 import type { Geometry } from 'geojson';
 
+export type PontoTermicoMunicipal = {
+    latitude: number;
+    longitude: number;
+    temperatura: number;
+};
+
 export type PerfilTermicoMunicipal = {
     minima: number;
     media: number;
     maxima: number;
     amostras: number;
     horario: string;
+    coordenadasConsultadas: number;
+    celulasIdentificadas: boolean;
+    pontos: PontoTermicoMunicipal[];
 };
 
 type Ponto = {
@@ -57,6 +66,14 @@ function dentroDoPoligono(
 }
 
 // Gera até 25 pontos dentro dos limites municipais.
+
+const ESPACAMENTO_AMOSTRAL_KM = 3;
+const MAXIMO_COORDENADAS = 90;
+const KM_POR_GRAU = 111.32;
+
+// Distribuição espacial aproximada.
+// O espaçamento é um parâmetro experimental,
+// não a resolução oficial do modelo meteorológico.
 export function gerarAmostrasMunicipais(
     geometria: Geometry
 ): Ponto[] {
@@ -67,76 +84,170 @@ export function gerarAmostrasMunicipais(
                 ? geometria.coordinates
                 : [];
 
-    if (poligonos.length === 0) {
-        return [];
-    }
+    if (poligonos.length === 0) return [];
 
-    const coordenadas = poligonos.flatMap(
+    const vertices = poligonos.flatMap(
         poligono => poligono[0]
     );
 
-    const longitudes = coordenadas.map(
-        ponto => ponto[0]
+    const oeste = Math.min(
+        ...vertices.map(p => p[0])
     );
 
-    const latitudes = coordenadas.map(
-        ponto => ponto[1]
+    const leste = Math.max(
+        ...vertices.map(p => p[0])
     );
 
-    const oeste = Math.min(...longitudes);
-    const leste = Math.max(...longitudes);
-    const sul = Math.min(...latitudes);
-    const norte = Math.max(...latitudes);
+    const sul = Math.min(
+        ...vertices.map(p => p[1])
+    );
 
-    const candidatos: Ponto[] = [];
+    const norte = Math.max(
+        ...vertices.map(p => p[1])
+    );
 
-    // Grade de candidatos distribuídos pelo território.
-    const divisoes = 25;
+    const latitudeCentral = (sul + norte) / 2;
 
-    for (let linha = 0; linha < divisoes; linha++) {
-        for (let coluna = 0; coluna < divisoes; coluna++) {
-            const longitude =
-                oeste +
-                ((coluna + 0.5) / divisoes) *
-                (leste - oeste);
+    const kmPorGrauLongitude =
+        KM_POR_GRAU *
+        Math.cos(latitudeCentral * Math.PI / 180);
 
+    const pertenceAoMunicipio = (
+        longitude: number,
+        latitude: number
+    ) =>
+        poligonos.some(poligono =>
+            dentroDoPoligono(
+                longitude,
+                latitude,
+                poligono
+            )
+        );
+
+    const criarGrade = (espacamentoKm: number) => {
+        const linhas = Math.max(
+            1,
+            Math.ceil(
+                (norte - sul) * KM_POR_GRAU /
+                espacamentoKm
+            )
+        );
+
+        const colunas = Math.max(
+            1,
+            Math.ceil(
+                (leste - oeste) *
+                kmPorGrauLongitude /
+                espacamentoKm
+            )
+        );
+
+        const candidatos: Ponto[] = [];
+
+        for (let linha = 0; linha < linhas; linha++) {
             const latitude =
-                sul +
-                ((linha + 0.5) / divisoes) *
+                sul + ((linha + 0.5) / linhas) *
                 (norte - sul);
 
-            const pertenceAoMunicipio = poligonos.some(
-                poligono =>
-                    dentroDoPoligono(
-                        longitude,
-                        latitude,
-                        poligono
-                    )
-            );
+            for (
+                let coluna = 0;
+                coluna < colunas;
+                coluna++
+            ) {
+                const longitude =
+                    oeste +
+                    ((coluna + 0.5) / colunas) *
+                    (leste - oeste);
 
-            if (pertenceAoMunicipio) {
-                candidatos.push({
-                    latitude,
-                    longitude
-                });
+                if (
+                    pertenceAoMunicipio(
+                        longitude,
+                        latitude
+                    )
+                ) {
+                    candidatos.push({
+                        latitude,
+                        longitude
+                    });
+                }
             }
         }
+
+        return candidatos;
+    };
+
+    // Reduz o espaçamento apenas quando nenhuma
+    // posição foi encontrada no território.
+    let candidatos: Ponto[] = [];
+
+    for (const espacamento of [ESPACAMENTO_AMOSTRAL_KM, 1.5, 0.75]) {
+        candidatos = criarGrade(espacamento);
+
+        if (candidatos.length > 0) break;
     }
 
-    const total = Math.min(25, candidatos.length);
+    if (candidatos.length <= MAXIMO_COORDENADAS) {
+        return candidatos;
+    }
 
-    return Array.from(
-        { length: total },
-        (_, indice) =>
-            candidatos[
-            Math.floor(
-                ((indice + 0.5) *
-                    candidatos.length) /
-                total
-            )
-            ]
-    );
+    // Se houver muitos candidatos, seleciona
+    // pontos afastados entre si para preservar
+    // a cobertura espacial.
+    const distanciaQuadrada = (
+        a: Ponto,
+        b: Ponto
+    ) => {
+        const dx =
+            (a.longitude - b.longitude) *
+            kmPorGrauLongitude;
+
+        const dy =
+            (a.latitude - b.latitude) *
+            KM_POR_GRAU;
+
+        return dx * dx + dy * dy;
+    };
+
+    const restantes = [...candidatos];
+
+    const escolhidos: Ponto[] = [
+        restantes.splice(
+            Math.floor(restantes.length / 2),
+            1
+        )[0]
+    ];
+
+    while (
+        escolhidos.length < MAXIMO_COORDENADAS &&
+        restantes.length > 0
+    ) {
+        let melhorIndice = 0;
+        let maiorDistancia = -1;
+
+        for (let i = 0; i < restantes.length; i++) {
+            const menorDistancia = Math.min(
+                ...escolhidos.map(escolhido =>
+                    distanciaQuadrada(
+                        restantes[i],
+                        escolhido
+                    )
+                )
+            );
+
+            if (menorDistancia > maiorDistancia) {
+                maiorDistancia = menorDistancia;
+                melhorIndice = i;
+            }
+        }
+
+        escolhidos.push(
+            restantes.splice(melhorIndice, 1)[0]
+        );
+    }
+
+    return escolhidos;
 }
+
 
 // Consulta a Open-Meteo e calcula o perfil amostral.
 export async function consultarPerfilTermicoMunicipal(
@@ -145,7 +256,7 @@ export async function consultarPerfilTermicoMunicipal(
 ): Promise<PerfilTermicoMunicipal> {
     const pontos = gerarAmostrasMunicipais(geometria);
 
-    if (pontos.length < 5) {
+    if (pontos.length === 0) {
         throw new Error(
             'Amostragem municipal insuficiente.'
         );
@@ -175,46 +286,95 @@ export async function consultarPerfilTermicoMunicipal(
         );
     }
 
+
     const resultados: unknown = await resposta.json();
 
-    if (
-        !Array.isArray(resultados) ||
-        resultados.length !== pontos.length
-    ) {
+    // Com uma coordenada, a API pode retornar
+    // um objeto; com várias, retorna uma lista.
+    const respostas: unknown[] =
+        Array.isArray(resultados)
+            ? resultados
+            : [resultados];
+
+    if (respostas.length !== pontos.length) {
         throw new Error(
-            'A resposta não corresponde aos pontos amostrados.'
+            'A resposta não corresponde às coordenadas consultadas.'
         );
     }
 
-    const leituras = resultados.map(
-        (resultado: unknown) => {
-            const atual = (
-                resultado as {
-                    current?: {
-                        temperature_2m?: unknown;
-                        time?: unknown;
-                    };
-                }
-            )?.current;
-
-            if (
-                typeof atual?.temperature_2m !== 'number' ||
-                !Number.isFinite(atual.temperature_2m) ||
-                typeof atual.time !== 'string'
-            ) {
-                throw new Error(
-                    'Uma ou mais leituras meteorológicas são inválidas.'
-                );
-            }
-
-            return {
-                temperatura: atual.temperature_2m,
-                horario: atual.time
+    const leituras = respostas.map((resultado, indice) => {
+        const dado = resultado as {
+            latitude?: unknown;
+            longitude?: unknown;
+            current?: {
+                temperature_2m?: unknown;
+                time?: unknown;
             };
-        }
-    );
+        };
 
-    // Garante que todos os pontos tenham a mesma referência.
+        const temperatura =
+            dado?.current?.temperature_2m;
+
+        const horario = dado?.current?.time;
+
+        if (
+            typeof temperatura !== 'number' ||
+            !Number.isFinite(temperatura) ||
+            typeof horario !== 'string'
+        ) {
+            throw new Error(
+                'Uma ou mais leituras meteorológicas são inválidas.'
+            );
+        }
+
+        const latitudeModelo = dado.latitude;
+        const longitudeModelo = dado.longitude;
+
+        const possuiCelula =
+            typeof latitudeModelo === 'number' &&
+            Number.isFinite(latitudeModelo) &&
+            typeof longitudeModelo === 'number' &&
+            Number.isFinite(longitudeModelo);
+
+        // As coordenadas retornadas identificam
+        // o centro da grade meteorológica utilizada.
+        const chaveCelula = possuiCelula
+            ? `${latitudeModelo.toFixed(4)},${longitudeModelo.toFixed(4)}`
+            : `consulta-${indice}`;
+
+        // Se várias posições usaram a mesma célula,
+        // será mantida a mais próxima do centro dela.
+        const distanciaCentro = possuiCelula
+            ? (
+                Math.pow(
+                    (pontos[indice].latitude -
+                        latitudeModelo) * 111.32,
+                    2
+                ) +
+                Math.pow(
+                    (pontos[indice].longitude -
+                        longitudeModelo) *
+                    111.32 *
+                    Math.cos(
+                        pontos[indice].latitude *
+                        Math.PI / 180
+                    ),
+                    2
+                )
+            )
+            : 0;
+
+        return {
+            ponto: pontos[indice],
+            temperatura,
+            horario,
+            chaveCelula,
+            possuiCelula,
+            distanciaCentro
+        };
+    });
+
+    // Compara apenas valores do mesmo horário.
     const horarios = new Set(
         leituras.map(leitura => leitura.horario)
     );
@@ -225,8 +385,41 @@ export async function consultarPerfilTermicoMunicipal(
         );
     }
 
-    const valores = leituras.map(
-        leitura => leitura.temperatura
+    // Remove repetição das células identificadas.
+    const porCelula = new Map<
+        string,
+        (typeof leituras)[number]
+    >();
+
+    for (const leitura of leituras) {
+        const anterior = porCelula.get(
+            leitura.chaveCelula
+        );
+
+        if (
+            !anterior ||
+            leitura.distanciaCentro <
+            anterior.distanciaCentro
+        ) {
+            porCelula.set(
+                leitura.chaveCelula,
+                leitura
+            );
+        }
+    }
+
+    const amostras = Array.from(
+        porCelula.values()
+    );
+
+    if (amostras.length === 0) {
+        throw new Error(
+            'Nenhuma amostra meteorológica válida.'
+        );
+    }
+
+    const valores = amostras.map(
+        amostra => amostra.temperatura
     );
 
     return {
@@ -240,8 +433,21 @@ export async function consultarPerfilTermicoMunicipal(
 
         maxima: Math.max(...valores),
 
-        amostras: valores.length,
+        amostras: amostras.length,
 
-        horario: leituras[0].horario
+        horario: amostras[0].horario,
+
+        coordenadasConsultadas: pontos.length,
+
+        celulasIdentificadas: leituras.every(
+            leitura => leitura.possuiCelula
+        ),
+
+        pontos: amostras.map(amostra => ({
+            latitude: amostra.ponto.latitude,
+            longitude: amostra.ponto.longitude,
+            temperatura: amostra.temperatura
+        }))
     };
 }
+

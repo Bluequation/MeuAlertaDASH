@@ -10,6 +10,15 @@ import type {
 } from './estacoesMunicipais';
 import ComparacaoMunicipal from './ComparacaoMunicipal';
 import {
+    FiThermometer,
+    FiSun,
+    FiDroplet,
+    FiWind,
+    FiBarChart2,
+    FiMaximize2,
+    FiMapPin
+} from 'react-icons/fi';
+import {
     consultarPerfilTermicoMunicipal,
     type PerfilTermicoMunicipal
 } from './perfilTermicoMunicipal';
@@ -38,7 +47,7 @@ type Props = {
     erroEstacoes: string | null;
     instanteAtual: number;
     idEstacaoSelecionada: string | null;
-    onSelecionarEstacao: (id: string) => void;
+    onSelecionarEstacao: (id: string | null) => void;
 };
 
 type DadosMeteorologicosAtuais = {
@@ -57,10 +66,34 @@ const ABAS: { id: AbaObservatorio; nome: string }[] = [
 ];
 
 const INDICADORES = [
-    { titulo: 'Temperatura', unidade: '°C', campo: 'temperatura' },
-    { titulo: 'Sensação térmica', unidade: '°C', campo: 'sensacao' },
-    { titulo: 'Umidade relativa', unidade: '%', campo: 'umidade' },
-    { titulo: 'Velocidade do vento', unidade: 'km/h', campo: 'vento' }
+    {
+        titulo: 'Temperatura',
+        unidade: '°C',
+        campo: 'temperatura',
+        icone: <FiThermometer />,
+        tom: 'temperatura'
+    },
+    {
+        titulo: 'Sensação térmica',
+        unidade: '°C',
+        campo: 'sensacao',
+        icone: <FiSun />,
+        tom: 'sensacao'
+    },
+    {
+        titulo: 'Umidade relativa',
+        unidade: '%',
+        campo: 'umidade',
+        icone: <FiDroplet />,
+        tom: 'umidade'
+    },
+    {
+        titulo: 'Velocidade do vento',
+        unidade: 'km/h',
+        campo: 'vento',
+        icone: <FiWind />,
+        tom: 'vento'
+    }
 ] as const;
 
 export default function ObservatorioMunicipal({
@@ -249,11 +282,17 @@ export default function ObservatorioMunicipal({
                 </p>
 
                 <span className="obs-situacao">
-                    {carregando
-                        ? 'Consultando Open-Meteo...'
-                        : erroMeteo
-                            ? 'Dados indisponíveis'
-                            : 'Open-Meteo • Estimativa atual'}
+                    {aba === 'agora'
+                        ? carregando
+                            ? 'Consultando Open-Meteo...'
+                            : erroMeteo
+                                ? 'Dados indisponíveis'
+                                : 'Open-Meteo • Estimativa atual'
+                        : aba === 'estacoes'
+                            ? 'CUIDAÍ • Medições das estações'
+                            : aba === 'historico'
+                                ? 'CUIDAÍ • Histórico de medições'
+                                : 'Open-Meteo • Comparação territorial'}
                 </span>
             </header>
 
@@ -290,11 +329,20 @@ export default function ObservatorioMunicipal({
                         <div className="obs-grade-indicadores">
                             {INDICADORES.map(indicador => (
                                 <article
-                                    className="obs-indicador"
+                                    className={`obs-indicador obs-indicador--${indicador.tom}`}
                                     key={indicador.titulo}
                                 >
-                                    <div className="obs-indicador-titulo">
-                                        {indicador.titulo}
+                                    <div className="obs-indicador-topo">
+                                        <div className="obs-indicador-titulo">
+                                            {indicador.titulo}
+                                        </div>
+
+                                        <span
+                                            className="obs-indicador-icone"
+                                            aria-hidden="true"
+                                        >
+                                            {indicador.icone}
+                                        </span>
                                     </div>
 
                                     <div className="obs-indicador-valor">
@@ -326,20 +374,11 @@ export default function ObservatorioMunicipal({
 
 
                         {/* FONTE E REFERÊNCIA DA CONSULTA */}
-                        <div
-                            style={{
-                                marginBottom: '16px',
-                                padding: '12px 14px',
-                                background: '#F4F9FD',
-                                border: '1px solid #E1EBF4',
-                                borderRadius: '10px',
-                                color: '#61788E',
-                                fontSize: '11px',
-                                lineHeight: 1.7
-                            }}
-                        >
+                        {/* FONTE E REFERÊNCIA DA CONSULTA */}
+                        <div className="obs-referencia-compacta">
+
                             {carregando && (
-                                <span>Atualizando informações meteorológicas...</span>
+                                <span>Atualizando dados meteorológicos...</span>
                             )}
 
                             {!carregando && erroMeteo && (
@@ -348,26 +387,39 @@ export default function ObservatorioMunicipal({
 
                             {!carregando && dadosAtuais && (
                                 <>
-                                    <div>
-                                        <strong>Fonte:</strong> Open-Meteo
-                                        {' • '}
-                                        <strong>Referência:</strong>{' '}
-                                        {dadosAtuais.horario.replace('T', ' às ')}
-                                        {' • Horário de Fortaleza'}
+                                    <div className="obs-referencia-linha">
+                                        <strong>Open-Meteo</strong>
+                                        <span aria-hidden="true">•</span>
+                                        <span>
+                                            Referência:{' '}
+                                            {dadosAtuais.horario.replace('T', ' às ')}
+                                            {' • Fortaleza'}
+                                        </span>
                                     </div>
 
-                                    <div>
-                                        Ponto de referência:
-                                        {' '}{latitude.toFixed(4)},
-                                        {' '}{longitude.toFixed(4)}
-                                    </div>
+                                    <details className="obs-referencia-detalhes">
+                                        <summary>
+                                            Detalhes da estimativa
+                                        </summary>
 
-                                    <div>
-                                        Estimativas meteorológicas para um ponto
-                                        de referência do município.
-                                    </div>
+                                        <div className="obs-referencia-conteudo">
+                                            <p>
+                                                <strong>Coordenadas:</strong>{' '}
+                                                {latitude.toFixed(4)},{' '}
+                                                {longitude.toFixed(4)}
+                                            </p>
+
+                                            <p>
+                                                Estimativa meteorológica para um ponto
+                                                de referência do município, não uma
+                                                medição local nem uma média oficial
+                                                municipal.
+                                            </p>
+                                        </div>
+                                    </details>
                                 </>
                             )}
+
                         </div>
 
 
@@ -378,34 +430,6 @@ export default function ObservatorioMunicipal({
                                 <span>Análise espacial</span>
                             </div>
 
-                            <div className="obs-estatisticas">
-                                <div>
-                                    <small>Mínima amostral</small>
-                                    <strong>
-                                        {perfilTermico
-                                            ? formatarTemperatura(perfilTermico.minima)
-                                            : '—'}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    <small>Média amostral</small>
-                                    <strong>
-                                        {perfilTermico
-                                            ? formatarTemperatura(perfilTermico.media)
-                                            : '—'}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    <small>Máxima amostral</small>
-                                    <strong>
-                                        {perfilTermico
-                                            ? formatarTemperatura(perfilTermico.maxima)
-                                            : '—'}
-                                    </strong>
-                                </div>
-                            </div>
 
                             {carregandoPerfil && (
                                 <p>Calculando a distribuição térmica do município...</p>
@@ -416,65 +440,144 @@ export default function ObservatorioMunicipal({
                             )}
 
                             {!carregandoPerfil && perfilTermico && (
-                                <>
-                                    <div
-                                        style={{
-                                            marginTop: '14px',
-                                            padding: '12px 14px',
-                                            background: '#F4F9FD',
-                                            borderRadius: '10px',
-                                            fontSize: '12px',
-                                            color: '#48657D'
-                                        }}
-                                    >
-                                        <strong>Amplitude espacial estimada: </strong>
-                                        {formatarTemperatura(
-                                            perfilTermico.maxima - perfilTermico.minima
-                                        )}
+                                <div className="obs-perfil-termico-bonito">
+                                    <div className="obs-perfil-termico-grid-principal">
+
+                                        <article className="obs-perfil-card obs-perfil-card--min">
+                                            <div className="obs-perfil-card-topo">
+                                                <span className="obs-perfil-card-titulo">
+                                                    Mínima amostral
+                                                </span>
+                                                <span className="obs-perfil-card-icone">
+                                                    <FiThermometer />
+                                                </span>
+                                            </div>
+
+                                            <strong className="obs-perfil-card-valor">
+                                                {formatarTemperatura(perfilTermico.minima)}
+                                            </strong>
+
+                                            <span className="obs-perfil-card-legenda">
+                                                ponto mais ameno
+                                            </span>
+                                        </article>
+
+                                        <article className="obs-perfil-card obs-perfil-card--media">
+                                            <div className="obs-perfil-card-topo">
+                                                <span className="obs-perfil-card-titulo">
+                                                    Média amostral
+                                                </span>
+                                                <span className="obs-perfil-card-icone">
+                                                    <FiBarChart2 />
+                                                </span>
+                                            </div>
+
+                                            <strong className="obs-perfil-card-valor">
+                                                {formatarTemperatura(perfilTermico.media)}
+                                            </strong>
+
+                                            <span className="obs-perfil-card-legenda">
+                                                comportamento médio
+                                            </span>
+                                        </article>
+
+                                        <article className="obs-perfil-card obs-perfil-card--max">
+                                            <div className="obs-perfil-card-topo">
+                                                <span className="obs-perfil-card-titulo">
+                                                    Máxima amostral
+                                                </span>
+                                                <span className="obs-perfil-card-icone">
+                                                    <FiSun />
+                                                </span>
+                                            </div>
+
+                                            <strong className="obs-perfil-card-valor">
+                                                {formatarTemperatura(perfilTermico.maxima)}
+                                            </strong>
+
+                                            <span className="obs-perfil-card-legenda">
+                                                ponto mais quente
+                                            </span>
+                                        </article>
+
                                     </div>
 
-                                    <p>
-                                        <strong>
-                                            {perfilTermico.amostras} pontos representativos
-                                        </strong>
-                                        {' dentro dos limites municipais.'}
+                                    <div className="obs-perfil-termico-grid-secundario">
+
+                                        <article className="obs-perfil-card obs-perfil-card--amplitude">
+                                            <div className="obs-perfil-card-topo">
+                                                <span className="obs-perfil-card-titulo">
+                                                    Amplitude espacial
+                                                </span>
+                                                <span className="obs-perfil-card-icone">
+                                                    <FiMaximize2 />
+                                                </span>
+                                            </div>
+
+                                            <strong className="obs-perfil-card-valor">
+                                                {formatarTemperatura(
+                                                    perfilTermico.maxima - perfilTermico.minima
+                                                )}
+                                            </strong>
+
+                                            <span className="obs-perfil-card-legenda">
+                                                diferença entre mínima e máxima
+                                            </span>
+                                        </article>
+
+                                        <article className="obs-perfil-card obs-perfil-card--pontos">
+                                            <div className="obs-perfil-card-topo">
+                                                <span className="obs-perfil-card-titulo">
+                                                    Pontos representativos
+                                                </span>
+                                                <span className="obs-perfil-card-icone">
+                                                    <FiMapPin />
+                                                </span>
+                                            </div>
+
+                                            <strong className="obs-perfil-card-valor">
+                                                {perfilTermico.amostras}
+                                            </strong>
+
+                                            <span className="obs-perfil-card-legenda">
+                                                amostras válidas no município
+                                            </span>
+                                        </article>
+
+                                    </div>
+
+                                    <p className="obs-perfil-termico-nota">
+                                        Estimativas da Open-Meteo sobre pontos amostrados,
+                                        não medições oficiais de todo o município.
                                     </p>
 
-                                    <p>
-                                        <strong>
-                                            {perfilTermico.coordenadasConsultadas}
-                                            {' coordenadas consultadas'}
-                                        </strong>
-                                        {' • '}
-                                        {perfilTermico.celulasIdentificadas
-                                            ? 'Pontos repetidos da mesma célula meteorológica foram agrupados.'
-                                            : 'Nem todas as células meteorológicas puderam ser identificadas.'}
-                                    </p>
+                                    <details className="obs-perfil-termico-metodo">
+                                        <summary>Ver metodologia da amostragem</summary>
 
-                                    <p>
-                                        <p>
-                                            Amostragem espacial exploratória:
-                                            espaçamento-alvo aproximado de 3 km,
-                                            com refinamento para territórios pequenos
-                                            e limite de 90 coordenadas por consulta.
-                                        </p>
-                                    </p>
+                                        <div className="obs-perfil-termico-metodo-conteudo">
+                                            <p>
+                                                <strong>Coordenadas consultadas: </strong>
+                                                {perfilTermico.coordenadasConsultadas}
+                                            </p>
 
-                                    <p>
-                                        Referência: {' '}
-                                        {perfilTermico.horario.replace('T', ' às ')}
-                                        {' • Horário de Fortaleza.'}
-                                    </p>
+                                            <p>
+                                                {perfilTermico.celulasIdentificadas
+                                                    ? 'Pontos repetidos da mesma célula meteorológica foram agrupados.'
+                                                    : 'Nem todas as células meteorológicas puderam ser identificadas.'}
+                                            </p>
 
-                                    <p>
-                                        Valores estimados pela Open-Meteo.
-                                        A média é calculada sobre os pontos
-                                        amostrados e não representa uma
-                                        medição oficial de todo o território.
-                                        Os pontos podem compartilhar células
-                                        do mesmo modelo meteorológico.
-                                    </p>
-                                </>
+                                            <p>
+                                                Amostragem espacial exploratória com refinamento territorial.
+                                            </p>
+
+                                            <p>
+                                                <strong>Referência: </strong>
+                                                {perfilTermico.horario.replace('T', ' às ')}
+                                                {' • Horário de Fortaleza'}
+                                            </p>
+                                        </div>
+                                    </details>
+                                </div>
                             )}
                         </article>
 
@@ -485,8 +588,17 @@ export default function ObservatorioMunicipal({
                 {aba === 'estacoes' && (
                     <>
                         <div className="obs-secao-titulo">
-                            <h4>Rede de observação</h4>
-                            <span>Estações CUIDAÍ • Firebase</span>
+                            <h4>Estações meteorológicas</h4>
+                            <span>
+                                {carregandoEstacoes
+                                    ? 'Carregando...'
+                                    : erroEstacoes
+                                        ? 'Dados indisponíveis'
+                                        : `${estacoesMunicipais.length} ${estacoesMunicipais.length === 1
+                                            ? 'estação'
+                                            : 'estações'
+                                        }`}
+                            </span>
                         </div>
 
                         {carregandoEstacoes ? (
@@ -514,19 +626,7 @@ export default function ObservatorioMunicipal({
                             </article>
                         ) : (
                             <>
-                                <article className="obs-bloco">
-                                    <strong>
-                                        {estacoesMunicipais.length}
-                                        {' '}
-                                        {estacoesMunicipais.length === 1
-                                            ? 'estação localizada'
-                                            : 'estações localizadas'}
-                                    </strong>
-                                    <p>
-                                        Selecione uma estação para
-                                        destacá-la no mapa municipal.
-                                    </p>
-                                </article>
+
 
                                 {estacoesMunicipais.map(estacao => {
                                     const leitura = estacao.ultimaLeitura;
@@ -543,9 +643,16 @@ export default function ObservatorioMunicipal({
                                     return (
                                         <button
                                             key={estacao.id}
+                                            className={`obs-estacao-card-municipal ${selecionada
+                                                ? 'obs-estacao-card-municipal--selecionada'
+                                                : ''
+                                                }`}
+                                            aria-pressed={selecionada}
                                             type="button"
                                             onClick={() =>
-                                                onSelecionarEstacao(estacao.id)
+                                                onSelecionarEstacao(
+                                                    selecionada ? null : estacao.id
+                                                )
                                             }
                                             style={{
                                                 width: '100%',
@@ -566,6 +673,8 @@ export default function ObservatorioMunicipal({
                                             }}
                                         >
                                             <div
+                                                className={`obs-estacao-status ${recente ? 'obs-estacao-status--recente' : ''
+                                                    }`}
                                                 style={{
                                                     display: 'flex',
                                                     justifyContent: 'space-between',
@@ -590,7 +699,7 @@ export default function ObservatorioMunicipal({
                                                     {recente
                                                         ? 'Leitura recente'
                                                         : leitura
-                                                            ? 'Leitura antiga'
+                                                            ? 'Sem dados recentes'
                                                             : 'Sem medição'}
                                                 </span>
                                             </div>
@@ -606,55 +715,40 @@ export default function ObservatorioMunicipal({
                                                 </p>
                                             )}
 
-                                            <div
-                                                style={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: '1fr 1fr',
-                                                    gap: '12px',
-                                                    marginTop: '16px'
-                                                }}
-                                            >
-                                                <div>
-                                                    <div
-                                                        style={{
-                                                            fontSize: '11px',
-                                                            color: '#8190A2'
-                                                        }}
-                                                    >
-                                                        Temperatura
+                                            <div className="obs-estacao-metricas">
+
+                                                <div className="obs-estacao-metrica obs-estacao-metrica--temperatura">
+                                                    <div className="obs-estacao-metrica-topo">
+                                                        <span>Temperatura</span>
+
+                                                        <span className="obs-estacao-metrica-icone">
+                                                            <FiThermometer />
+                                                        </span>
                                                     </div>
 
-                                                    <strong
-                                                        style={{
-                                                            fontSize: '24px'
-                                                        }}
-                                                    >
+                                                    <strong>
                                                         {leitura
                                                             ? `${leitura.temperatura.toFixed(1).replace('.', ',')} °C`
                                                             : '—'}
                                                     </strong>
                                                 </div>
 
-                                                <div>
-                                                    <div
-                                                        style={{
-                                                            fontSize: '11px',
-                                                            color: '#8190A2'
-                                                        }}
-                                                    >
-                                                        Umidade
+                                                <div className="obs-estacao-metrica obs-estacao-metrica--umidade">
+                                                    <div className="obs-estacao-metrica-topo">
+                                                        <span>Umidade</span>
+
+                                                        <span className="obs-estacao-metrica-icone">
+                                                            <FiDroplet />
+                                                        </span>
                                                     </div>
 
-                                                    <strong
-                                                        style={{
-                                                            fontSize: '24px'
-                                                        }}
-                                                    >
+                                                    <strong>
                                                         {leitura
                                                             ? `${leitura.umidade.toFixed(0)}%`
                                                             : '—'}
                                                     </strong>
                                                 </div>
+
                                             </div>
 
                                             <p
@@ -672,13 +766,18 @@ export default function ObservatorioMunicipal({
                                             </p>
 
                                             <div
+                                                className="obs-estacao-acao"
                                                 style={{
                                                     fontSize: '12px',
                                                     fontWeight: 700,
                                                     color: '#087CDB'
                                                 }}
                                             >
-                                                Selecionar no mapa
+                                                <FiMapPin aria-hidden="true" />
+
+                                                {selecionada
+                                                    ? 'Remover destaque'
+                                                    : 'Selecionar no mapa'}
                                             </div>
                                         </button>
                                     );
@@ -686,19 +785,7 @@ export default function ObservatorioMunicipal({
                             </>
                         )}
 
-                        <p
-                            style={{
-                                fontSize: '11px',
-                                lineHeight: 1.6,
-                                color: '#8190A2'
-                            }}
-                        >
-                            As medições das estações são diferentes
-                            das estimativas da Open-Meteo.
-                            A ausência de uma leitura recente não
-                            significa necessariamente que a estação
-                            esteja desligada.
-                        </p>
+
                     </>
                 )}
 
@@ -734,16 +821,6 @@ export default function ObservatorioMunicipal({
                     </>
                 )}
             </div>
-
-            <footer className="obs-rodape">
-                <strong>Fontes e metodologia</strong>
-                <p>
-                    Estimativas meteorológicas da Open-Meteo
-                    e observações das estações CUIDAÍ serão
-                    identificadas separadamente, com seus
-                    respectivos horários de referência.
-                </p>
-            </footer>
 
         </section>
     );

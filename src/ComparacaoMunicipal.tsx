@@ -389,196 +389,194 @@ export default function ComparacaoMunicipal({
                     </p>
 
 
-                    <article
-                        className="obs-bloco"
-                        style={{
-                            marginBottom: 16,
-                            background: '#F5F9FD',
-                            border: '1px solid #DCE8F3'
-                        }}
-                    >
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 10,
-                            flexWrap: 'wrap'
-                        }}>
-                            <h4>O que os dados mostram</h4>
+                    <details className="comparacao-analise">
+                        <summary>Ver análise dos resultados</summary>
 
-                            <span style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: '#168FC4'
+                        <article
+                            className="obs-bloco"
+                            style={{
+                                marginBottom: 16,
+                                background: '#F5F9FD',
+                                border: '1px solid #DCE8F3'
+                            }}
+                        >
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 10,
+                                flexWrap: 'wrap'
                             }}>
-                                Análise comparativa
-                            </span>
-                        </div>
+                                <h4>O que os dados mostram</h4>
 
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 12,
-                            marginTop: 16
-                        }}>
-                            {INDICADORES.map(indicador => (
-                                <p
-                                    key={indicador.campo}
-                                    style={{
-                                        margin: 0,
-                                        color: '#42576B',
-                                        fontSize: 13,
-                                        lineHeight: 1.7
-                                    }}
-                                >
-                                    {descreverComparacao(
-                                        indicador.titulo,
-                                        resultado.a[indicador.campo],
-                                        resultado.b[indicador.campo],
-                                        municipioAtual,
-                                        municipioB.nome,
-                                        indicador.campo === 'umidade'
-                                            ? 'pontos percentuais'
-                                            : indicador.unidade
-                                    )}
-                                </p>
-                            ))}
-                        </div>
-
-                        <p style={{
-                            margin: '16px 0 0',
-                            paddingTop: 12,
-                            borderTop: '1px solid #DCE8F3',
-                            color: '#8190A2',
-                            fontSize: 11,
-                            lineHeight: 1.6
-                        }}>
-                            Interpretação automática de estimativas
-                            meteorológicas para dois pontos de referência,
-                            no mesmo horário. As diferenças observadas
-                            não permitem, isoladamente, determinar suas causas.
-                        </p>
-                    </article>
-
-
-                    {INDICADORES.map(indicador => {
-                        const valorA =
-                            resultado.a[indicador.campo];
-
-                        const valorB =
-                            resultado.b[indicador.campo];
-
-                        const diferenca = valorB - valorA;
-
-                        const escala = Math.max(
-                            Math.abs(valorA),
-                            Math.abs(valorB),
-                            1
-                        );
-
-                        return (
-                            <article
-                                key={indicador.campo}
-                                className="obs-bloco"
-                                style={{ marginBottom: 13 }}
-                            >
-                                <h4>{indicador.titulo}</h4>
-
-                                {[
-                                    {
-                                        letra: 'A',
-                                        valor: valorA,
-                                        cor: '#168FC4'
-                                    },
-                                    {
-                                        letra: 'B',
-                                        valor: valorB,
-                                        cor: '#E98645'
-                                    }
-                                ].map(item => (
-                                    <div
-                                        key={item.letra}
-                                        style={{ marginTop: 15 }}
-                                    >
-                                        <div style={{
-                                            display: 'flex',
-                                            justifyContent:
-                                                'space-between',
-                                            alignItems: 'center',
-                                            gap: 8,
-                                            fontSize: 12,
-                                            marginBottom: 7
-                                        }}>
-                                            <span style={{
-                                                color: '#718096'
-                                            }}>
-                                                Município {item.letra}
-                                            </span>
-
-                                            <strong style={{
-                                                color: '#192942',
-                                                fontSize: 16
-                                            }}>
-                                                {formatar(item.valor)}
-                                                {' '}
-                                                {indicador.unidade}
-                                            </strong>
-                                        </div>
-
-                                        <div style={{
-                                            height: 9,
-                                            background: '#EAF0F6',
-                                            borderRadius: 20,
-                                            overflow: 'hidden'
-                                        }}>
-                                            <div style={{
-                                                height: '100%',
-                                                width: `${Math.max(
-                                                    0,
-                                                    item.valor / escala * 100
-                                                )}%`,
-                                                background: item.cor,
-                                                borderRadius: 20
-                                            }} />
-                                        </div>
-                                    </div>
-                                ))}
-
-                                <div style={{
-                                    marginTop: 17,
-                                    paddingTop: 12,
-                                    borderTop:
-                                        '1px solid #E6EDF5',
-                                    color: '#536B80',
-                                    fontSize: 12
+                                <span style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: '#168FC4'
                                 }}>
-                                    Diferença (B − A):{' '}
-                                    <strong>
-                                        {diferenca > 0 ? '+' : ''}
-                                        {formatar(diferenca)}
-                                        {' '}
-                                        {indicador.campo === 'umidade'
-                                            ? 'p.p.'
-                                            : indicador.unidade}
-                                    </strong>
-                                </div>
-                            </article>
-                        );
-                    })}
+                                    Análise comparativa
+                                </span>
+                            </div>
 
-                    <p style={{
-                        color: '#8190A2',
-                        fontSize: 11,
-                        lineHeight: 1.7,
-                        marginTop: 16
-                    }}>
-                        Comparação exploratória entre dois
-                        pontos de referência municipais.
-                        Os valores são estimativas da
-                        Open-Meteo e não representam médias
-                        oficiais de todo o território.
-                        As barras são relativas ao maior
-                        valor de cada indicador.
+                            <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 12,
+                                marginTop: 16
+                            }}>
+                                {INDICADORES.map(indicador => (
+                                    <p
+                                        key={indicador.campo}
+                                        style={{
+                                            margin: 0,
+                                            color: '#42576B',
+                                            fontSize: 13,
+                                            lineHeight: 1.7
+                                        }}
+                                    >
+                                        {descreverComparacao(
+                                            indicador.titulo,
+                                            resultado.a[indicador.campo],
+                                            resultado.b[indicador.campo],
+                                            municipioAtual,
+                                            municipioB.nome,
+                                            indicador.campo === 'umidade'
+                                                ? 'pontos percentuais'
+                                                : indicador.unidade
+                                        )}
+                                    </p>
+                                ))}
+                            </div>
+
+                            <p style={{
+                                margin: '16px 0 0',
+                                paddingTop: 12,
+                                borderTop: '1px solid #DCE8F3',
+                                color: '#8190A2',
+                                fontSize: 11,
+                                lineHeight: 1.6
+                            }}>
+                                Interpretação automática de estimativas
+                                meteorológicas para dois pontos de referência,
+                                no mesmo horário. As diferenças observadas
+                                não permitem, isoladamente, determinar suas causas.
+                            </p>
+                        </article>
+                    </details>
+
+                    <div className="comparacao-grade">
+                        {INDICADORES.map(indicador => {
+                            const valorA =
+                                resultado.a[indicador.campo];
+
+                            const valorB =
+                                resultado.b[indicador.campo];
+
+                            const diferenca = valorB - valorA;
+
+                            const escala = Math.max(
+                                Math.abs(valorA),
+                                Math.abs(valorB),
+                                1
+                            );
+
+                            return (
+                                <article
+                                    key={indicador.campo}
+                                    className="obs-bloco comparacao-grafico"
+                                    style={{ marginBottom: 0 }}
+                                >
+                                    <h4>{indicador.titulo}</h4>
+
+                                    {[
+                                        {
+                                            letra: 'A',
+                                            valor: valorA,
+                                            cor: '#168FC4'
+                                        },
+                                        {
+                                            letra: 'B',
+                                            valor: valorB,
+                                            cor: '#E98645'
+                                        }
+                                    ].map(item => (
+                                        <div
+                                            key={item.letra}
+                                            style={{ marginTop: 15 }}
+                                        >
+                                            <div style={{
+                                                display: 'flex',
+                                                justifyContent:
+                                                    'space-between',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                fontSize: 12,
+                                                marginBottom: 7
+                                            }}>
+                                                <span style={{
+                                                    color: '#718096'
+                                                }}>
+                                                    {item.letra === 'A'
+                                                        ? municipioAtual
+                                                        : municipioB.nome}
+                                                </span>
+
+                                                <strong style={{
+                                                    color: '#192942',
+                                                    fontSize: 16
+                                                }}>
+                                                    {formatar(item.valor)}
+                                                    {' '}
+                                                    {indicador.unidade}
+                                                </strong>
+                                            </div>
+
+                                            <div style={{
+                                                height: 9,
+                                                background: '#EAF0F6',
+                                                borderRadius: 20,
+                                                overflow: 'hidden'
+                                            }}>
+                                                <div className="comparacao-barra" style={{
+
+                                                    height: '100%',
+                                                    width: `${Math.max(
+                                                        0,
+                                                        item.valor / escala * 100
+                                                    )}%`,
+                                                    background: item.cor,
+                                                    borderRadius: 20
+                                                }} />
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <div style={{
+                                        marginTop: 17,
+                                        paddingTop: 12,
+                                        borderTop:
+                                            '1px solid #E6EDF5',
+                                        color: '#536B80',
+                                        fontSize: 12
+                                    }}>
+                                        Diferença (B − A):{' '}
+                                        <strong>
+                                            {diferenca > 0 ? '+' : ''}
+                                            {formatar(diferenca)}
+                                            {' '}
+                                            {indicador.campo === 'umidade'
+                                                ? 'p.p.'
+                                                : indicador.unidade}
+                                        </strong>
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+
+                    <p className="comparacao-nota">
+                        Fonte: Open-Meteo • Estimativas pontuais,
+                        não médias municipais.
                     </p>
                 </>
             )}

@@ -662,7 +662,9 @@ export default function AtlasBrasil({
                                     }}
                                     eventHandlers={{
                                         click: () =>
-                                            setIdEstacaoSelecionada(estacao.id)
+                                            setIdEstacaoSelecionada(atual =>
+                                                atual === estacao.id ? null : estacao.id
+                                            )
                                     }}
                                 >
                                     <Tooltip direction="top">

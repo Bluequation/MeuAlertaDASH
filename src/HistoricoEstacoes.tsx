@@ -17,6 +17,12 @@ import {
     YAxis
 } from 'recharts';
 
+import {
+    FiThermometer,
+    FiDroplet,
+    FiDatabase,
+    FiClock
+} from 'react-icons/fi';
 import { db } from './firebase';
 import type { EstacaoPublica } from './estacoesMunicipais';
 
@@ -159,7 +165,7 @@ export default function HistoricoEstacoes({
     return (
         <div>
             <article className="obs-bloco">
-                <h4>Estação meteorológica</h4>
+                <h4>Estação selecionada</h4>
 
                 <select
                     aria-label="Selecionar estação para o histórico"
@@ -185,13 +191,6 @@ export default function HistoricoEstacoes({
                     ))}
                 </select>
 
-                <p style={{
-                    fontSize: 12,
-                    color: '#8190A2'
-                }}>
-                    Últimas 72 medições armazenadas,
-                    conforme a disponibilidade do Firebase.
-                </p>
             </article>
 
             {carregando && (
@@ -218,26 +217,31 @@ export default function HistoricoEstacoes({
 
             {!carregando && !erro && leituras.length > 0 && (
                 <>
-                    <article className="obs-bloco">
-                        <strong>
-                            {leituras.length} medições disponíveis
-                        </strong>
+                    <div className="historico-resumo">
+                        <div className="historico-resumo-total">
+                            <span className="historico-resumo-icone">
+                                <FiDatabase />
+                            </span>
 
-                        <p style={{
-                            fontSize: 12,
-                            color: '#8190A2'
-                        }}>
-                            De{' '}
-                            {new Date(
-                                leituras[0].recebidoEm
-                            ).toLocaleString('pt-BR')}
-                            {' até '}
-                            {new Date(
-                                leituras[leituras.length - 1]
-                                    .recebidoEm
-                            ).toLocaleString('pt-BR')}
-                        </p>
-                    </article>
+                            <strong>
+                                {leituras.length} medições
+                            </strong>
+                        </div>
+
+                        <div className="historico-resumo-periodo">
+                            <FiClock aria-hidden="true" />
+
+                            <span>
+                                {new Date(
+                                    leituras[0].recebidoEm
+                                ).toLocaleString('pt-BR')}
+                                {' até '}
+                                {new Date(
+                                    leituras[leituras.length - 1].recebidoEm
+                                ).toLocaleString('pt-BR')}
+                            </span>
+                        </div>
+                    </div>
 
                     {leituras.length >= 2 ? (
                         ([
@@ -245,20 +249,31 @@ export default function HistoricoEstacoes({
                                 campo: 'temperatura',
                                 titulo: 'Evolução da temperatura',
                                 unidade: '°C',
-                                cor: '#168FC4'
+                                cor: '#DC7A40'
                             },
                             {
                                 campo: 'umidade',
                                 titulo: 'Evolução da umidade',
                                 unidade: '%',
-                                cor: '#E98645'
+                                cor: '#348CCB'
                             }
                         ] as const).map(grafico => (
                             <article
-                                className="obs-bloco"
+                                className={`obs-bloco historico-grafico historico-grafico--${grafico.campo}`}
                                 key={grafico.campo}
                             >
-                                <h4>{grafico.titulo}</h4>
+                                <div className="historico-grafico-cabecalho">
+                                    <span
+                                        className="historico-grafico-icone"
+                                        aria-hidden="true"
+                                    >
+                                        {grafico.campo === 'temperatura'
+                                            ? <FiThermometer />
+                                            : <FiDroplet />}
+                                    </span>
+
+                                    <h4>{grafico.titulo}</h4>
+                                </div>
 
                                 <div style={{
                                     width: '100%',
@@ -281,6 +296,7 @@ export default function HistoricoEstacoes({
                                             <CartesianGrid
                                                 stroke="#E6EDF5"
                                                 strokeDasharray="3 3"
+                                                vertical={false}
                                             />
 
                                             <XAxis
@@ -315,7 +331,10 @@ export default function HistoricoEstacoes({
                                                 dot={
                                                     leituras.length <= 12
                                                 }
-                                                isAnimationActive={false}
+                                                isAnimationActive={true}
+                                                animationDuration={850}
+                                                animationEasing="ease-out"
+                                                activeDot={{ r: 6 }}
                                             />
                                         </LineChart>
                                     </ResponsiveContainer>
@@ -332,16 +351,9 @@ export default function HistoricoEstacoes({
                         </article>
                     )}
 
-                    <p style={{
-                        fontSize: 11,
-                        lineHeight: 1.7,
-                        color: '#8190A2'
-                    }}>
-                        Fonte: estação CUIDAÍ.
-                        Os gráficos representam medições
-                        registradas, não estimativas da Open-Meteo.
-                        A cobertura temporal depende das
-                        leituras efetivamente disponíveis.
+                    <p className="historico-fonte">
+                        Fonte: Estação CUIDAÍ • Medições registradas,
+                        não estimativas da Open-Meteo.
                     </p>
                 </>
             )}

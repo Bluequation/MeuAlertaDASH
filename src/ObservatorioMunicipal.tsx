@@ -124,10 +124,13 @@ export default function ObservatorioMunicipal({
     useEffect(() => {
         const controlador = new AbortController();
 
-        const consultar = async () => {
-            setCarregando(true);
+        const consultar = async (primeiraConsulta = false) => {
+            if (primeiraConsulta) {
+                setCarregando(true);
+                setDadosAtuais(null);
+            }
+
             setErroMeteo(null);
-            setDadosAtuais(null);
 
             try {
                 const parametros = new URLSearchParams({
@@ -197,9 +200,18 @@ export default function ObservatorioMunicipal({
             }
         };
 
-        void consultar();
+        void consultar(true);
 
-        return () => controlador.abort();
+        const intervalo = window.setInterval(() => {
+            if (!document.hidden) {
+                void consultar();
+            }
+        }, 15 * 60 * 1000);
+
+        return () => {
+            window.clearInterval(intervalo);
+            controlador.abort();
+        };
     }, [latitude, longitude]);
 
 
@@ -266,6 +278,17 @@ export default function ObservatorioMunicipal({
         }
     }, [idEstacaoSelecionada]);
 
+    const quantidadeEstacoesRecentes =
+        estacoesMunicipais.filter(estacao => {
+            const leitura = estacao.ultimaLeitura;
+
+            return (
+                leitura !== null &&
+                instanteAtual >= leitura.recebidoEm &&
+                instanteAtual - leitura.recebidoEm <=
+                30 * 60 * 1000
+            );
+        }).length;
 
     return (
         <section className="obs-municipal">
@@ -286,7 +309,9 @@ export default function ObservatorioMunicipal({
                         ? carregando
                             ? 'Consultando Open-Meteo...'
                             : erroMeteo
-                                ? 'Dados indisponíveis'
+                                ? dadosAtuais
+                                    ? 'Open-Meteo • Última estimativa disponível'
+                                    : 'Dados indisponíveis'
                                 : 'Open-Meteo • Estimativa atual'
                         : aba === 'estacoes'
                             ? 'CUIDAÍ • Medições das estações'
@@ -422,7 +447,65 @@ export default function ObservatorioMunicipal({
 
                         </div>
 
+                        <details className="obs-sintese-gestao">
+                            <summary>
+                                <span>Síntese para gestão</span>
+                                <small>Cobertura e orientação</small>
+                            </summary>
 
+                            <div className="obs-sintese-corpo">
+
+                                <div className="obs-sintese-item">
+                                    <strong>Observações locais</strong>
+
+                                    <p>
+                                        {carregandoEstacoes
+                                            ? 'Verificando estações...'
+                                            : erroEstacoes
+                                                ? 'Disponibilidade não confirmada.'
+                                                : estacoesMunicipais.length === 0
+                                                    ? 'Nenhuma estação CUIDAÍ publicada neste município.'
+                                                    : `${quantidadeEstacoesRecentes} de ${estacoesMunicipais.length} estações com leitura nos últimos 30 minutos.`}
+                                    </p>
+                                </div>
+
+                                <div className="obs-sintese-item">
+                                    <strong>Variação térmica territorial</strong>
+
+                                    <p>
+                                        {carregandoPerfil
+                                            ? 'Calculando perfil térmico...'
+                                            : erroPerfil || !perfilTermico
+                                                ? 'Perfil térmico indisponível.'
+                                                : `Diferença estimada de ${formatarTemperatura(
+                                                    perfilTermico.maxima -
+                                                    perfilTermico.minima
+                                                )} entre os pontos amostrados.`}
+                                    </p>
+                                </div>
+
+                                <div className="obs-sintese-item">
+                                    <strong>Orientação de acompanhamento</strong>
+
+                                    <p>
+                                        {!carregandoEstacoes &&
+                                            !erroEstacoes &&
+                                            estacoesMunicipais.length > 0 &&
+                                            quantidadeEstacoesRecentes === 0
+                                            ? 'Sem leituras recentes. Verifique a disponibilidade das estações antes de utilizar registros antigos como condições atuais.'
+                                            : 'Consulte a aba Estações para verificar leituras e horários registrados pelos sensores.'}
+                                    </p>
+                                </div>
+
+                                <p className="obs-sintese-nota">
+                                    Dados para acompanhamento territorial.
+                                    As estimativas da Open-Meteo não substituem
+                                    medições locais nem constituem alertas
+                                    oficiais de risco.
+                                </p>
+
+                            </div>
+                        </details>
 
                         <article className="obs-bloco">
                             <div className="obs-bloco-cabecalho">

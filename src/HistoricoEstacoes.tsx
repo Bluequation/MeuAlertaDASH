@@ -21,9 +21,12 @@ import {
     FiThermometer,
     FiDroplet,
     FiDatabase,
-    FiClock
+    FiClock,
+    FiDownload,
+    FiPrinter
 } from 'react-icons/fi';
 import { db } from './firebase';
+import { abrirRelatorioHistorico } from './RelatorioHistorico';
 import type { EstacaoPublica } from './estacoesMunicipais';
 
 type Leitura = {
@@ -150,6 +153,81 @@ export default function HistoricoEstacoes({
         return () => unsubscribe();
     }, [idConsulta]);
 
+    const exportarCSV = () => {
+        if (
+            !estacao ||
+            carregando ||
+            erro ||
+            leituras.length === 0
+        ) {
+            return;
+        }
+
+        const cabecalho = [
+            'Data e hora (Fortaleza)',
+            'Temperatura (°C)',
+            'Umidade relativa (%)'
+        ];
+
+        const linhas = leituras.map(leitura => {
+            const data = new Date(
+                leitura.recebidoEm
+            ).toLocaleString('pt-BR', {
+                timeZone: 'America/Fortaleza',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+
+            const temperatura = leitura.temperatura
+                .toFixed(1)
+                .replace('.', ',');
+
+            const umidade = leitura.umidade
+                .toFixed(1)
+                .replace('.', ',');
+
+            return [
+                data,
+                temperatura,
+                umidade
+            ].join(';');
+        });
+
+        const conteudo = '\uFEFF' + [
+            cabecalho.join(';'),
+            ...linhas
+        ].join('\r\n');
+
+        const arquivo = new Blob(
+            [conteudo],
+            { type: 'text/csv;charset=utf-8;' }
+        );
+
+        const endereco = URL.createObjectURL(arquivo);
+
+        const link = document.createElement('a');
+
+        link.href = endereco;
+
+        link.download = `cuidai-historico-${estacao.id.replace(
+            /[^a-zA-Z0-9_-]/g,
+            '-'
+        )}.csv`;
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        window.setTimeout(() => {
+            URL.revokeObjectURL(endereco);
+        }, 1000);
+    };
+
     if (estacoes.length === 0) {
         return (
             <article className="obs-bloco">
@@ -241,7 +319,41 @@ export default function HistoricoEstacoes({
                                 ).toLocaleString('pt-BR')}
                             </span>
                         </div>
+
+                        <details className="historico-exportacao">
+                            <summary>
+                                <FiDownload aria-hidden="true" />
+                                Exportar
+                                <span aria-hidden="true">▾</span>
+                            </summary>
+
+                            <div className="historico-exportacao-opcoes">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (estacao) {
+                                            abrirRelatorioHistorico(
+                                                estacao,
+                                                leituras
+                                            );
+                                        }
+                                    }}
+                                >
+                                    <FiPrinter aria-hidden="true" />
+                                    Relatório para impressão / PDF
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={exportarCSV}
+                                >
+                                    <FiDownload aria-hidden="true" />
+                                    Dados em CSV
+                                </button>
+                            </div>
+                        </details>
                     </div>
+
 
                     {leituras.length >= 2 ? (
                         ([

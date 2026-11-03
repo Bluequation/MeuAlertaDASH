@@ -36,11 +36,15 @@ type Props = {
     uf: string;
     latitude: number;
     longitude: number;
+    distritoNome?: string | null;
+    latitudeArea?: number;
+    longitudeArea?: number;
     codigoMunicipio: string;
     municipiosCeara: FeatureCollection | null;
     geometria: Geometry;
     onPerfilTermico: (
-        perfil: PerfilTermicoMunicipal | null
+        perfil: PerfilTermicoMunicipal | null,
+        erro?: string | null
     ) => void;
     estacoesMunicipais: EstacaoPublica[];
     carregandoEstacoes: boolean;
@@ -100,6 +104,9 @@ export default function ObservatorioMunicipal({
     municipio,
     uf,
     latitude,
+    distritoNome,
+    latitudeArea,
+    longitudeArea,
     estacoesMunicipais,
     carregandoEstacoes,
     erroEstacoes,
@@ -112,6 +119,8 @@ export default function ObservatorioMunicipal({
     geometria,
     onPerfilTermico
 }: Props) {
+    const latitudeConsulta = latitudeArea ?? latitude;
+    const longitudeConsulta = longitudeArea ?? longitude;
     const [aba, setAba] =
         useState<AbaObservatorio>('agora');
 
@@ -134,8 +143,8 @@ export default function ObservatorioMunicipal({
 
             try {
                 const parametros = new URLSearchParams({
-                    latitude: latitude.toFixed(5),
-                    longitude: longitude.toFixed(5),
+                    latitude: latitudeConsulta.toFixed(5),
+                    longitude: longitudeConsulta.toFixed(5),
                     current: [
                         'temperature_2m',
                         'apparent_temperature',
@@ -212,7 +221,7 @@ export default function ObservatorioMunicipal({
             window.clearInterval(intervalo);
             controlador.abort();
         };
-    }, [latitude, longitude]);
+    }, [latitudeConsulta, longitudeConsulta]);
 
 
     // PERFIL TÉRMICO — AMOSTRAGEM MUNICIPAL
@@ -249,7 +258,9 @@ export default function ObservatorioMunicipal({
                     );
 
                     setErroPerfil(
-                        'Não foi possível calcular o perfil térmico.'
+                        erro instanceof Error
+                            ? erro.message
+                            : 'Não foi possível calcular o perfil térmico.'
                     );
                 }
             })
@@ -264,8 +275,8 @@ export default function ObservatorioMunicipal({
 
     // Compartilha os dados já consultados com o mapa.
     useEffect(() => {
-        onPerfilTermico(perfilTermico);
-    }, [perfilTermico, onPerfilTermico]);
+        onPerfilTermico(perfilTermico, erroPerfil);
+    }, [perfilTermico, erroPerfil, onPerfilTermico]);
 
     const formatarTemperatura = (valor: number) =>
         `${valor.toFixed(1).replace('.', ',')} °C`;
@@ -298,7 +309,7 @@ export default function ObservatorioMunicipal({
                     CUIDAÍ | OBSERVATÓRIO MUNICIPAL
                 </div>
 
-                <h3>{municipio}, {uf}</h3>
+                <h3>{distritoNome ?? municipio}, {uf}</h3>
 
                 <p>
                     Investigação meteorológica do território
@@ -430,15 +441,17 @@ export default function ObservatorioMunicipal({
                                         <div className="obs-referencia-conteudo">
                                             <p>
                                                 <strong>Coordenadas:</strong>{' '}
-                                                {latitude.toFixed(4)},{' '}
-                                                {longitude.toFixed(4)}
+                                                {latitudeConsulta.toFixed(4)},{' '}
+                                                {longitudeConsulta.toFixed(4)}
                                             </p>
 
                                             <p>
-                                                Estimativa meteorológica para um ponto
-                                                de referência do município, não uma
-                                                medição local nem uma média oficial
-                                                municipal.
+                                                <p>
+                                                    Estimativa meteorológica para um ponto
+                                                    de referência da área selecionada,
+                                                    não uma medição local nem uma média oficial
+                                                    do território.
+                                                </p>
                                             </p>
                                         </div>
                                     </details>

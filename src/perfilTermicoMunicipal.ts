@@ -69,6 +69,7 @@ function dentroDoPoligono(
 
 const ESPACAMENTO_AMOSTRAL_KM = 3;
 const MAXIMO_COORDENADAS = 90;
+const MINIMO_CANDIDATOS = 12;
 const KM_POR_GRAU = 111.32;
 
 // Distribuição espacial aproximada.
@@ -180,10 +181,19 @@ export function gerarAmostrasMunicipais(
     // posição foi encontrada no território.
     let candidatos: Ponto[] = [];
 
+    // Refina a distribuição quando a grade inicial
+    // apresenta poucos candidatos dentro do território.
+    // Refina a distribuição quando a grade inicial
+    // apresenta poucos candidatos dentro do território.
     for (const espacamento of [ESPACAMENTO_AMOSTRAL_KM, 1.5, 0.75]) {
         candidatos = criarGrade(espacamento);
 
-        if (candidatos.length > 0) break;
+        if (
+            candidatos.length >= MINIMO_CANDIDATOS ||
+            espacamento === 0.75
+        ) {
+            break;
+        }
     }
 
     if (candidatos.length <= MAXIMO_COORDENADAS) {

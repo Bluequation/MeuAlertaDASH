@@ -98,6 +98,7 @@ body,
 
 .atlas-layout__mapa {
   min-width: 0;
+  position: relative;
 }
 
 .atlas-layout__painel {
@@ -2329,4 +2330,109 @@ body,
   color: #61788E;
   font-size: 10px;
   line-height: 1.6;
+}
+
+/* CUIDAÍ — SELEÇÃO DE DISTRITOS */
+
+.atlas-distritos-etiqueta {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 900;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  max-width: calc(100% - 32px);
+  padding: 12px 15px;
+
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #DCE7F0;
+  border-radius: 12px;
+
+  box-shadow: 0 4px 16px rgba(25, 41, 66, 0.09);
+  color: #192942;
+  font-size: 12px;
+}
+
+.atlas-distritos-etiqueta button {
+  border: none;
+  background: #EAF5FC;
+  color: #087CDB;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* CUIDAÍ — METEOROLOGIA DISTRITAL */
+
+.atlas-meteo-distrito {
+  position: absolute;
+  top: 96px;
+  right: 16px;
+  z-index: 950;
+
+  width: min(255px, calc(100% - 32px));
+  padding: 17px;
+
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #DCE8F3;
+  border-radius: 16px;
+
+  box-shadow: 0 5px 22px rgba(25, 41, 66, 0.10);
+  color: #192942;
+}
+
+.atlas-meteo-distrito-topo {
+  color: #168FC4;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.atlas-meteo-distrito h4 {
+  font-size: 17px;
+  font-weight: 800;
+  margin: 7px 0 14px;
+  color: #192942;
+}
+
+.atlas-meteo-distrito-grade {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.atlas-meteo-distrito-grade>div {
+  padding: 12px 9px;
+  border-radius: 11px;
+  background: #F5F9FD;
+  border: 1px solid #EAF0F5;
+}
+
+.atlas-meteo-distrito-grade small {
+  display: block;
+  font-size: 10px;
+  color: #7A8999;
+  margin-bottom: 9px;
+}
+
+.atlas-meteo-distrito-grade strong {
+  font-size: 17px;
+  font-weight: 800;
+  color: #192942;
+}
+
+.atlas-meteo-distrito p {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #718096;
+  margin-top: 12px;
+}
+
+.atlas-meteo-distrito-fonte {
+  font-size: 10px !important;
 }

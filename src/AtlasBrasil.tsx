@@ -55,6 +55,18 @@ const CORES_CEARA: Record<string, string> = {
     'vale do jaguaribe': '#E9B285'
 };
 
+// CORES DOS DISTRITOS — DESTAQUE SOMENTE AO PASSAR O MOUSE
+const CORES_DISTRITOS = [
+    '#2688D9', // Azul
+    '#E5A13A', // Laranja
+    '#9165C7', // Roxo
+    '#28A899', // Turquesa
+    '#DB7796', // Rosa
+    '#8AAE43', // Verde oliva
+    '#CF7650', // Terracota
+    '#6387BD'  // Azul acinzentado
+];
+
 function chaveRegiao(nome: string) {
     return nome
         .normalize('NFD')
@@ -95,32 +107,54 @@ function corPontoTermico(
 }
 
 
+
+
+
 function EnquadramentoAtlas({
     dados,
     estado,
     municipios,
-    municipio
+    municipio,
+    distritos,
+    distritoSelecionado
 }: {
     dados: FeatureCollection;
     estado: EstadoAtlas | null;
     municipios: FeatureCollection | null;
     municipio: MunicipioAtlas | null;
+    distritos: FeatureCollection | null;
+    distritoSelecionado: string | null;
 }) {
     const map = useMap();
 
     useEffect(() => {
-        // Identifica qual território precisa ser exibido.
-        const geometria = municipio && municipios
-            ? municipios.features.find(
-                item =>
-                    String(item.properties?.id) === municipio.codigo
-            )
-            : estado
-                ? dados.features.find(
-                    item =>
-                        String(item.properties?.CD_UF) === estado.codigo
-                )
-                : dados;
+        // Identifica o distrito selecionado.
+        const distritoAtual = distritos?.features.find(
+            item =>
+                String(item.properties?.CD_DIST ?? '') ===
+                distritoSelecionado
+        );
+
+        // Prioridade:
+        // 1. Distrito selecionado
+        // 2. Todos os distritos de Ipaporanga
+        // 3. Município, estado ou Brasil
+        const geometria = distritoAtual
+            ?? (
+                municipio?.codigo === '2305654' && distritos
+                    ? distritos
+                    : municipio && municipios
+                        ? municipios.features.find(
+                            item =>
+                                String(item.properties?.id) === municipio.codigo
+                        )
+                        : estado
+                            ? dados.features.find(
+                                item =>
+                                    String(item.properties?.CD_UF) === estado.codigo
+                            )
+                            : dados
+            );
 
         if (!geometria) return;
 
@@ -144,8 +178,9 @@ function EnquadramentoAtlas({
 
                 // Depois, ajusta a geometria à largura atual.
                 map.fitBounds(limites, {
-                    padding: [25, 25],
-                    animate: false
+                    padding: [28, 28],
+                    maxZoom: distritoAtual ? 13 : undefined,
+                    animate: true
                 });
             });
         };
@@ -164,7 +199,15 @@ function EnquadramentoAtlas({
             observador.disconnect();
             cancelAnimationFrame(quadro);
         };
-    }, [map, dados, estado, municipios, municipio]);
+    }, [
+        map,
+        dados,
+        estado,
+        municipios,
+        municipio,
+        distritos,
+        distritoSelecionado
+    ]);
 
     return null;
 }
@@ -188,6 +231,16 @@ export default function AtlasBrasil({
     const [estado, setEstado] = useState<EstadoAtlas | null>(null);
     const [municipios, setMunicipios] = useState<FeatureCollection | null>(null);
     const [municipio, setMunicipio] = useState<MunicipioAtlas | null>(null);
+
+    // DISTRITOS DE IPAPORANGA
+    const [distritosIpaporanga, setDistritosIpaporanga] =
+        useState<FeatureCollection | null>(null);
+
+    const [distritoSelecionado, setDistritoSelecionado] =
+        useState<string | null>(null);
+
+    const [erroDistritos, setErroDistritos] =
+        useState<string | null>(null);
     const [regioesPorMunicipio, setRegioesPorMunicipio] = useState<Record<string, string>>({});
     const [carregandoMunicipios, setCarregandoMunicipios] = useState(false);
     const [erro, setErro] = useState('');
@@ -199,33 +252,49 @@ export default function AtlasBrasil({
     const [mostrarAmostras, setMostrarAmostras] =
         useState(false);
 
+
+    const [erroAmostras, setErroAmostras] =
+        useState<string | null>(null);
+
     const [perfilMapa, setPerfilMapa] =
         useState<{
             codigo: string;
+            distrito: string | null;
             perfil: PerfilTermicoMunicipal;
         } | null>(null);
 
     const codigoMunicipioSelecionado =
         municipio?.codigo ?? null;
 
-    // Recebe os resultados calculados pelo Observatório.
+    const codigoDistritoAtivo =
+        municipio?.codigo === '2305654'
+            ? distritoSelecionado
+            : null;
+
+    // Recebe o perfil calculado para o território atual.
     const receberPerfilTermico = useCallback(
-        (perfil: PerfilTermicoMunicipal | null) => {
+        (
+            perfil: PerfilTermicoMunicipal | null,
+            erro: string | null = null
+        ) => {
+            setErroAmostras(erro);
             setPerfilMapa(
                 perfil && codigoMunicipioSelecionado
                     ? {
                         codigo: codigoMunicipioSelecionado,
+                        distrito: codigoDistritoAtivo,
                         perfil
                     }
                     : null
             );
         },
-        [codigoMunicipioSelecionado]
+        [codigoMunicipioSelecionado, codigoDistritoAtivo]
     );
 
-    // Garante que pontos de outro município não apareçam.
+    // Evita exibir amostras de outro distrito.
     const perfilMunicipio =
-        perfilMapa?.codigo === codigoMunicipioSelecionado
+        perfilMapa?.codigo === codigoMunicipioSelecionado &&
+            perfilMapa?.distrito === codigoDistritoAtivo
             ? perfilMapa.perfil
             : null;
 
@@ -301,6 +370,49 @@ export default function AtlasBrasil({
         return () => controlador.abort();
     }, [estado?.sigla]);
 
+    // CARREGAMENTO DA MALHA DISTRITAL DE IPAPORANGA
+    useEffect(() => {
+        setDistritosIpaporanga(null);
+        setDistritoSelecionado(null);
+        setErroDistritos(null);
+
+        if (municipio?.codigo !== '2305654') return;
+
+        const controlador = new AbortController();
+
+        fetch('/distritos-ipaporanga.geojson', {
+            signal: controlador.signal
+        })
+            .then(resposta => {
+                if (!resposta.ok) {
+                    throw new Error('GeoJSON dos distritos não encontrado.');
+                }
+                return resposta.json();
+            })
+            .then((resultado: FeatureCollection) => {
+                if (
+                    resultado.type !== 'FeatureCollection' ||
+                    !Array.isArray(resultado.features) ||
+                    resultado.features.length === 0
+                ) {
+                    throw new Error('GeoJSON distrital inválido.');
+                }
+
+                if (!controlador.signal.aborted) {
+                    setDistritosIpaporanga(resultado);
+                }
+            })
+            .catch(erro => {
+                if (!controlador.signal.aborted) {
+                    console.error(erro);
+                    setErroDistritos('Não foi possível carregar os distritos.');
+                }
+            });
+
+        return () => controlador.abort();
+
+    }, [municipio?.codigo]);
+
     const estaNoCeara = estado?.sigla === 'CE';
 
     const geometriaEstado = dados && estado
@@ -314,6 +426,21 @@ export default function AtlasBrasil({
             feature => String(feature.properties?.id) === municipio.codigo
         )
         : null;
+
+    // GEOMETRIA DO DISTRITO SELECIONADO
+    const geometriaDistritoSelecionado = useMemo(() => {
+        if (!distritosIpaporanga || !distritoSelecionado) {
+            return null;
+        }
+
+        return distritosIpaporanga.features.find(
+            feature =>
+                String(feature.properties?.CD_DIST) ===
+                distritoSelecionado
+        ) ?? null;
+
+    }, [distritosIpaporanga, distritoSelecionado]);
+
     // Estações efetivamente localizadas no município.
     const estacoesDoMunicipio = useMemo(() => {
         if (!geometriaMunicipio) return [];
@@ -327,7 +454,22 @@ export default function AtlasBrasil({
         );
     }, [estacoes, geometriaMunicipio]);
 
-    const idEstacaoAtiva = estacoesDoMunicipio.some(
+    // ESTAÇÕES DO TERRITÓRIO ATUAL
+    const estacoesDoTerritorio = useMemo(() => {
+        if (!geometriaDistritoSelecionado) {
+            return estacoesDoMunicipio;
+        }
+
+        return estacoesDoMunicipio.filter(estacao =>
+            estacaoDentroDoMunicipio(
+                geometriaDistritoSelecionado.geometry,
+                estacao.latitude,
+                estacao.longitude
+            )
+        );
+    }, [estacoesDoMunicipio, geometriaDistritoSelecionado]);
+
+    const idEstacaoAtiva = estacoesDoTerritorio.some(
         estacao => estacao.id === idEstacaoSelecionada
     )
         ? idEstacaoSelecionada
@@ -350,6 +492,75 @@ export default function AtlasBrasil({
             longitude: centro.lng
         };
     }, [geometriaMunicipio]);
+
+
+    // PONTO DE REFERÊNCIA DO DISTRITO
+    const pontoReferenciaDistrito = useMemo(() => {
+        const feature = geometriaDistritoSelecionado;
+
+        if (!feature) return null;
+
+        const limites = L.geoJSON(feature).getBounds();
+
+        if (!limites.isValid()) return null;
+
+        const centro = limites.getCenter();
+
+        const dentro = (latitude: number, longitude: number) =>
+            estacaoDentroDoMunicipio(
+                feature.geometry,
+                latitude,
+                longitude
+            );
+
+        if (dentro(centro.lat, centro.lng)) {
+            return {
+                latitude: centro.lat,
+                longitude: centro.lng
+            };
+        }
+
+        // Busca o ponto interno mais próximo do centro.
+        let melhor: {
+            latitude: number;
+            longitude: number;
+        } | null = null;
+
+        let menorDistancia = Infinity;
+        const divisoes = 25;
+
+        for (let linha = 0; linha < divisoes; linha++) {
+            for (let coluna = 0; coluna < divisoes; coluna++) {
+                const y = (linha + 0.5) / divisoes;
+                const x = (coluna + 0.5) / divisoes;
+
+                const latitude = limites.getSouth() +
+                    y * (limites.getNorth() - limites.getSouth());
+
+                const longitude = limites.getWest() +
+                    x * (limites.getEast() - limites.getWest());
+
+                if (!dentro(latitude, longitude)) continue;
+
+                const distancia =
+                    (x - 0.5) ** 2 + (y - 0.5) ** 2;
+
+                if (distancia < menorDistancia) {
+                    menorDistancia = distancia;
+                    melhor = { latitude, longitude };
+                }
+            }
+        }
+
+        return melhor;
+    }, [geometriaDistritoSelecionado]);
+
+    // Referência ativa: distrito ou município.
+    const pontoReferenciaArea =
+        geometriaDistritoSelecionado
+            ? pontoReferenciaDistrito
+            : pontoReferenciaMunicipio;
+
 
     const geometriaAtual = estaNoCeara && municipios
         ? geometriaMunicipio ?? municipios
@@ -380,8 +591,81 @@ export default function AtlasBrasil({
         return [exterior, ...aneis];
     }, [geometriaMunicipio]);
 
+
+    const mostrandoMalhaDistrital =
+        municipio?.codigo === '2305654' &&
+        distritosIpaporanga !== null;
+
+
+    // MÁSCARA GEOGRÁFICA DO DISTRITO SELECIONADO
+    const mascaraDistritoSelecionado =
+        useMemo<L.LatLngExpression[][] | null>(() => {
+
+            const geometria = geometriaDistritoSelecionado?.geometry;
+
+            if (
+                !geometria ||
+                (
+                    geometria.type !== 'Polygon' &&
+                    geometria.type !== 'MultiPolygon'
+                )
+            ) {
+                return null;
+            }
+
+            const aneis = geometria.type === 'Polygon'
+                ? geometria.coordinates
+                : geometria.coordinates.flat();
+
+            const exterior: L.LatLngExpression[] = [
+                [-38, -80],
+                [-38, -25],
+                [10, -25],
+                [10, -80]
+            ];
+
+            const interiores = aneis.map(anel =>
+                anel.map(
+                    ([longitude, latitude]): L.LatLngExpression =>
+                        [latitude, longitude]
+                )
+            );
+
+            return [exterior, ...interiores];
+
+        }, [geometriaDistritoSelecionado]);
+
+    // Decide qual limite deve ficar visível.
+    const mascaraVisual =
+        municipio?.codigo === '2305654' && distritoSelecionado
+            ? (mascaraDistritoSelecionado ?? mascaraExterna)
+            : mascaraExterna;
+
+    // FILTRA OS PONTOS TÉRMICOS PELO DISTRITO SELECIONADO
+    const pontosVisiveis = perfilMunicipio?.pontos.filter(ponto => {
+        if (!geometriaDistritoSelecionado) return true;
+
+        return estacaoDentroDoMunicipio(
+            geometriaDistritoSelecionado.geometry,
+            ponto.latitude,
+            ponto.longitude
+        );
+    }) ?? [];
+
     const estiloTerritorio = (feature?: Feature): L.PathOptions => {
         if (municipio) {
+            // Evita sobrepor dois contornos territoriais
+            // quando estamos exibindo os distritos.
+            if (mostrandoMalhaDistrital) {
+                return {
+                    color: 'transparent',
+                    weight: 0,
+                    opacity: 0,
+                    fillOpacity: 0,
+                    interactive: false
+                };
+            }
+
             return {
                 color: '#087CDB',
                 weight: 2.4,
@@ -496,8 +780,14 @@ export default function AtlasBrasil({
 
                         {dados && (
                             <>
-                                <EnquadramentoAtlas dados={dados} estado={estado}
-                                    municipios={municipios} municipio={municipio} />
+                                <EnquadramentoAtlas
+                                    dados={dados}
+                                    estado={estado}
+                                    municipios={municipios}
+                                    municipio={municipio}
+                                    distritos={distritosIpaporanga}
+                                    distritoSelecionado={distritoSelecionado}
+                                />
 
                                 {/* Nível municipal: base geográfica real. */}
                                 {municipio && (
@@ -508,12 +798,20 @@ export default function AtlasBrasil({
                                     />
                                 )}
 
-                                {/* Apaga o mapa externo, preservando somente o interior municipal. */}
-                                {municipio && mascaraExterna && (
-                                    <Polygon positions={mascaraExterna} pathOptions={{
-                                        stroke: false, fillColor: '#F3F7FB', fillOpacity: 1,
-                                        fillRule: 'evenodd', interactive: false
-                                    }} />
+                                {/* Mantém a máscara nos outros municípios.
+    Em Ipaporanga, a camada distrital fica sem recorte externo. */}
+                                {/* OCULTA O MAPA FORA DO TERRITÓRIO ATUAL */}
+                                {municipio && mascaraVisual && (
+                                    <Polygon
+                                        positions={mascaraVisual}
+                                        pathOptions={{
+                                            stroke: false,
+                                            fillColor: '#F3F7FB',
+                                            fillOpacity: 1,
+                                            fillRule: 'evenodd',
+                                            interactive: false
+                                        }}
+                                    />
                                 )}
 
                                 <GeoJSON
@@ -562,12 +860,88 @@ export default function AtlasBrasil({
                                     }}
                                 />
 
+                                {/* A seleção distrital é controlada pela camada abaixo. */}
+                                {/* LIMITES INTERATIVOS DOS DISTRITOS DE IPAPORANGA */}
+                                {municipio?.codigo === '2305654' && distritosIpaporanga && (
+                                    <GeoJSON
+                                        key={`distritos-${distritoSelecionado ?? 'todos'}`}
+
+                                        data={
+                                            geometriaDistritoSelecionado
+                                                ? geometriaDistritoSelecionado
+                                                : distritosIpaporanga
+                                        }
+
+                                        style={() => ({
+                                            color: '#66A7D3',
+                                            weight: 1.5,
+                                            opacity: 1,
+                                            fillColor: '#FFFFFF',
+                                            fillOpacity: 0.01
+                                        })}
+
+                                        onEachFeature={(feature, layer) => {
+                                            const codigo = String(
+                                                feature.properties?.CD_DIST ?? ''
+                                            );
+
+                                            const nome = String(
+                                                feature.properties?.NM_DIST ?? 'Distrito'
+                                            );
+
+                                            const indice = distritosIpaporanga.features.findIndex(
+                                                item =>
+                                                    String(item.properties?.CD_DIST) === codigo
+                                            );
+
+                                            const cor = CORES_DISTRITOS[
+                                                Math.max(0, indice) % CORES_DISTRITOS.length
+                                            ];
+
+                                            const camada = layer as L.Path;
+
+                                            layer.bindTooltip(nome, {
+                                                sticky: true,
+                                                direction: 'top'
+                                            });
+
+                                            // COLORIR AO PASSAR O MOUSE
+                                            layer.on('mouseover', () => {
+                                                camada.setStyle({
+                                                    color: cor,
+                                                    weight: 2.5,
+                                                    fillColor: cor,
+                                                    fillOpacity: 0.28
+                                                });
+
+                                                camada.bringToFront();
+                                            });
+
+                                            // RETIRAR A COR AO SAIR
+                                            layer.on('mouseout', () => {
+                                                camada.setStyle({
+                                                    color: '#66A7D3',
+                                                    weight: 1.5,
+                                                    fillColor: '#FFFFFF',
+                                                    fillOpacity: 0.01
+                                                });
+                                            });
+
+                                            // SELECIONAR DISTRITO PARA ZOOM
+                                            layer.on('click', () => {
+                                                setDistritoSelecionado(atual =>
+                                                    atual === codigo ? null : codigo
+                                                );
+                                            });
+                                        }}
+                                    />
+                                )}
 
                                 {/* PONTOS DA AMOSTRAGEM TÉRMICA MUNICIPAL */}
                                 {municipio &&
                                     mostrarAmostras &&
                                     perfilMunicipio &&
-                                    perfilMunicipio.pontos.map((ponto, indice) => (
+                                    pontosVisiveis.map((ponto, indice) => (
                                         <CircleMarker
                                             key={`${municipio.codigo}-amostra-${indice}`}
                                             center={[ponto.latitude, ponto.longitude]}
@@ -630,7 +1004,7 @@ export default function AtlasBrasil({
                         )}
 
                         {/* ESTAÇÕES CUIDAÍ DO MUNICÍPIO */}
-                        {municipio && estacoesDoMunicipio.map(estacao => {
+                        {municipio && estacoesDoTerritorio.map(estacao => {
                             const leitura = estacao.ultimaLeitura;
 
                             const recente =
@@ -709,6 +1083,38 @@ export default function AtlasBrasil({
                     </MapContainer>
 
 
+
+                    {/* IDENTIFICAÇÃO DO DISTRITO SELECIONADO */}
+                    {municipio?.codigo === '2305654' && (
+                        <div className="atlas-distritos-etiqueta">
+                            <strong>
+                                {erroDistritos
+                                    ? erroDistritos
+                                    : !distritosIpaporanga
+                                        ? 'Carregando distritos...'
+                                        : distritoSelecionado
+                                            ? String(
+                                                distritosIpaporanga.features.find(
+                                                    item =>
+                                                        String(item.properties?.CD_DIST) ===
+                                                        distritoSelecionado
+                                                )?.properties?.NM_DIST ?? 'Distrito selecionado'
+                                            )
+                                            : `${distritosIpaporanga.features.length} distritos • Clique para selecionar`
+                                }
+                            </strong>
+
+                            {distritoSelecionado && (
+                                <button
+                                    type="button"
+                                    onClick={() => setDistritoSelecionado(null)}
+                                >
+                                    Limpar
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {/* CONTROLE DE VISUALIZAÇÃO DAS AMOSTRAS */}
                     {municipio && (
                         <div className="atlas-amostras-controle">
@@ -732,9 +1138,24 @@ export default function AtlasBrasil({
                                 {perfilMunicipio
                                     ? mostrarAmostras
                                         ? 'Ocultar pontos'
-                                        : `Mostrar ${perfilMunicipio.amostras} pontos`
-                                    : 'Preparando amostras...'}
+                                        : `Mostrar ${pontosVisiveis.length} pontos`
+                                    : erroAmostras
+                                        ? 'Amostras indisponíveis'
+                                        : 'Preparando amostras...'}
                             </button>
+
+                            {erroAmostras && (
+                                <p
+                                    role="alert"
+                                    style={{
+                                        marginTop: 8,
+                                        fontSize: 11,
+                                        color: '#B42318'
+                                    }}
+                                >
+                                    {erroAmostras}
+                                </p>
+                            )}
 
                             {mostrarAmostras && perfilMunicipio && (
                                 <div className="atlas-amostras-legenda">
@@ -754,7 +1175,7 @@ export default function AtlasBrasil({
                                     </div>
 
                                     <small>
-                                        Escala relativa aos pontos do município.
+                                        Escala relativa aos pontos da área selecionada.
                                         Fonte: Open-Meteo.
                                     </small>
                                 </div>
@@ -766,25 +1187,43 @@ export default function AtlasBrasil({
 
                 {/* DASHBOARD ESTATÍSTICO À DIREITA */}
                 <aside className="atlas-layout__painel">
-                    {municipio && pontoReferenciaMunicipio && geometriaMunicipio && (
-                        <ObservatorioMunicipal
-                            key={municipio.codigo}
-                            municipio={municipio.nome}
-                            uf={estado?.sigla ?? 'CE'}
-                            latitude={pontoReferenciaMunicipio.latitude}
-                            longitude={pontoReferenciaMunicipio.longitude}
-                            geometria={geometriaMunicipio.geometry}
-                            onPerfilTermico={receberPerfilTermico}
-                            estacoesMunicipais={estacoesDoMunicipio}
-                            carregandoEstacoes={carregandoEstacoes}
-                            erroEstacoes={erroEstacoes}
-                            instanteAtual={instanteAtual}
-                            idEstacaoSelecionada={idEstacaoAtiva}
-                            onSelecionarEstacao={setIdEstacaoSelecionada}
-                            codigoMunicipio={municipio.codigo}
-                            municipiosCeara={municipios}
-                        />
-                    )}
+
+                    {municipio &&
+                        pontoReferenciaMunicipio &&
+                        pontoReferenciaArea &&
+                        geometriaMunicipio && (
+                            <ObservatorioMunicipal
+                                key={`${municipio.codigo}-${distritoSelecionado ?? 'municipio'}`}
+                                municipio={municipio.nome}
+                                distritoNome={
+                                    geometriaDistritoSelecionado
+                                        ? String(
+                                            geometriaDistritoSelecionado.properties
+                                                ?.NM_DIST ?? 'Distrito'
+                                        )
+                                        : null
+                                }
+                                uf={estado?.sigla ?? 'CE'}
+                                latitude={pontoReferenciaMunicipio.latitude}
+                                longitude={pontoReferenciaMunicipio.longitude}
+                                latitudeArea={pontoReferenciaArea.latitude}
+                                longitudeArea={pontoReferenciaArea.longitude}
+                                geometria={
+                                    geometriaDistritoSelecionado?.geometry ??
+                                    geometriaMunicipio.geometry
+                                }
+                                onPerfilTermico={receberPerfilTermico}
+                                estacoesMunicipais={estacoesDoTerritorio}
+                                carregandoEstacoes={carregandoEstacoes}
+                                erroEstacoes={erroEstacoes}
+                                instanteAtual={instanteAtual}
+                                idEstacaoSelecionada={idEstacaoAtiva}
+                                onSelecionarEstacao={setIdEstacaoSelecionada}
+                                codigoMunicipio={municipio.codigo}
+                                municipiosCeara={municipios}
+                            />
+                        )}
+
                 </aside>
 
             </div>
@@ -821,7 +1260,9 @@ export default function AtlasBrasil({
 
             <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#718096' }}>
                 {municipio
-                    ? 'Mapa geográfico restrito aos limites municipais. Os distritos internos serão incorporados depois.'
+                    ? municipio.codigo === '2305654'
+                        ? 'Clique em um distrito para destacá-lo. Limites distritais do IBGE, Censo 2022.'
+                        : 'Mapa geográfico restrito aos limites municipais. Detalhamento distrital em preparação.'
                     : estaNoCeara
                         ? 'Passe o mouse para identificar o município e sua região; clique para explorar.'
                         : estado

@@ -129,19 +129,20 @@ function EnquadramentoAtlas({
 
     useEffect(() => {
         // Identifica o distrito selecionado.
+        // Identifica a divisão territorial selecionada.
         const distritoAtual = distritos?.features.find(
             item =>
-                String(item.properties?.CD_DIST ?? '') ===
-                distritoSelecionado
+                String(
+                    item.properties?.CD_DIST ??
+                    item.properties?.id ??
+                    ''
+                ) === distritoSelecionado
         );
 
-        // Prioridade:
-        // 1. Distrito selecionado
-        // 2. Todos os distritos de Ipaporanga
-        // 3. Município, estado ou Brasil
+        // Prioriza a área selecionada, depois a malha completa.
         const geometria = distritoAtual
             ?? (
-                municipio?.codigo === '2305654' && distritos
+                municipio && distritos
                     ? distritos
                     : municipio && municipios
                         ? municipios.features.find(
@@ -155,7 +156,6 @@ function EnquadramentoAtlas({
                             )
                             : dados
             );
-
         if (!geometria) return;
 
         const limites = L.geoJSON(geometria).getBounds();
@@ -241,6 +241,12 @@ export default function AtlasBrasil({
 
     const [erroDistritos, setErroDistritos] =
         useState<string | null>(null);
+    // REGIONAIS ADMINISTRATIVAS DE FORTALEZA
+    const [regionaisFortaleza, setRegionaisFortaleza] =
+        useState<FeatureCollection | null>(null);
+
+    const [erroRegionais, setErroRegionais] =
+        useState<string | null>(null);
     const [regioesPorMunicipio, setRegioesPorMunicipio] = useState<Record<string, string>>({});
     const [carregandoMunicipios, setCarregandoMunicipios] = useState(false);
     const [erro, setErro] = useState('');
@@ -267,7 +273,8 @@ export default function AtlasBrasil({
         municipio?.codigo ?? null;
 
     const codigoDistritoAtivo =
-        municipio?.codigo === '2305654'
+        municipio?.codigo === '2305654' ||
+            municipio?.codigo === '2304400'
             ? distritoSelecionado
             : null;
 
@@ -413,6 +420,97 @@ export default function AtlasBrasil({
 
     }, [municipio?.codigo]);
 
+    // CARREGAMENTO DAS 12 REGIONAIS DE FORTALEZA
+    useEffect(() => {
+        setRegionaisFortaleza(null);
+        setErroRegionais(null);
+
+        // Código IBGE de Fortaleza
+        if (municipio?.codigo !== '2304400') return;
+
+        const controlador = new AbortController();
+
+        fetch('/regionais-fortaleza.geojson', {
+            signal: controlador.signal
+        })
+            .then(resposta => {
+                if (!resposta.ok) {
+                    throw new Error(
+                        'GeoJSON das Regionais não encontrado.'
+                    );
+                }
+
+                return resposta.json();
+            })
+            .then((resultado: FeatureCollection) => {
+                if (
+                    resultado.type !== 'FeatureCollection' ||
+                    !Array.isArray(resultado.features) ||
+                    resultado.features.length !== 12
+                ) {
+                    throw new Error(
+                        'A malha deve conter 12 Regionais.'
+                    );
+                }
+
+                if (!controlador.signal.aborted) {
+                    setRegionaisFortaleza(resultado);
+                }
+            })
+            .catch(erro => {
+                if (!controlador.signal.aborted) {
+                    console.error(erro);
+                    setErroRegionais(
+                        'Não foi possível carregar as Regionais.'
+                    );
+                }
+            });
+
+        return () => controlador.abort();
+
+    }, [municipio?.codigo]);
+
+    // CARREGAMENTO DAS REGIONAIS DE FORTALEZA
+    useEffect(() => {
+        setRegionaisFortaleza(null);
+        setErroRegionais(null);
+
+        if (municipio?.codigo !== '2304400') return;
+
+        const controlador = new AbortController();
+
+        fetch('/regionais-fortaleza.geojson', {
+            signal: controlador.signal
+        })
+            .then(resposta => {
+                if (!resposta.ok) {
+                    throw new Error('Malha de Fortaleza não encontrada.');
+                }
+                return resposta.json();
+            })
+            .then((resultado: FeatureCollection) => {
+                if (
+                    resultado.type !== 'FeatureCollection' ||
+                    !Array.isArray(resultado.features) ||
+                    resultado.features.length !== 12
+                ) {
+                    throw new Error('Malha das Regionais inválida.');
+                }
+
+                if (!controlador.signal.aborted) {
+                    setRegionaisFortaleza(resultado);
+                }
+            })
+            .catch(falha => {
+                if (!controlador.signal.aborted) {
+                    console.error(falha);
+                    setErroRegionais('Não foi possível carregar as Regionais.');
+                }
+            });
+
+        return () => controlador.abort();
+    }, [municipio?.codigo]);
+
     const estaNoCeara = estado?.sigla === 'CE';
 
     const geometriaEstado = dados && estado
@@ -427,19 +525,35 @@ export default function AtlasBrasil({
         )
         : null;
 
-    // GEOMETRIA DO DISTRITO SELECIONADO
+    // MALHA TERRITORIAL ATIVA
+    const divisoesAtivas =
+        municipio?.codigo === '2305654'
+            ? distritosIpaporanga
+            : municipio?.codigo === '2304400'
+                ? regionaisFortaleza
+                : null;
+
+    const erroTerritorial =
+        municipio?.codigo === '2304400'
+            ? erroRegionais
+            : erroDistritos;
+
+    // GEOMETRIA DA DIVISÃO TERRITORIAL SELECIONADA
     const geometriaDistritoSelecionado = useMemo(() => {
-        if (!distritosIpaporanga || !distritoSelecionado) {
+        if (!divisoesAtivas || !distritoSelecionado) {
             return null;
         }
 
-        return distritosIpaporanga.features.find(
+        return divisoesAtivas.features.find(
             feature =>
-                String(feature.properties?.CD_DIST) ===
-                distritoSelecionado
+                String(
+                    feature.properties?.CD_DIST ??
+                    feature.properties?.id ??
+                    ''
+                ) === distritoSelecionado
         ) ?? null;
 
-    }, [distritosIpaporanga, distritoSelecionado]);
+    }, [divisoesAtivas, distritoSelecionado]);
 
     // Estações efetivamente localizadas no município.
     const estacoesDoMunicipio = useMemo(() => {
@@ -593,8 +707,7 @@ export default function AtlasBrasil({
 
 
     const mostrandoMalhaDistrital =
-        municipio?.codigo === '2305654' &&
-        distritosIpaporanga !== null;
+        divisoesAtivas !== null;
 
 
     // MÁSCARA GEOGRÁFICA DO DISTRITO SELECIONADO
@@ -637,7 +750,7 @@ export default function AtlasBrasil({
 
     // Decide qual limite deve ficar visível.
     const mascaraVisual =
-        municipio?.codigo === '2305654' && distritoSelecionado
+        geometriaDistritoSelecionado
             ? (mascaraDistritoSelecionado ?? mascaraExterna)
             : mascaraExterna;
 
@@ -785,7 +898,7 @@ export default function AtlasBrasil({
                                     estado={estado}
                                     municipios={municipios}
                                     municipio={municipio}
-                                    distritos={distritosIpaporanga}
+                                    distritos={divisoesAtivas}
                                     distritoSelecionado={distritoSelecionado}
                                 />
 
@@ -862,14 +975,13 @@ export default function AtlasBrasil({
 
                                 {/* A seleção distrital é controlada pela camada abaixo. */}
                                 {/* LIMITES INTERATIVOS DOS DISTRITOS DE IPAPORANGA */}
-                                {municipio?.codigo === '2305654' && distritosIpaporanga && (
+                                {divisoesAtivas && (
                                     <GeoJSON
-                                        key={`distritos-${distritoSelecionado ?? 'todos'}`}
-
+                                        key={`divisoes-${municipio?.codigo}-${distritoSelecionado ?? 'todos'}`}
                                         data={
                                             geometriaDistritoSelecionado
                                                 ? geometriaDistritoSelecionado
-                                                : distritosIpaporanga
+                                                : divisoesAtivas
                                         }
 
                                         style={() => ({
@@ -882,17 +994,23 @@ export default function AtlasBrasil({
 
                                         onEachFeature={(feature, layer) => {
                                             const codigo = String(
-                                                feature.properties?.CD_DIST ?? ''
+                                                feature.properties?.CD_DIST ??
+                                                feature.properties?.id ??
+                                                ''
                                             );
 
                                             const nome = String(
-                                                feature.properties?.NM_DIST ?? 'Distrito'
+                                                feature.properties?.NM_DIST ??
+                                                feature.properties?.regiao_adm ??
+                                                'Área'
                                             );
 
-                                            const indice = distritosIpaporanga.features.findIndex(
-                                                item =>
-                                                    String(item.properties?.CD_DIST) === codigo
-                                            );
+                                            const indice = municipio?.codigo === '2304400'
+                                                ? Number(feature.properties?.id) - 1
+                                                : divisoesAtivas.features.findIndex(
+                                                    item =>
+                                                        String(item.properties?.CD_DIST) === codigo
+                                                );
 
                                             const cor = CORES_DISTRITOS[
                                                 Math.max(0, indice) % CORES_DISTRITOS.length
@@ -1085,35 +1203,35 @@ export default function AtlasBrasil({
 
 
                     {/* IDENTIFICAÇÃO DO DISTRITO SELECIONADO */}
-                    {municipio?.codigo === '2305654' && (
-                        <div className="atlas-distritos-etiqueta">
-                            <strong>
-                                {erroDistritos
-                                    ? erroDistritos
-                                    : !distritosIpaporanga
-                                        ? 'Carregando distritos...'
-                                        : distritoSelecionado
+                    {(municipio?.codigo === '2305654' ||
+                        municipio?.codigo === '2304400') && (
+                            <div className="atlas-distritos-etiqueta">
+                                {erroTerritorial
+                                    ? erroTerritorial
+                                    : !divisoesAtivas
+                                        ? 'Carregando divisões territoriais...'
+                                        : geometriaDistritoSelecionado
                                             ? String(
-                                                distritosIpaporanga.features.find(
-                                                    item =>
-                                                        String(item.properties?.CD_DIST) ===
-                                                        distritoSelecionado
-                                                )?.properties?.NM_DIST ?? 'Distrito selecionado'
+                                                geometriaDistritoSelecionado.properties?.NM_DIST ??
+                                                geometriaDistritoSelecionado.properties?.regiao_adm ??
+                                                'Área selecionada'
                                             )
-                                            : `${distritosIpaporanga.features.length} distritos • Clique para selecionar`
+                                            : `${divisoesAtivas.features.length} ${municipio?.codigo === '2304400'
+                                                ? 'Regionais'
+                                                : 'distritos'
+                                            } • Clique para selecionar`
                                 }
-                            </strong>
 
-                            {distritoSelecionado && (
-                                <button
-                                    type="button"
-                                    onClick={() => setDistritoSelecionado(null)}
-                                >
-                                    Limpar
-                                </button>
-                            )}
-                        </div>
-                    )}
+                                {distritoSelecionado && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setDistritoSelecionado(null)}
+                                    >
+                                        Limpar
+                                    </button>
+                                )}
+                            </div>
+                        )}
 
                     {/* CONTROLE DE VISUALIZAÇÃO DAS AMOSTRAS */}
                     {municipio && (
@@ -1199,7 +1317,9 @@ export default function AtlasBrasil({
                                     geometriaDistritoSelecionado
                                         ? String(
                                             geometriaDistritoSelecionado.properties
-                                                ?.NM_DIST ?? 'Distrito'
+                                                ?.NM_DIST ??
+                                            geometriaDistritoSelecionado.properties?.regiao_adm ??
+                                            'Área'
                                         )
                                         : null
                                 }

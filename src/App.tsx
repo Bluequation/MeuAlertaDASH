@@ -85,25 +85,72 @@ interface LeituraHistoricaMeteo {
   momento: string;
 }
 
-const CORES = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE'];
+const CORES_CATEGORIAS: Record<string, string> = {
+  Chuvas: '#168FC4',
+  Passagem: '#D59A35',
+  Energia: '#8868B8',
+  Estrada: '#3A9B78',
+  Quentura: '#D65B39'
+};
 
-const GRADIENTES_CALOR: Record<string, any> = {
-  'Chuvas': { 0.1: '#bae6fd', 0.39: '#bae6fd', 0.4: '#38bdf8', 0.59: '#38bdf8', 0.6: '#0284c7', 0.79: '#0284c7', 0.8: '#1d4ed8', 0.99: '#1d4ed8', 1.0: '#1e3a8a' },
-  'Passagem': { 0.1: '#fef08a', 0.39: '#fef08a', 0.4: '#fbbf24', 0.59: '#fbbf24', 0.6: '#f97316', 0.79: '#f97316', 0.8: '#ea580c', 0.99: '#ea580c', 1.0: '#9a3412' },
-  'Energia': { 0.1: '#e9d5ff', 0.39: '#e9d5ff', 0.4: '#c084fc', 0.59: '#c084fc', 0.6: '#a855f7', 0.79: '#a855f7', 0.8: '#7e22ce', 0.99: '#7e22ce', 1.0: '#4c1d95' },
-  'Todas': { 0.1: 'rgba(0, 122, 255, 0.4)', 0.39: 'rgba(0, 122, 255, 0.4)', 0.4: 'cyan', 0.59: 'cyan', 0.6: 'lime', 0.79: 'lime', 0.8: 'orange', 0.99: 'orange', 1.0: 'red' },
-  'Estrada': { 0.1: '#d9f99d', 0.39: '#d9f99d', 0.4: '#86efac', 0.59: '#86efac', 0.6: '#4ade80', 0.79: '#4ade80', 0.8: '#65a30d', 0.99: '#65a30d', 1.0: '#3f6212' },
-  'Quentura': {
-    0.1: '#ffe7a2',
-    0.39: '#ffe7a2',
-    0.4: '#ffc566',
-    0.59: '#ffc566',
-    0.6: '#f68b45',
-    0.79: '#f68b45',
-    0.8: '#df573b',
-    0.99: '#df573b',
-    1.0: '#a92839'
+const corDaCategoria = (categoria: string): string =>
+  CORES_CATEGORIAS[categoria] ?? '#718399';
+
+const GRADIENTES_CALOR: Record<string, Record<number, string>> = {
+
+  // TODAS — ESCALA VIVA, SEM EXTREMOS ESCUROS
+  'Todas': {
+    0.10: '#B8E2FF',
+    0.325: '#329EED',
+    0.55: '#46D898',
+    0.775: '#F9E14D',
+    1.00: '#FF6155'
   },
+
+  // CHUVAS — AZUL
+  'Chuvas': {
+    0.10: '#C6EAFF',
+    0.325: '#85D4FA',
+    0.55: '#43B9F0',
+    0.775: '#168FDC',
+    1.00: '#176FC4'
+  },
+
+  // PASSAGEM — AMARELO E ÂMBAR
+  'Passagem': {
+    0.10: '#FFF3AA',
+    0.325: '#FFE27A',
+    0.55: '#FFC54C',
+    0.775: '#F7A832',
+    1.00: '#E98C29'
+  },
+
+  // ENERGIA — VIOLETA
+  'Energia': {
+    0.10: '#EBDFFF',
+    0.325: '#D0B7FF',
+    0.55: '#B58BF4',
+    0.775: '#966FE4',
+    1.00: '#805CCD'
+  },
+
+  // ESTRADA — VERDE
+  'Estrada': {
+    0.10: '#D5F3C5',
+    0.325: '#A9E8B0',
+    0.55: '#76D89C',
+    0.775: '#42BE83',
+    1.00: '#249F72'
+  },
+
+  // QUENTURA — CORAL E VERMELHO
+  'Quentura': {
+    0.10: '#FFE1CF',
+    0.325: '#FFB99A',
+    0.55: '#FF936D',
+    0.775: '#F66C50',
+    1.00: '#E84B43'
+  }
 };
 
 const getGradiente = (filtro: string) => {
@@ -121,12 +168,13 @@ function CamadaCalor({ alertas, gradiente }: { alertas: Alerta[], gradiente: any
     if (!map || alertas.length === 0) return;
     const pontos = alertas.map(a => [a.latitude, a.longitude, 0.4] as [number, number, number]);
     const heatLayer = (L as any).heatLayer(pontos, {
-      radius: 35, blur: 15, maxZoom: 15, max: 1.0, minOpacity: 0.5, gradient: gradiente
+      radius: 30, blur: 6, maxZoom: 15, max: 1.0, minOpacity: 0.35, gradient: gradiente
     }).addTo(map);
     return () => { map.removeLayer(heatLayer); };
   }, [map, alertas, gradiente]);
   return null;
 }
+
 
 // DADOS METEOROLÓGICOS ESTIMADOS PELA OPEN-METEO
 interface DadosOpenMeteo {
@@ -1659,6 +1707,7 @@ function App() {
   const [carregamentoInicial, setCarregamentoInicial] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState<'visao_geral' | 'mapa_calor' | 'meteorologia' | 'sobre'>('visao_geral');
   const [filtroCalor, setFiltroCalor] = useState<string>('Todas');
+  // Zoom atual da aba Mapa de Calor
   const [filtroCategoria, setFiltroCategoria] = useState<string>('Todas');
   const [online, setOnline] = useState(navigator.onLine);  // 👇 ESTADOS PARA CONTROLAR A RESPONSIVIDADE E O MENU MOBILE
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -2588,8 +2637,7 @@ function App() {
   const cssLegenda = `linear-gradient(to right, ${coresLegenda[0]} 0%, ${coresLegenda[0]} 20%, ${coresLegenda[1]} 20%, ${coresLegenda[1]} 40%, ${coresLegenda[2]} 40%, ${coresLegenda[2]} 60%, ${coresLegenda[3]} 60%, ${coresLegenda[3]} 80%, ${coresLegenda[4]} 80%, ${coresLegenda[4]} 100%)`;
 
   const getCorCategoria = (nomeCategoria: string) => {
-    const index = dadosGrafico.findIndex((item) => item.nome === nomeCategoria);
-    return index !== -1 ? CORES[index % CORES.length] : '#007AFF';
+    return corDaCategoria(nomeCategoria);
   };
 
   const criarIconeVazado = (cor: string) => {
@@ -2787,8 +2835,10 @@ function App() {
         width: '100%',
         height: '100dvh',
         minHeight: 0,
-        backgroundColor: '#F2F2F7',
-        overflow: 'hidden'
+        backgroundColor:
+          abaAtiva === 'meteorologia'
+            ? '#F8FAFC'
+            : '#F2F2F7', overflow: 'hidden'
       }}
     >
 
@@ -3136,7 +3186,11 @@ function App() {
                       cursor: 'pointer',
                       fontSize: '12px',
                       fontWeight: '700',
-                      backgroundColor: filtroCategoria === categoria ? '#007AFF' : '#FFFFFF',
+                      backgroundColor: filtroCategoria === categoria
+                        ? categoria === 'Todas'
+                          ? '#192942'
+                          : corDaCategoria(categoria)
+                        : '#FFFFFF',
                       color: filtroCategoria === categoria ? '#FFFFFF' : '#636366',
                       boxShadow: filtroCategoria === categoria
                         ? '0 4px 12px rgba(0,122,255,0.25)'
@@ -3320,7 +3374,10 @@ function App() {
 
                         <Bar dataKey="quantidade" name="Registros" radius={[0, 6, 6, 0]} maxBarSize={20}>
                           {dadosGrafico.map((_, index) =>
-                            <Cell key={`cell-bar-${index}`} fill={CORES[index % CORES.length]} />
+                            <Cell
+                              key={`cell-bar-${index}`}
+                              fill={corDaCategoria(dadosGrafico[index].nome)}
+                            />
                           )}
                         </Bar>
                       </BarChart>
@@ -3912,6 +3969,10 @@ function App() {
                 carregandoEstacoes={carregandoMeteo}
                 erroEstacoes={erroMeteo}
                 instanteAtual={agoraMeteo}
+                alertasQuentura={alertasAtivos.filter(
+                  alerta =>
+                    alerta.categoria.trim().toLowerCase() === 'quentura'
+                )}
               />
             </div>
 
@@ -5557,15 +5618,41 @@ function App() {
             <div style={{ ...cardStyle, flex: 1, padding: 0, overflow: 'hidden', position: 'relative', minHeight: isMobile ? '500px' : 'auto' }}>
               <div style={{ position: 'absolute', top: isMobile ? 10 : 20, left: isMobile ? 10 : 60, zIndex: 1000, display: 'flex', gap: '8px', flexWrap: 'wrap', maxWidth: isMobile ? '90%' : '60%' }}>
                 <button onClick={() => setFiltroCalor('Todas')} style={{ padding: '8px 16px', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', backgroundColor: filtroCalor === 'Todas' ? '#1C1C1E' : 'rgba(255,255,255,0.9)', color: filtroCalor === 'Todas' ? 'white' : '#8E8E93', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>Todas</button>
-                {categoriasUnicas.map(categoria => <button key={categoria} onClick={() => setFiltroCalor(categoria as string)} style={{ padding: '8px 16px', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', backgroundColor: filtroCalor === categoria ? '#007AFF' : 'rgba(255,255,255,0.9)', color: filtroCalor === categoria ? 'white' : '#8E8E93', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>{categoria as string}</button>)}
+                {categoriasUnicas.map(categoria => <button key={categoria} onClick={() => setFiltroCalor(categoria as string)} style={{
+                  padding: '8px 16px', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', backgroundColor: filtroCalor === categoria
+                    ? corDaCategoria(categoria)
+                    : 'rgba(255,255,255,0.9)', color: filtroCalor === categoria ? 'white' : '#8E8E93', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }}>{categoria as string}</button>)}
               </div>
 
               <div style={{ position: 'absolute', bottom: isMobile ? 20 : 'auto', top: isMobile ? 'auto' : 20, right: isMobile ? '50%' : 20, transform: isMobile ? 'translateX(50%)' : 'none', zIndex: 1000, backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
-                <strong style={{ display: 'block', marginBottom: '12px', fontSize: '14px', textAlign: 'center' }}>Concentração de registros</strong>
-                <div style={{ width: '200px', height: '14px', borderRadius: '8px', background: cssLegenda }}></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px', marginTop: '7px', fontSize: '10px', color: '#8E8E93', fontWeight: '600' }}>
-                  <span style={{ whiteSpace: 'nowrap' }}>Menor concentração</span>
-                  <span style={{ whiteSpace: 'nowrap' }}>Maior concentração</span></div>
+                <strong style={{ display: 'block', marginBottom: '12px', fontSize: '14px', textAlign: 'center' }}>
+                  Concentração de registros
+                </strong>
+
+                <div
+                  style={{
+                    width: '200px',
+                    height: '14px',
+                    borderRadius: '8px',
+                    background: cssLegenda
+                  }}
+                />
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '20px',
+                    marginTop: '7px',
+                    fontSize: '10px',
+                    color: '#8E8E93',
+                    fontWeight: 600
+                  }}
+                >
+                  <span>Menor concentração</span>
+                  <span>Maior concentração</span>
+                </div>
               </div>
 
 
@@ -5584,7 +5671,6 @@ function App() {
                   className="mapa-cuidai"
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-
 
                 <CamadaCalor
                   alertas={alertasParaOMapa}

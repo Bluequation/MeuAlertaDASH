@@ -2545,3 +2545,688 @@ body,
     transition: none;
   }
 }
+
+/* ==========================================
+   CUIDAÍ — NOVO VISUAL DA MALHA TÉRMICA
+   ========================================== */
+
+/* Coluna contendo mapa e controles externos */
+.atlas-layout__coluna-mapa {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+
+/* Escurece somente o mapa-base, sem afetar
+   os pontos térmicos e os limites territoriais. */
+/* CUIDAÍ — MODO ANALÍTICO AUTOMÁTICO */
+
+.atlas-cuidai .atlas-layout__mapa .leaflet-tile-pane {
+  transition:
+    filter 180ms ease,
+    opacity 180ms ease;
+}
+
+/* Ativo automaticamente ao selecionar MALHA */
+.atlas-cuidai .atlas-layout__mapa--termica .leaflet-tile-pane {
+  filter:
+    grayscale(0.65) saturate(0.55) brightness(1) contrast(0.88);
+
+  opacity: 1;
+}
+
+/* Controle fora do mapa */
+.atlas-layout__coluna-mapa .atlas-amostras-controle {
+  position: static;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  padding: 10px 12px;
+  border: 1px solid #DFE9F2;
+  border-radius: 12px;
+  background: #F5F8FC;
+
+  pointer-events: auto;
+}
+
+/* Botões mais compactos */
+.atlas-layout__coluna-mapa .atlas-amostras-botao {
+  padding: 9px 12px;
+  box-shadow: none;
+  flex-shrink: 0;
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* Legenda horizontal e discreta */
+.atlas-layout__coluna-mapa .atlas-amostras-legenda {
+  position: static;
+  flex: 1 1 185px;
+
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  padding: 3px 2px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+/* Título e temperaturas na mesma linha */
+.atlas-escala-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+
+  font-size: 10px;
+  color: #61788E;
+}
+
+.atlas-escala-linha strong {
+  margin: 0;
+  font-size: 11px;
+  color: #192942;
+  white-space: nowrap;
+}
+
+/* Escala nas mesmas cores dos pontos */
+.atlas-layout__coluna-mapa .atlas-amostras-escala {
+  width: 100%;
+  height: 8px;
+  margin: 0;
+  border-radius: 99px;
+
+  background: linear-gradient(90deg,
+      #2399D7 0%,
+      #23C2B8 25%,
+      #F2CF46 50%,
+      #F99137 75%,
+      #D84443 100%);
+}
+
+/* Identificação das Regionais e distritos
+   também deixa de ocupar a área do mapa. */
+.atlas-layout__coluna-mapa .atlas-distritos-etiqueta {
+  position: static;
+  align-self: flex-start;
+
+  max-width: 100%;
+  box-sizing: border-box;
+
+  padding: 9px 12px;
+  box-shadow: none;
+}
+
+/* Celulares */
+@media (max-width: 650px) {
+  .atlas-layout__coluna-mapa .atlas-amostras-controle {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .atlas-layout__coluna-mapa .atlas-amostras-legenda {
+    flex-basis: 100%;
+    max-height: none;
+  }
+
+  .atlas-layout__coluna-mapa .atlas-distritos-etiqueta {
+    max-width: 100%;
+  }
+}
+
+/* CUIDAÍ — LEGENDA TÉRMICA PADRONIZADA */
+
+.atlas-escala-marcas {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+
+  color: #41566B;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-escala-marcas span {
+  white-space: nowrap;
+}
+
+.atlas-escala-marcas span:nth-child(2):only-child {
+  text-align: center;
+}
+
+/* ========================================
+   CUIDAÍ — MARCADOR DE QUENTURA
+   ======================================== */
+
+.atlas-relato-quentura {
+  position: relative;
+  background: transparent;
+  border: none;
+}
+
+/* Halo visual, sem indicar raio geográfico */
+.atlas-relato-quentura__halo {
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+
+  background: rgba(219, 91, 47, 0.18);
+  border: 1px solid rgba(196, 65, 31, 0.4);
+}
+
+/* Símbolo central — acabamento fosco */
+.atlas-relato-quentura__centro {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+
+  border-radius: 50%;
+  background: #C84E2D;
+  border: 2px solid #FFFFFF;
+  color: #FFFFFF;
+
+  box-shadow: 0 2px 6px rgba(80, 35, 20, 0.22);
+}
+
+/* ==========================================
+   CUIDAÍ — CONTROLES COMPACTOS DO ATLAS
+   ========================================== */
+
+.atlas-botao-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  margin-right: 6px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.atlas-layout__coluna-mapa .atlas-amostras-controle {
+  gap: 8px;
+}
+
+.atlas-layout__coluna-mapa .atlas-amostras-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Botão ativo mais claro e objetivo */
+.atlas-amostras-botao--ativo {
+  background: #E9F4FF;
+  border-color: #2D8CFF;
+  color: #1170D8;
+}
+
+/* Botões desabilitados menos chamativos */
+.atlas-amostras-botao:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.atlas-escala-linha {
+  gap: 8px;
+}
+
+.atlas-escala-linha span {
+  font-size: 11px;
+}
+
+.atlas-escala-linha strong {
+  font-size: 13px;
+}
+
+/* ==========================================
+   CUIDAÍ — TOOLBAR TERRITORIAL DEFINITIVA
+   ========================================== */
+
+.atlas-toolbar {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+
+  background: #FFFFFF;
+  border: 1px solid #E1E8F0;
+  border-radius: 15px;
+
+  box-shadow: 0 3px 14px rgba(25, 41, 66, 0.035);
+  color: #192942;
+}
+
+.atlas-toolbar__acoes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.atlas-toolbar__grupo {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+
+  background: #F2F5F9;
+  border: 1px solid #E5EBF2;
+  border-radius: 11px;
+}
+
+.atlas-toolbar__botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  min-height: 34px;
+  padding: 7px 11px;
+
+  border: 1px solid transparent;
+  border-radius: 8px;
+
+  background: transparent;
+  color: #5E7185;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.atlas-toolbar__botao svg {
+  flex-shrink: 0;
+  stroke-width: 1.9;
+}
+
+.atlas-toolbar__botao:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.85);
+  color: #192942;
+}
+
+.atlas-toolbar__botao:focus-visible {
+  outline: 2px solid #168FC4;
+  outline-offset: 2px;
+}
+
+.atlas-toolbar__botao--ativo {
+  background: #FFFFFF;
+  color: #087CDB;
+  box-shadow: 0 1px 5px rgba(25, 41, 66, 0.10);
+}
+
+.atlas-toolbar__botao--avulso {
+  padding-inline: 12px;
+}
+
+.atlas-toolbar__botao--quentura {
+  background: #FFF1EA;
+  color: #B75132;
+}
+
+.atlas-toolbar__botao--quentura:hover:not(:disabled) {
+  background: #FFE8DC;
+  color: #A84629;
+}
+
+.atlas-toolbar__botao:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.atlas-toolbar__contador {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 6px;
+
+  background: rgba(25, 41, 66, 0.065);
+  color: inherit;
+  font-size: 10px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-toolbar__separador {
+  width: 1px;
+  height: 24px;
+  background: #E4EAF1;
+  margin: 0 2px;
+}
+
+.atlas-toolbar__espaco {
+  flex: 1 1 12px;
+}
+
+.atlas-toolbar__grupo--escala {
+  flex-shrink: 0;
+}
+
+/* LEGENDA */
+.atlas-toolbar__legenda {
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid #EEF2F6;
+}
+
+.atlas-toolbar__legenda-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+
+  font-size: 11px;
+  color: #788A9C;
+}
+
+.atlas-toolbar__legenda-topo strong {
+  font-size: 11px;
+  font-weight: 700;
+  color: #263F56;
+  white-space: nowrap;
+}
+
+.atlas-toolbar__gradiente {
+  height: 8px;
+  border-radius: 99px;
+
+  background: linear-gradient(90deg,
+      #2399D7 0%,
+      #23C2B8 25%,
+      #F2CF46 50%,
+      #F99137 75%,
+      #D84443 100%);
+}
+
+.atlas-toolbar__marcas {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+
+  color: #607589;
+  font-size: 10px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-toolbar__erro {
+  display: block;
+  margin-top: 8px;
+  color: #A64B3B;
+  font-size: 11px;
+}
+
+@media (max-width: 650px) {
+  .atlas-toolbar {
+    padding: 10px;
+  }
+
+  .atlas-toolbar__acoes {
+    gap: 5px;
+  }
+
+  .atlas-toolbar__botao {
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+
+  .atlas-toolbar__separador {
+    display: none;
+  }
+
+  .atlas-toolbar__espaco {
+    flex-basis: 100%;
+    height: 0;
+  }
+}
+
+/* Controles do Atlas em uma linha */
+@media (min-width: 651px) {
+  .atlas-toolbar__acoes {
+    flex-wrap: nowrap;
+    gap: 4px;
+    overflow-x: auto;
+  }
+
+  .atlas-toolbar__botao {
+    padding: 7px 8px;
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .atlas-toolbar__grupo {
+    flex-shrink: 0;
+  }
+
+  .atlas-toolbar__espaco {
+    display: none;
+  }
+
+  .atlas-toolbar__grupo--escala {
+    margin-left: auto;
+  }
+}
+
+/* INSPEÇÃO TÉRMICA — CUIDAÍ */
+
+.atlas-cuidai .leaflet-tooltip.atlas-tooltip-termico {
+  padding: 7px 11px;
+  border: 1px solid #DCE7F0;
+  border-radius: 9px;
+
+  background: #FFFFFF;
+  color: #192942;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  box-shadow: 0 4px 15px rgba(25, 41, 66, 0.12);
+}
+
+/* CUIDAÍ — IDENTIFICAÇÃO TERRITORIAL */
+
+.atlas-tooltip-bairro {
+  padding: 6px 10px;
+  border: 1px solid #DCE7F0;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #192942;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 3px 12px rgba(25, 41, 66, .10);
+}
+
+/* CUIDAÍ — CARTÃO DE INSPEÇÃO */
+
+.atlas-leitura-local {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 13px 15px;
+  background: #FFFFFF;
+  border: 1px solid #E1E8F0;
+  border-radius: 13px;
+  color: #192942;
+}
+
+.atlas-leitura-local__conteudo {
+  flex: 1;
+  min-width: 0;
+}
+
+.atlas-leitura-local__local {
+  color: #718399;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.atlas-leitura-local__valor {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.atlas-leitura-local__valor strong {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -.7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-leitura-local__valor span {
+  color: #718399;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.atlas-leitura-local p {
+  margin: 5px 0 0;
+  color: #596D80;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.atlas-leitura-local__fonte {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  font-size: 10px;
+  color: #64778A;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.atlas-leitura-local__fechar {
+  border: none;
+  background: transparent;
+  color: #8190A0;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+@media (max-width: 650px) {
+  .atlas-leitura-local {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .atlas-leitura-local__fonte {
+    order: 3;
+    width: 100%;
+  }
+}
+
+/* Oculta nomes flutuantes durante a visualização térmica */
+.atlas-layout__mapa--termica .leaflet-tooltip.atlas-tooltip-territorio,
+.atlas-layout__mapa--termica .leaflet-tooltip.atlas-tooltip-bairro {
+  display: none !important;
+}
+
+/* CUIDAÍ — RETORNO COMPACTO NO MAPA */
+
+.atlas-mapa-voltar {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 1100;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 9px 13px;
+  border: 1px solid #DCE6F0;
+  border-radius: 10px;
+
+  background: rgba(255, 255, 255, 0.96);
+  color: #192942;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
+  box-shadow: 0 2px 8px rgba(25, 41, 66, 0.08);
+  cursor: pointer;
+}
+
+.atlas-mapa-voltar:hover {
+  background: #F4F8FC;
+}
+
+.atlas-mapa-voltar:focus-visible {
+  outline: 2px solid #168FC4;
+  outline-offset: 2px;
+}
+
+/* CUIDAÍ — ACABAMENTO CARTOGRÁFICO */
+
+.atlas-cuidai .atlas-layout__mapa {
+  box-sizing: border-box;
+  border: 1px solid #E5EDF4;
+  box-shadow: 0 4px 20px rgba(25, 41, 66, 0.025);
+}
+
+.atlas-cuidai .atlas-layout__mapa .leaflet-container {
+  background-color: #F8FAFC !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-cuidai .atlas-layout__mapa .leaflet-tile-pane {
+    transition: none;
+  }
+}
+
+/* CUIDAÍ — CARTO POSITRON SEM RÓTULOS */
+
+.atlas-cuidai .atlas-layout__mapa--sem-rotulos .leaflet-tile-pane {
+  filter: none !important;
+  opacity: 1 !important;
+}

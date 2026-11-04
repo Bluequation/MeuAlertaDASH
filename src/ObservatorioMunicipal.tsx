@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from 'react';
+import { consultarOpenMeteoComCache } from './openMeteoCache';
 import type {
     Geometry,
     FeatureCollection
@@ -155,14 +156,7 @@ export default function ObservatorioMunicipal({
                     wind_speed_unit: 'kmh'
                 });
 
-                const resposta = await fetch(
-                    `https://api.open-meteo.com/v1/forecast?${parametros}`,
-                    { signal: controlador.signal }
-                );
 
-                if (!resposta.ok) {
-                    throw new Error('Falha na consulta meteorológica');
-                }
 
                 type LeituraApi = {
                     time: string;
@@ -172,7 +166,10 @@ export default function ObservatorioMunicipal({
                     wind_speed_10m: number;
                 };
 
-                const resultado = await resposta.json() as {
+                const resultado = await consultarOpenMeteoComCache(
+                    `https://api.open-meteo.com/v1/forecast?${parametros.toString()}`,
+                    controlador.signal
+                ) as {
                     current?: LeituraApi;
                 };
 
@@ -198,9 +195,13 @@ export default function ObservatorioMunicipal({
                         horario: atual.time
                     });
                 }
-            } catch {
+            } catch (erro) {
                 if (!controlador.signal.aborted) {
-                    setErroMeteo('Não foi possível consultar a Open-Meteo.');
+                    setErroMeteo(
+                        erro instanceof Error && erro.message.includes('429')
+                            ? 'Open-Meteo temporariamente indisponível por limite de consultas.'
+                            : 'Não foi possível consultar a Open-Meteo.'
+                    );
                 }
             } finally {
                 if (!controlador.signal.aborted) {
@@ -323,7 +324,7 @@ export default function ObservatorioMunicipal({
                                 ? dadosAtuais
                                     ? 'Open-Meteo • Última estimativa disponível'
                                     : 'Dados indisponíveis'
-                                : 'Open-Meteo • Estimativa atual'
+                                : 'Open-Meteo • Estimativa recente'
                         : aba === 'estacoes'
                             ? 'CUIDAÍ • Medições das estações'
                             : aba === 'historico'
@@ -397,13 +398,13 @@ export default function ObservatorioMunicipal({
                                         <small>{indicador.unidade}</small>
                                     </div>
 
-                                    <div className="obs-indicador-nota">
-                                        {carregando
-                                            ? 'Consultando...'
-                                            : erroMeteo
-                                                ? 'Sem dados disponíveis'
-                                                : 'Estimativa Open-Meteo'}
-                                    </div>
+                                    {(carregando || erroMeteo) && (
+                                        <div className="obs-indicador-nota">
+                                            {carregando
+                                                ? 'Consultando...'
+                                                : 'Consulta indisponível'}
+                                        </div>
+                                    )}
                                 </article>
                             ))}
                         </div>
@@ -709,11 +710,9 @@ export default function ObservatorioMunicipal({
                             <article className="obs-bloco">
                                 <div className="obs-estado-vazio">
                                     <h4>Nenhuma estação localizada</h4>
-                                    <p>
-                                        Ainda não há estações CUIDAÍ
-                                        publicadas com localização dentro
-                                        dos limites de {municipio}.
-                                    </p>
+                                    Ainda não há estações CUIDAÍ
+                                    publicadas com localização dentro
+                                    dos limites de {distritoNome ?? municipio}.
                                     <p>
                                         As estimativas meteorológicas
                                         continuam disponíveis na aba Agora.
@@ -857,7 +856,9 @@ export default function ObservatorioMunicipal({
                                                 {leitura
                                                     ? `Última leitura: ${new Date(
                                                         leitura.recebidoEm
-                                                    ).toLocaleString('pt-BR')}`
+                                                    ).toLocaleString('pt-BR', {
+                                                        timeZone: 'America/Fortaleza'
+                                                    })}`
                                                     : 'Nenhuma leitura válida disponível.'}
                                             </p>
 
@@ -906,6 +907,20 @@ export default function ObservatorioMunicipal({
                             <h4>Comparação territorial</h4>
                             <span>Dois municípios • Open-Meteo</span>
                         </div>
+
+                        <p
+                            className="comparacao-nota"
+                            style={{ margin: '0 2px 14px' }}
+                        >
+                            Comparação entre pontos de referência municipais,
+                            não entre médias de municípios.
+                            {distritoNome && (
+                                <>
+                                    {' '}A seleção de {distritoNome} não altera
+                                    os locais utilizados nesta comparação.
+                                </>
+                            )}
+                        </p>
 
                         <ComparacaoMunicipal
                             municipioAtual={municipio}

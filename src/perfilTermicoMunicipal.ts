@@ -1,5 +1,6 @@
 
 import type { Geometry } from 'geojson';
+import { consultarOpenMeteoComCache } from './openMeteoCache';
 
 export type PontoTermicoMunicipal = {
     latitude: number;
@@ -284,20 +285,10 @@ export async function consultarPerfilTermicoMunicipal(
         current: 'temperature_2m',
         timezone: 'America/Fortaleza'
     });
-
-    const resposta = await fetch(
+    const resultados: unknown = await consultarOpenMeteoComCache(
         `https://api.open-meteo.com/v1/forecast?${parametros.toString()}`,
-        { signal }
+        signal
     );
-
-    if (!resposta.ok) {
-        throw new Error(
-            `Open-Meteo: HTTP ${resposta.status}`
-        );
-    }
-
-
-    const resultados: unknown = await resposta.json();
 
     // Com uma coordenada, a API pode retornar
     // um objeto; com várias, retorna uma lista.

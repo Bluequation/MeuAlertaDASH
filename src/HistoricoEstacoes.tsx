@@ -121,6 +121,7 @@ export default function HistoricoEstacoes({
                         momento: new Date(recebidoEm).toLocaleString(
                             'pt-BR',
                             {
+                                timeZone: 'America/Fortaleza',
                                 day: '2-digit',
                                 month: '2-digit',
                                 hour: '2-digit',
@@ -234,7 +235,7 @@ export default function HistoricoEstacoes({
                 <h4>Histórico indisponível</h4>
                 <p>
                     Não existem estações publicadas
-                    localizadas neste município.
+                    localizadas na área selecionada.
                 </p>
             </article>
         );
@@ -312,11 +313,15 @@ export default function HistoricoEstacoes({
                             <span>
                                 {new Date(
                                     leituras[0].recebidoEm
-                                ).toLocaleString('pt-BR')}
+                                ).toLocaleString('pt-BR', {
+                                    timeZone: 'America/Fortaleza'
+                                })}
                                 {' até '}
                                 {new Date(
                                     leituras[leituras.length - 1].recebidoEm
-                                ).toLocaleString('pt-BR')}
+                                ).toLocaleString('pt-BR', {
+                                    timeZone: 'America/Fortaleza'
+                                })}
                             </span>
                         </div>
 
@@ -395,6 +400,7 @@ export default function HistoricoEstacoes({
                                     <ResponsiveContainer
                                         width="100%"
                                         height="100%"
+                                        initialDimension={{ width: 300, height: 240 }}
                                     >
                                         <LineChart
                                             data={leituras}
@@ -466,6 +472,9 @@ export default function HistoricoEstacoes({
                     <p className="historico-fonte">
                         Fonte: Estação CUIDAÍ • Medições registradas,
                         não estimativas da Open-Meteo.
+                        Os gráficos e arquivos exportados apresentam
+                        apenas as leituras válidas encontradas entre
+                        os 72 registros mais recentes consultados.
                     </p>
                 </>
             )}

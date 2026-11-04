@@ -1985,7 +1985,7 @@ function App() {
 
   // CONSULTA METEOROLÓGICA REGIONAL — OPEN-METEO
   useEffect(() => {
-    if (abaAtiva !== 'meteorologia') return;
+    if (!EXIBIR_SECOES_LEGADAS || abaAtiva !== 'meteorologia') return;
 
     const controlador = new AbortController();
 
@@ -2167,7 +2167,7 @@ function App() {
 
   // GRADE REGIONAL DE TEMPERATURA — OPEN-METEO
   useEffect(() => {
-    if (abaAtiva !== 'meteorologia') return;
+    if (!EXIBIR_SECOES_LEGADAS || abaAtiva !== 'meteorologia') return;
 
     const cache = cacheGradeTermica.current;
 
@@ -2312,7 +2312,7 @@ function App() {
 
   // ANÁLISE LOCAL — 25 PONTOS OPEN-METEO
   useEffect(() => {
-    if (abaAtiva !== 'meteorologia') return;
+    if (!EXIBIR_SECOES_LEGADAS || abaAtiva !== 'meteorologia') return;
 
     const controlador = new AbortController();
 
@@ -3255,8 +3255,18 @@ function App() {
                   <span style={{ color: '#8E8E93', fontSize: '12px' }}>Quantidade de ocorrências registradas ao longo do tempo</span>
                 </div>
 
-                <div style={{ flex: 1, minHeight: '250px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
+                <div
+                  style={{
+                    width: '100%',
+                    height: isMobile ? 250 : 320,
+                    minWidth: 0
+                  }}
+                >
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    initialDimension={{ width: 300, height: 250 }}
+                  >
                     <AreaChart data={dadosLinhaTempo} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                       <defs>
                         <linearGradient id="corOnda" x1="0" y1="0" x2="0" y2="1">
@@ -3291,7 +3301,12 @@ function App() {
                   <h3 style={{ color: '#1C1C1E', fontSize: '16px', fontWeight: '700', margin: '0 0 15px' }}>Ocorrências por tipo</h3>
 
                   <div style={{ height: '155px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer
+                      width="100%"
+                      height="100%"
+                      initialDimension={{ width: 300, height: 150 }}
+                    >
+
                       <BarChart data={dadosGrafico} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E5EA" />
 
@@ -3339,7 +3354,11 @@ function App() {
 
                   <div style={{ height: '145px' }}>
                     {dadosPluviometriaRecente.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer
+                        width="100%"
+                        height="100%"
+                        initialDimension={{ width: 300, height: 150 }}
+                      >
                         <AreaChart
                           data={dadosPluviometriaRecente}
                           margin={{ top: 10, right: 5, left: -22, bottom: 0 }}

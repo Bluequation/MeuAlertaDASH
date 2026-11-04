@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { FeatureCollection } from 'geojson';
+import { consultarOpenMeteoComCache } from './openMeteoCache';
 import L from 'leaflet';
 
 type Leitura = {
@@ -200,18 +201,10 @@ export default function ComparacaoMunicipal({
                     wind_speed_unit: 'kmh'
                 });
 
-                const resposta = await fetch(
-                    `https://api.open-meteo.com/v1/forecast?${parametros}`,
-                    { signal: controlador.signal }
+                const dados: unknown = await consultarOpenMeteoComCache(
+                    `https://api.open-meteo.com/v1/forecast?${parametros.toString()}`,
+                    controlador.signal
                 );
-
-                if (!resposta.ok) {
-                    throw new Error(
-                        'Não foi possível consultar a Open-Meteo.'
-                    );
-                }
-
-                const dados: unknown = await resposta.json();
 
                 if (!Array.isArray(dados) || dados.length !== 2) {
                     throw new Error(

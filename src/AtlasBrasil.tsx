@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     estacaoDentroDoMunicipio,
     type EstacaoPublica
@@ -128,8 +128,6 @@ function EnquadramentoAtlas({
     const map = useMap();
 
     useEffect(() => {
-        // Identifica o distrito selecionado.
-        // Identifica a divisão territorial selecionada.
         const distritoAtual = distritos?.features.find(
             item =>
                 String(
@@ -139,7 +137,6 @@ function EnquadramentoAtlas({
                 ) === distritoSelecionado
         );
 
-        // Prioriza a área selecionada, depois a malha completa.
         const geometria = distritoAtual
             ?? (
                 municipio && distritos
@@ -156,6 +153,7 @@ function EnquadramentoAtlas({
                             )
                             : dados
             );
+
         if (!geometria) return;
 
         const limites = L.geoJSON(geometria).getBounds();
@@ -164,41 +162,37 @@ function EnquadramentoAtlas({
 
         let quadro = 0;
 
-        // Mantém o território inteiro e centralizado
-        // durante todo o redimensionamento do mapa.
-        const ajustarEnquadramento = () => {
+        const ajustar = () => {
             cancelAnimationFrame(quadro);
 
             quadro = requestAnimationFrame(() => {
-                // Primeiro, informa ao Leaflet a largura atual.
+                // Interrompe qualquer animação anterior.
+                map.stop();
+
                 map.invalidateSize({
                     pan: false,
                     animate: false
                 });
 
-                // Depois, ajusta a geometria à largura atual.
+                // Enquadramento imediato, sem zoom animado.
                 map.fitBounds(limites, {
                     padding: [28, 28],
                     maxZoom: distritoAtual ? 13 : undefined,
-                    animate: true
+                    animate: false
                 });
             });
         };
 
-        // Detecta continuamente as mudanças de largura.
-        const observador = new ResizeObserver(
-            ajustarEnquadramento
-        );
-
+        const observador = new ResizeObserver(ajustar);
         observador.observe(map.getContainer());
 
-        // Enquadramento inicial, inclusive após um clique.
-        ajustarEnquadramento();
+        ajustar();
 
         return () => {
             observador.disconnect();
             cancelAnimationFrame(quadro);
         };
+
     }, [
         map,
         dados,
@@ -231,6 +225,50 @@ export default function AtlasBrasil({
     const [estado, setEstado] = useState<EstadoAtlas | null>(null);
     const [municipios, setMunicipios] = useState<FeatureCollection | null>(null);
     const [municipio, setMunicipio] = useState<MunicipioAtlas | null>(null);
+    // DISSOLVÊNCIA SUAVE DO ATLAS
+    const [mapaOculto, setMapaOculto] = useState(false);
+
+    const transicaoEmCurso = useRef(false);
+    const temporizadoresMapa = useRef<number[]>([]);
+
+    useEffect(() => {
+        return () => {
+            temporizadoresMapa.current.forEach(
+                temporizador => window.clearTimeout(temporizador)
+            );
+        };
+    }, []);
+
+    const navegarComFade = (acao: () => void) => {
+        if (transicaoEmCurso.current) return;
+
+        transicaoEmCurso.current = true;
+
+        // 110 ms — desaparecimento
+        setMapaOculto(true);
+
+        const primeiro = window.setTimeout(() => {
+            // Troca o território enquanto o mapa está oculto.
+            acao();
+
+            // 30 ms — permite atualizar o enquadramento.
+            const segundo = window.setTimeout(() => {
+                // 110 ms — reaparecimento
+                setMapaOculto(false);
+
+                const terceiro = window.setTimeout(() => {
+                    transicaoEmCurso.current = false;
+                    temporizadoresMapa.current = [];
+                }, 110);
+
+                temporizadoresMapa.current.push(terceiro);
+            }, 30);
+
+            temporizadoresMapa.current.push(segundo);
+        }, 110);
+
+        temporizadoresMapa.current.push(primeiro);
+    };
 
     // DISTRITOS DE IPAPORANGA
     const [distritosIpaporanga, setDistritosIpaporanga] =
@@ -470,46 +508,7 @@ export default function AtlasBrasil({
 
     }, [municipio?.codigo]);
 
-    // CARREGAMENTO DAS REGIONAIS DE FORTALEZA
-    useEffect(() => {
-        setRegionaisFortaleza(null);
-        setErroRegionais(null);
 
-        if (municipio?.codigo !== '2304400') return;
-
-        const controlador = new AbortController();
-
-        fetch('/regionais-fortaleza.geojson', {
-            signal: controlador.signal
-        })
-            .then(resposta => {
-                if (!resposta.ok) {
-                    throw new Error('Malha de Fortaleza não encontrada.');
-                }
-                return resposta.json();
-            })
-            .then((resultado: FeatureCollection) => {
-                if (
-                    resultado.type !== 'FeatureCollection' ||
-                    !Array.isArray(resultado.features) ||
-                    resultado.features.length !== 12
-                ) {
-                    throw new Error('Malha das Regionais inválida.');
-                }
-
-                if (!controlador.signal.aborted) {
-                    setRegionaisFortaleza(resultado);
-                }
-            })
-            .catch(falha => {
-                if (!controlador.signal.aborted) {
-                    console.error(falha);
-                    setErroRegionais('Não foi possível carregar as Regionais.');
-                }
-            });
-
-        return () => controlador.abort();
-    }, [municipio?.codigo]);
 
     const estaNoCeara = estado?.sigla === 'CE';
 
@@ -851,10 +850,13 @@ export default function AtlasBrasil({
                     </p>
                 </div>
                 {estado && (
-                    <button type="button" onClick={() => {
-                        if (municipio) setMunicipio(null);
-                        else setEstado(null);
-                    }} style={{
+                    <button type="button" onClick={() => navegarComFade(() => {
+                        if (municipio) {
+                            setMunicipio(null);
+                        } else {
+                            setEstado(null);
+                        }
+                    })} style={{
                         border: '1px solid #D8E6F3', background: '#F4F9FD',
                         color: '#087CDB', borderRadius: '10px', padding: '10px 14px',
                         cursor: 'pointer', fontWeight: 700
@@ -875,7 +877,11 @@ export default function AtlasBrasil({
                 }
             >
                 <div
-                    className="atlas-layout__mapa"
+                    className={
+                        mapaOculto
+                            ? 'atlas-layout__mapa atlas-layout__mapa--oculto'
+                            : 'atlas-layout__mapa'
+                    }
                     style={{
                         height: 'min(85vh, 850px)',
                         minHeight: '620px',
@@ -885,8 +891,14 @@ export default function AtlasBrasil({
                         background: '#F3F7FB'
                     }}
                 >
-                    <MapContainer center={[-14.5, -52]} zoom={4} zoomSnap={0}
-                        zoomControl={false} scrollWheelZoom={false} doubleClickZoom={false}
+                    <MapContainer
+                        center={[-14.5, -52]}
+                        zoom={4}
+                        zoomSnap={0}
+                        zoomAnimationThreshold={12}
+                        zoomControl={false}
+                        scrollWheelZoom={false}
+                        doubleClickZoom={false}
                         style={{ width: '100%', height: '100%', background: '#F3F7FB' }}>
 
 
@@ -957,18 +969,21 @@ export default function AtlasBrasil({
                                             (layer as L.Path).setStyle(estiloTerritorio(feature));
                                         });
                                         layer.on('click', () => {
-                                            if (!estado) {
-                                                setEstado({
-                                                    codigo: String(feature.properties?.CD_UF ?? ''),
-                                                    nome: String(feature.properties?.NM_UF ?? ''),
-                                                    sigla: String(feature.properties?.SIGLA_UF ?? '')
-                                                });
-                                            } else if (estaNoCeara && municipios) {
-                                                if (!codigo) return;
-                                                setMostrarAmostras(false);
-                                                setPerfilMapa(null);
-                                                setMunicipio({ codigo, nome });
-                                            }
+                                            navegarComFade(() => {
+                                                if (!estado) {
+                                                    setEstado({
+                                                        codigo: String(feature.properties?.CD_UF ?? ''),
+                                                        nome: String(feature.properties?.NM_UF ?? ''),
+                                                        sigla: String(feature.properties?.SIGLA_UF ?? '')
+                                                    });
+                                                } else if (estaNoCeara && municipios) {
+                                                    if (!codigo) return;
+
+                                                    setMostrarAmostras(false);
+                                                    setPerfilMapa(null);
+                                                    setMunicipio({ codigo, nome });
+                                                }
+                                            });
                                         });
                                     }}
                                 />
@@ -1047,10 +1062,13 @@ export default function AtlasBrasil({
 
                                             // SELECIONAR DISTRITO PARA ZOOM
                                             layer.on('click', () => {
-                                                setDistritoSelecionado(atual =>
-                                                    atual === codigo ? null : codigo
-                                                );
+                                                navegarComFade(() => {
+                                                    setDistritoSelecionado(atual =>
+                                                        atual === codigo ? null : codigo
+                                                    );
+                                                });
                                             });
+
                                         }}
                                     />
                                 )}
@@ -1225,7 +1243,9 @@ export default function AtlasBrasil({
                                 {distritoSelecionado && (
                                     <button
                                         type="button"
-                                        onClick={() => setDistritoSelecionado(null)}
+                                        onClick={() =>
+                                            navegarComFade(() => setDistritoSelecionado(null))
+                                        }
                                     >
                                         Limpar
                                     </button>

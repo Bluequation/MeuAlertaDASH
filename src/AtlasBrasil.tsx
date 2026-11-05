@@ -273,8 +273,8 @@ function MalhaTermicaPontilhada({
             return;
         }
 
-        const espacamento = 14;
-        const raio = 3.6;
+        const espacamento = 11;
+        const raio = 2.4;
 
         let quadro = 0;
 
@@ -448,9 +448,8 @@ function MalhaTermicaPontilhada({
                         ? Math.max(0, 1 - distanciaFoco / 105)
                         : 0;
 
-
                     const raioAtual = centroFoco
-                        ? 2.4 + 6.2 * influencia
+                        ? 2.2 + 4.8 * influencia
                         : raio;
 
                     contexto.globalAlpha = quenturaEmDestaque
@@ -488,8 +487,8 @@ function MalhaTermicaPontilhada({
                     contexto.fill();
 
                     // Borda discreta, sem brilho ou sombra.
-                    contexto.strokeStyle = 'rgba(25, 41, 66, 0.22)';
-                    contexto.lineWidth = 0.6;
+                    contexto.strokeStyle = 'rgba(25, 41, 66, 0.16)';
+                    contexto.lineWidth = 0.4;
                     contexto.stroke();
                 }
             }
@@ -1762,7 +1761,7 @@ export default function AtlasBrasil({
         : 0.6;
     // CARTO — BASE SEM RÓTULOS PARA O MODO ANALÍTICO
     const chaveCarto = String(
-        import.meta.env.VITE_CARTOKE_KEY ?? ''
+        import.meta.env.VITE_CARTO_KEY ?? ''
     ).trim();
 
     const usarMapaSemRotulos =
@@ -1770,6 +1769,24 @@ export default function AtlasBrasil({
         mostrarAmostras &&
         modoVisualizacaoTermica === 'malha' &&
         chaveCarto.length > 0;
+
+    // Limites discretos durante a visualização térmica
+    const estiloDivisoes: L.PathOptions =
+        mostrarAmostras && modoVisualizacaoTermica === 'malha'
+            ? {
+                color: '#A9C2D2',
+                weight: 0.8,
+                opacity: 0.5,
+                fillColor: '#FFFFFF',
+                fillOpacity: 0.01
+            }
+            : {
+                color: '#66A7D3',
+                weight: 1.5,
+                opacity: 1,
+                fillColor: '#FFFFFF',
+                fillOpacity: 0.01
+            };
 
     const estiloTerritorio = (): L.PathOptions => {
         // MUNICÍPIO: preserva os limites distritais existentes.
@@ -2222,13 +2239,7 @@ export default function AtlasBrasil({
                                                         : divisoesAtivas
                                                 }
 
-                                                style={() => ({
-                                                    color: '#66A7D3',
-                                                    weight: 1.5,
-                                                    opacity: 1,
-                                                    fillColor: '#FFFFFF',
-                                                    fillOpacity: 0.01
-                                                })}
+                                                style={() => estiloDivisoes}
 
                                                 onEachFeature={(feature, layer) => {
                                                     const codigo = String(
@@ -2272,12 +2283,7 @@ export default function AtlasBrasil({
 
                                                         // Durante a inspeção térmica, não pinta a Regional.
                                                         if (inspecaoTermicaRef.current) {
-                                                            camada.setStyle({
-                                                                color: '#66A7D3',
-                                                                weight: 1.5,
-                                                                fillColor: '#FFFFFF',
-                                                                fillOpacity: 0.01
-                                                            });
+                                                            camada.setStyle(estiloDivisoes);
 
                                                             layer.closeTooltip();
                                                             return;
@@ -2296,12 +2302,7 @@ export default function AtlasBrasil({
 
                                                     // RETIRAR A COR AO SAIR
                                                     layer.on('mouseout', () => {
-                                                        camada.setStyle({
-                                                            color: '#66A7D3',
-                                                            weight: 1.5,
-                                                            fillColor: '#FFFFFF',
-                                                            fillOpacity: 0.01
-                                                        });
+                                                        camada.setStyle(estiloDivisoes);
                                                     });
 
                                                     layer.on('click', () => {

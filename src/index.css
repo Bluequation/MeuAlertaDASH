@@ -3174,23 +3174,23 @@ body,
 
 .atlas-mapa-voltar {
   position: absolute;
-  top: 14px;
-  left: 14px;
+  top: 10px;
+  left: 10px;
   z-index: 1100;
 
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
 
-  padding: 9px 13px;
+  padding: 5px 9px;
   border: 1px solid #DCE6F0;
-  border-radius: 10px;
+  border-radius: 8px;
 
   background: rgba(255, 255, 255, 0.96);
   color: #192942;
 
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 
   box-shadow: 0 2px 8px rgba(25, 41, 66, 0.08);
@@ -3243,8 +3243,9 @@ body,
   }
 
   .atlas-layout:not(.atlas-layout--municipio) .atlas-layout__mapa {
-    height: min(60dvh, 480px) !important;
+    height: clamp(340px, calc(100dvh - 170px), 900px) !important;
     min-height: 0 !important;
+    max-height: none !important;
   }
 }
 

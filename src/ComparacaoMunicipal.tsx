@@ -507,7 +507,7 @@ export default function ComparacaoMunicipal({
     return (
         <div>
             <article className="obs-bloco">
-                <h4>Escolha duas áreas para comparar</h4>
+                <h4>Selecionar áreas</h4>
 
                 <div
                     style={{
@@ -632,77 +632,7 @@ export default function ComparacaoMunicipal({
                     </p>
                 )}
 
-                <p
-                    style={{
-                        fontSize: '11px',
-                        color: '#718096',
-                        lineHeight: 1.5,
-                        marginTop: '10px'
-                    }}
-                >
-                    Estimativas Open-Meteo em pontos de referência
-                    das áreas selecionadas.
-                </p>
             </article>
-
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns:
-                    'repeat(auto-fit, minmax(190px, 1fr))',
-                gap: 12,
-                marginTop: 14
-            }}>
-                {[
-                    {
-                        titulo: 'Área B',
-                        nome: municipioAtual,
-                        cor: '#168FC4'
-                    },
-                    {
-                        titulo: 'Município B',
-                        nome: municipioB?.nome ?? 'A selecionar',
-                        cor: '#E98645'
-                    }
-                ].map(item => (
-                    <div
-                        key={item.titulo}
-                        style={{
-                            padding: 17,
-                            border: '1px solid #E0EAF3',
-                            borderRadius: 15,
-                            background: '#F8FAFD'
-                        }}
-                    >
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            marginBottom: 9
-                        }}>
-                            <span style={{
-                                width: 9,
-                                height: 9,
-                                borderRadius: '50%',
-                                background: item.cor
-                            }} />
-
-                            <small style={{
-                                color: '#8190A2',
-                                fontWeight: 700
-                            }}>
-                                {item.titulo}
-                            </small>
-                        </div>
-
-                        <strong style={{
-                            color: '#192942',
-                            fontSize: 17
-                        }}>
-                            {item.nome}
-                        </strong>
-                    </div>
-                ))}
-            </div>
 
             {carregando && (
                 <article

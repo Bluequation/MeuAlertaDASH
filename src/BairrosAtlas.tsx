@@ -50,6 +50,7 @@ function contemPonto(
     );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function identificarBairro(
     bairros: FeatureCollection | null,
     latitude: number,

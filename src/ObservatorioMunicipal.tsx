@@ -324,7 +324,7 @@ export default function ObservatorioMunicipal({
                                 ? dadosAtuais
                                     ? 'Open-Meteo • Última estimativa disponível'
                                     : 'Dados indisponíveis'
-                                : 'Open-Meteo • Estimativa recente'
+                                : 'Open-Meteo • Estimativa meteorológica'
                         : aba === 'estacoes'
                             ? 'CUIDAÍ • Medições das estações'
                             : aba === 'historico'
@@ -448,10 +448,9 @@ export default function ObservatorioMunicipal({
 
                                             <p>
                                                 <p>
-                                                    Estimativa meteorológica para um ponto
-                                                    de referência da área selecionada,
-                                                    não uma medição local nem uma média oficial
-                                                    do território.
+                                                    Estimativa meteorológica para um ponto de referência
+                                                    da área selecionada. Não representa medição de
+                                                    uma estação local nem média de todo o território.
                                                 </p>
                                             </p>
                                         </div>
@@ -478,7 +477,7 @@ export default function ObservatorioMunicipal({
                                             : erroEstacoes
                                                 ? 'Disponibilidade não confirmada.'
                                                 : estacoesMunicipais.length === 0
-                                                    ? 'Nenhuma estação CUIDAÍ publicada neste município.'
+                                                    ? 'Nenhuma estação CUIDAÍ publicada na área selecionada.'
                                                     : `${quantidadeEstacoesRecentes} de ${estacoesMunicipais.length} estações com leitura nos últimos 30 minutos.`}
                                     </p>
                                 </div>
@@ -529,7 +528,7 @@ export default function ObservatorioMunicipal({
 
 
                             {carregandoPerfil && (
-                                <p>Calculando a distribuição térmica do município...</p>
+                                <p>Calculando o perfil térmico da área selecionada...</p>
                             )}
 
                             {!carregandoPerfil && erroPerfil && (
@@ -637,15 +636,16 @@ export default function ObservatorioMunicipal({
                                             </strong>
 
                                             <span className="obs-perfil-card-legenda">
-                                                amostras válidas no município
+                                                pontos da amostragem espacial
                                             </span>
                                         </article>
 
                                     </div>
 
                                     <p className="obs-perfil-termico-nota">
-                                        Estimativas da Open-Meteo sobre pontos amostrados,
-                                        não medições oficiais de todo o município.
+                                        Perfil calculado com estimativas da Open-Meteo em
+                                        pontos amostrados. Não representa medições locais
+                                        nem a temperatura de todos os pontos do território.
                                     </p>
 
                                     <details className="obs-perfil-termico-metodo">

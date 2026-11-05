@@ -773,7 +773,7 @@ function EnquadramentoAtlas({
 
                 // Enquadramento imediato, sem zoom animado.
                 map.fitBounds(limites, {
-                    padding: [28, 28],
+                    padding: !estado ? [8, 8] : [28, 28],
                     maxZoom: distritoAtual ? 13 : undefined,
                     animate: false
                 });
@@ -1771,7 +1771,7 @@ export default function AtlasBrasil({
         modoVisualizacaoTermica === 'malha' &&
         chaveCarto.length > 0;
 
-    const estiloTerritorio = (_feature?: Feature): L.PathOptions => {
+    const estiloTerritorio = (): L.PathOptions => {
         // MUNICÍPIO: preserva os limites distritais existentes.
         if (municipio) {
             if (mostrandoMalhaDistrital) {
@@ -1853,7 +1853,7 @@ export default function AtlasBrasil({
 
             // Quando não há seleção, recupera a paleta original.
             if (!codigoEmFoco) {
-                poligono.setStyle(estiloTerritorio(feature));
+                poligono.setStyle(estiloTerritorio());
                 return;
             }
 
@@ -2041,7 +2041,7 @@ export default function AtlasBrasil({
                                     });
                                 }}
                             >
-                                <FiArrowLeft size={15} />
+                                <FiArrowLeft size={13} />
                                 <span>
                                     {municipio ? 'Ceará' : 'Brasil'}
                                 </span>
@@ -2789,6 +2789,7 @@ export default function AtlasBrasil({
                                     {/* CONCENTRAÇÃO DE RELATOS */}
                                     <button
                                         type="button"
+                                        title="Destaca relatos comunitários próximos entre si."
                                         disabled={relatosEmConcentracao.length < 2}
                                         className={`atlas-toolbar__botao atlas-toolbar__botao--avulso ${mostrarConcentracaoQuentura &&
                                             relatosEmConcentracao.length >= 2
@@ -3020,12 +3021,14 @@ export default function AtlasBrasil({
             <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#718096' }}>
                 {municipio
                     ? municipio.codigo === '2305654'
-                        ? 'Clique em um distrito para destacá-lo. Limites distritais do IBGE, Censo 2022.'
-                        : 'Mapa geográfico restrito aos limites municipais. Detalhamento distrital em preparação.'
+                        ? 'Selecione um distrito no menu para explorar sua área. Divisões distritais: IBGE.'
+                        : municipio.codigo === '2304400'
+                            ? 'Selecione uma regional no menu para consultar suas informações territoriais.'
+                            : 'Visualização geográfica dos limites municipais.'
                     : estaNoCeara
-                        ? 'Passe o cursor sobre um município para destacar sua região de planejamento. Clique para explorar.'
+                        ? 'Selecione um município para explorar o território. No computador, passe o cursor para destacar sua região.'
                         : estado
-                            ? `${estado.sigla} • A divisão municipal dos demais estados será incorporada nas próximas etapas.`
+                            ? `${estado.sigla} • Exploração municipal disponível atualmente para o Ceará.`
                             : 'Selecione um estado para explorar o território.'}
             </p>
         </div>

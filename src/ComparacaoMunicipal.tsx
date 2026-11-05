@@ -182,7 +182,7 @@ function descreverComparacao(
     const diferenca = valorB - valorA;
 
     if (Math.abs(diferenca) < 0.05) {
-        return `A ${indicador.toLowerCase()} estimada é equivalente nas duas áreas, considerando a precisão apresentada.`;
+        return `Na precisão apresentada, as estimativas de ${indicador.toLowerCase()} não mostram diferença entre as duas áreas.`;
     }
 
     const municipioMaior =

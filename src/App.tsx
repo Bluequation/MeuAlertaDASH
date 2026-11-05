@@ -162,12 +162,18 @@ const getGradiente = (filtro: string) => {
   return GRADIENTES_CALOR['Todas'];
 };
 
-function CamadaCalor({ alertas, gradiente }: { alertas: Alerta[], gradiente: any }) {
+function CamadaCalor({
+  alertas,
+  gradiente
+}: {
+  alertas: Alerta[];
+  gradiente: Record<number, string>;
+}) {
   const map = useMap();
   useEffect(() => {
     if (!map || alertas.length === 0) return;
     const pontos = alertas.map(a => [a.latitude, a.longitude, 0.4] as [number, number, number]);
-    const heatLayer = (L as any).heatLayer(pontos, {
+    const heatLayer = L.heatLayer(pontos, {
       radius: 30, blur: 6, maxZoom: 15, max: 1.0, minOpacity: 0.35, gradient: gradiente
     }).addTo(map);
     return () => { map.removeLayer(heatLayer); };
@@ -1627,7 +1633,7 @@ function App() {
   const [carregandoMeteo, setCarregandoMeteo] = useState(true);
   const [erroMeteo, setErroMeteo] = useState<string | null>(null);
   const [idEstacaoMeteo, setIdEstacaoMeteo] = useState<string | null>(null);
-  const [agoraMeteo, setAgoraMeteo] = useState(Date.now());
+  const [agoraMeteo, setAgoraMeteo] = useState(Date.now);
   // PONTO SELECIONADO PARA CONSULTA OPEN-METEO
   const [pontoOpenMeteo, setPontoOpenMeteo] = useState({
     latitude: -5.3,
@@ -1747,7 +1753,7 @@ function App() {
     }, 4000);
 
     return () => clearInterval(intervaloTecnologias);
-  }, []);
+  }, [tecnologias.length]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1823,7 +1829,19 @@ function App() {
       const lista: Alerta[] = [];
       snapshot.forEach((doc) => {
         const dados = doc.data();
-        if (dados.coordenada && dados.coordenada.latitude) {
+        const latitude = dados.coordenada?.latitude;
+        const longitude = dados.coordenada?.longitude;
+
+        if (
+          typeof latitude === 'number' &&
+          Number.isFinite(latitude) &&
+          latitude >= -90 &&
+          latitude <= 90 &&
+          typeof longitude === 'number' &&
+          Number.isFinite(longitude) &&
+          longitude >= -180 &&
+          longitude <= 180
+        ) {
           const mmTitulo = dados.titulo?.match(/\(([\d.,]+)mm\)/i);
 
           lista.push({
@@ -2477,7 +2495,7 @@ function App() {
   const exportarDados = () => {
     if (alertas.length === 0) return;
 
-    const limpar = (valor: any) => {
+    const limpar = (valor: unknown) => {
       const texto = valor === undefined || valor === null ? '' : String(valor);
       return `"${texto.replace(/"/g, '""')}"`;
     };
@@ -2560,7 +2578,7 @@ function App() {
   const alertasAtivosVisao = alertasVisaoGeral.filter(a => (a.votosResolvido || 0) < 3);
   const alertasResolvidosVisao = alertasVisaoGeral.filter(a => (a.votosResolvido || 0) >= 3);
 
-  const alertasPorCategoria = alertasVisaoGeral.reduce((acc: any, alerta) => {
+  const alertasPorCategoria = alertasVisaoGeral.reduce((acc: Record<string, number>, alerta) => {
     acc[alerta.categoria] = (acc[alerta.categoria] || 0) + 1;
     return acc;
   }, {});
@@ -2569,7 +2587,14 @@ function App() {
     nome: chave, quantidade: alertasPorCategoria[chave],
   }));
 
-  const alertasPorDia = alertasVisaoGeral.reduce((acc: any, alerta) => {
+  const alertasPorDia = alertasVisaoGeral.reduce((
+    acc: Record<string, {
+      data: string;
+      ocorrencias: number;
+      timestamp: number;
+    }>,
+    alerta
+  ) => {
     if (alerta.criadoEm) {
       const d = new Date(alerta.criadoEm);
       const chave = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -2589,7 +2614,7 @@ function App() {
   }, {});
 
   const dadosLinhaTempo = Object.values(alertasPorDia)
-    .sort((a: any, b: any) => a.timestamp - b.timestamp);
+    .sort((a, b) => a.timestamp - b.timestamp);
 
   const alertasComPluviometro = alertasVisaoGeral.filter(a =>
     typeof a.milimetrosChuva === 'number' && Number.isFinite(a.milimetrosChuva)
@@ -3464,7 +3489,7 @@ function App() {
                           />
 
                           <Tooltip
-                            formatter={(valor: any) => [`${valor} mm`, 'Chuva']}
+                            formatter={(valor: unknown) => [`${valor} mm`, 'Chuva']}
                             contentStyle={{
                               borderRadius: '12px',
                               border: 'none'
@@ -5228,7 +5253,7 @@ function App() {
                                   />
 
                                   <Tooltip
-                                    formatter={(valor: any) => [
+                                    formatter={(valor: unknown) => [
                                       `${Number(valor).toLocaleString('pt-BR', {
                                         maximumFractionDigits: 1
                                       })} ${grafico.unidade}`,

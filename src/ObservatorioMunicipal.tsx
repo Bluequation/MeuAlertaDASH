@@ -905,21 +905,17 @@ export default function ObservatorioMunicipal({
                     <>
                         <div className="obs-secao-titulo">
                             <h4>Comparação territorial</h4>
-                            <span>Dois municípios • Open-Meteo</span>
+                            <span>Áreas do Ceará • Open-Meteo</span>
                         </div>
 
                         <p
                             className="comparacao-nota"
                             style={{ margin: '0 2px 14px' }}
                         >
-                            Comparação entre pontos de referência municipais,
-                            não entre médias de municípios.
-                            {distritoNome && (
-                                <>
-                                    {' '}A seleção de {distritoNome} não altera
-                                    os locais utilizados nesta comparação.
-                                </>
-                            )}
+                            Compare municípios do Ceará, distritos de Ipaporanga
+                            e regionais de Fortaleza. Os resultados representam
+                            estimativas pontuais para o mesmo horário,
+                            não médias de toda a área.
                         </p>
 
                         <ComparacaoMunicipal

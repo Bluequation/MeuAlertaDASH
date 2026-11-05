@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
-import type { FeatureCollection } from 'geojson';
+import type { Feature, FeatureCollection } from 'geojson';
+import { estacaoDentroDoMunicipio } from './estacoesMunicipais';
 import { consultarOpenMeteoComCache } from './openMeteoCache';
 import L from 'leaflet';
 
@@ -25,11 +26,142 @@ type Props = {
     municipios: FeatureCollection | null;
 };
 
+type TipoArea = 'municipio' | 'distrito' | 'regional';
+
+type AreaComparavel = {
+    id: string;
+    nome: string;
+    tipo: TipoArea;
+    latitude: number;
+    longitude: number;
+};
+
+// Encontra uma referência dentro da área geográfica.
+function obterPontoInterno(feature: Feature) {
+    if (!feature.geometry) return null;
+
+    const limites = L.geoJSON(feature).getBounds();
+
+    if (!limites.isValid()) return null;
+
+    const centro = limites.getCenter();
+
+    const dentro = (latitude: number, longitude: number) =>
+        estacaoDentroDoMunicipio(
+            feature.geometry!,
+            latitude,
+            longitude
+        );
+
+    if (dentro(centro.lat, centro.lng)) {
+        return {
+            latitude: centro.lat,
+            longitude: centro.lng
+        };
+    }
+
+    // Para polígonos irregulares, procura um ponto interno.
+    for (const divisao of [10, 25]) {
+        let melhor: {
+            latitude: number;
+            longitude: number;
+        } | null = null;
+
+        let distanciaMenor = Infinity;
+
+        for (let y = 0; y < divisao; y++) {
+            for (let x = 0; x < divisao; x++) {
+                const proporcaoX = (x + 0.5) / divisao;
+                const proporcaoY = (y + 0.5) / divisao;
+
+                const latitude =
+                    limites.getSouth() +
+                    proporcaoY *
+                    (limites.getNorth() - limites.getSouth());
+
+                const longitude =
+                    limites.getWest() +
+                    proporcaoX *
+                    (limites.getEast() - limites.getWest());
+
+                if (!dentro(latitude, longitude)) continue;
+
+                const distancia =
+                    (proporcaoX - 0.5) ** 2 +
+                    (proporcaoY - 0.5) ** 2;
+
+                if (distancia < distanciaMenor) {
+                    distanciaMenor = distancia;
+                    melhor = { latitude, longitude };
+                }
+            }
+        }
+
+        if (melhor) return melhor;
+    }
+
+    return null;
+}
+
+// Constrói as opções de distritos e regionais.
+function mapearDivisoes(
+    dados: FeatureCollection | null,
+    tipo: 'distrito' | 'regional',
+    municipio: string,
+    nomeMunicipio: string
+): AreaComparavel[] {
+    return (dados?.features ?? []).flatMap((feature, indice) => {
+        const codigo = String(
+            feature.properties?.CD_DIST ??
+            feature.properties?.id ??
+            ''
+        );
+
+        const nome = String(
+            feature.properties?.NM_DIST ??
+            feature.properties?.regiao_adm ??
+            feature.properties?.Nome ??
+            `Área ${indice + 1}`
+        ).trim();
+
+        const ponto = obterPontoInterno(feature);
+
+        if (!codigo || !ponto) return [];
+
+        return [{
+            id: `${tipo}:${municipio}:${codigo}`,
+            nome: `${nome} (${nomeMunicipio})`,
+            tipo,
+            ...ponto
+        }];
+    });
+}
+
 const INDICADORES = [
-    { campo: 'temperatura', titulo: 'Temperatura', unidade: '°C' },
-    { campo: 'sensacao', titulo: 'Sensação térmica', unidade: '°C' },
-    { campo: 'umidade', titulo: 'Umidade relativa', unidade: '%' },
-    { campo: 'vento', titulo: 'Velocidade do vento', unidade: 'km/h' }
+    {
+        campo: 'temperatura',
+        titulo: 'Temperatura',
+        unidade: '°C',
+        cores: { clara: '#F6B78C', escura: '#D96C32' }
+    },
+    {
+        campo: 'sensacao',
+        titulo: 'Sensação térmica',
+        unidade: '°C',
+        cores: { clara: '#F5B1AE', escura: '#D95C60' }
+    },
+    {
+        campo: 'umidade',
+        titulo: 'Umidade relativa',
+        unidade: '%',
+        cores: { clara: '#91C9EC', escura: '#238DC4' }
+    },
+    {
+        campo: 'vento',
+        titulo: 'Velocidade do vento',
+        unidade: 'km/h',
+        cores: { clara: '#94D9CC', escura: '#24998B' }
+    }
 ] as const;
 
 const formatar = (valor: number) =>
@@ -50,7 +182,7 @@ function descreverComparacao(
     const diferenca = valorB - valorA;
 
     if (Math.abs(diferenca) < 0.05) {
-        return `A ${indicador.toLowerCase()} estimada é equivalente nos dois municípios, considerando a precisão apresentada.`;
+        return `A ${indicador.toLowerCase()} estimada é equivalente nas duas áreas, considerando a precisão apresentada.`;
     }
 
     const municipioMaior =
@@ -104,74 +236,195 @@ function interpretarLeitura(item: unknown): Leitura | null {
 }
 
 export default function ComparacaoMunicipal({
-    municipioAtual,
+    municipioAtual: municipioInicial,
     codigoAtual,
     latitudeAtual,
     longitudeAtual,
     municipios
 }: Props) {
+    const [codigoA, setCodigoA] =
+        useState(`municipio:${codigoAtual}`);
+
     const [codigoB, setCodigoB] = useState('');
+
+    const [dadosDistritos, setDadosDistritos] =
+        useState<FeatureCollection | null>(null);
+
+    const [dadosRegionais, setDadosRegionais] =
+        useState<FeatureCollection | null>(null);
+
+    const [avisosTerritoriais, setAvisosTerritoriais] =
+        useState<string[]>([]);
+
     const [resultado, setResultado] =
         useState<Resultado | null>(null);
+
     const [carregando, setCarregando] = useState(false);
     const [erro, setErro] = useState<string | null>(null);
 
-    const listaMunicipios = useMemo(() => {
-        return (municipios?.features ?? [])
-            .map(feature => ({
-                codigo: String(feature.properties?.id ?? ''),
-                nome: String(feature.properties?.name ?? '')
-            }))
-            .filter(item =>
-                item.codigo !== codigoAtual &&
-                item.codigo.length > 0 &&
-                item.nome.length > 0
-            )
-            .sort((a, b) =>
-                a.nome.localeCompare(b.nome, 'pt-BR')
-            );
-    }, [municipios, codigoAtual]);
+    // Carrega as divisões independentemente do município
+    // que está aberto no Atlas.
+    useEffect(() => {
+        const controlador = new AbortController();
 
-    const municipioB = listaMunicipios.find(
-        item => item.codigo === codigoB
+        const carregar = async (
+            caminho: string,
+            nome: string,
+            aoCarregar: (dados: FeatureCollection) => void
+        ) => {
+            try {
+                const resposta = await fetch(caminho, {
+                    signal: controlador.signal
+                });
+
+                if (!resposta.ok) {
+                    throw new Error('Arquivo indisponível');
+                }
+
+                const dados: FeatureCollection =
+                    await resposta.json();
+
+                if (
+                    dados.type !== 'FeatureCollection' ||
+                    !Array.isArray(dados.features) ||
+                    dados.features.length === 0
+                ) {
+                    throw new Error('Dados geográficos inválidos');
+                }
+
+                if (!controlador.signal.aborted) {
+                    aoCarregar(dados);
+                }
+            } catch {
+                if (!controlador.signal.aborted) {
+                    setAvisosTerritoriais(anteriores => [
+                        ...anteriores,
+                        `${nome} indisponíveis para comparação.`
+                    ]);
+                }
+            }
+        };
+
+        void carregar(
+            '/distritos-ipaporanga.geojson',
+            'Distritos de Ipaporanga',
+            setDadosDistritos
+        );
+
+        void carregar(
+            '/regionais-fortaleza.geojson',
+            'Regionais de Fortaleza',
+            setDadosRegionais
+        );
+
+        return () => controlador.abort();
+    }, []);
+
+    // Reúne municípios, distritos e regionais
+    // numa única coleção de áreas comparáveis.
+    const listaAreas = useMemo<AreaComparavel[]>(() => {
+        const areasMunicipais: AreaComparavel[] =
+            (municipios?.features ?? []).flatMap(feature => {
+                const codigo = String(
+                    feature.properties?.id ?? ''
+                );
+
+                const nome = String(
+                    feature.properties?.name ?? ''
+                ).trim();
+
+                if (!codigo || !nome || !feature.geometry) {
+                    return [];
+                }
+
+                const usarReferenciaAtual =
+                    codigo === codigoAtual &&
+                    estacaoDentroDoMunicipio(
+                        feature.geometry,
+                        latitudeAtual,
+                        longitudeAtual
+                    );
+
+                const ponto = usarReferenciaAtual
+                    ? {
+                        latitude: latitudeAtual,
+                        longitude: longitudeAtual
+                    }
+                    : obterPontoInterno(feature);
+
+                if (!ponto) return [];
+
+                return [{
+                    id: `municipio:${codigo}`,
+                    nome,
+                    tipo: 'municipio' as const,
+                    ...ponto
+                }];
+            });
+
+        return [
+            ...areasMunicipais,
+            ...mapearDivisoes(
+                dadosDistritos,
+                'distrito',
+                '2305654',
+                'Ipaporanga'
+            ),
+            ...mapearDivisoes(
+                dadosRegionais,
+                'regional',
+                '2304400',
+                'Fortaleza'
+            )
+        ].sort((a, b) =>
+            a.nome.localeCompare(b.nome, 'pt-BR')
+        );
+    }, [
+        municipios,
+        codigoAtual,
+        latitudeAtual,
+        longitudeAtual,
+        dadosDistritos,
+        dadosRegionais
+    ]);
+
+    const areaA = listaAreas.find(
+        area => area.id === codigoA
     );
 
-    const geometriaB = useMemo(() => {
-        return municipios?.features.find(
-            feature =>
-                String(feature.properties?.id) === codigoB
-        ) ?? null;
-    }, [municipios, codigoB]);
+    const areaB = listaAreas.find(
+        area => area.id === codigoB
+    );
 
-    const pontoB = useMemo(() => {
-        if (!geometriaB) return null;
+    // Mantém compatibilidade com os gráficos e
+    // com a análise textual que já existem.
+    const municipioAtual = areaA?.nome ?? municipioInicial;
 
-        const limites = L.geoJSON(geometriaB).getBounds();
+    const municipioB = areaB
+        ? { nome: areaB.nome }
+        : null;
 
-        if (!limites.isValid()) return null;
-
-        const centro = limites.getCenter();
-
-        return {
-            latitude: centro.lat,
-            longitude: centro.lng
-        };
-    }, [geometriaB]);
-
+    // Consulta duas coordenadas na mesma requisição.
     useEffect(() => {
         const controlador = new AbortController();
 
         setResultado(null);
         setErro(null);
 
-        if (!codigoB) {
+        if (!codigoA || !codigoB) {
             setCarregando(false);
             return () => controlador.abort();
         }
 
-        if (!pontoB) {
+        if (codigoA === codigoB) {
             setCarregando(false);
-            setErro('Município sem referência geográfica válida.');
+            setErro('Escolha duas áreas diferentes.');
+            return () => controlador.abort();
+        }
+
+        if (!areaA || !areaB) {
+            setCarregando(false);
+            setErro('Uma das áreas ainda não está disponível.');
             return () => controlador.abort();
         }
 
@@ -181,13 +434,13 @@ export default function ComparacaoMunicipal({
             try {
                 const parametros = new URLSearchParams({
                     latitude: [
-                        latitudeAtual,
-                        pontoB.latitude
+                        areaA.latitude,
+                        areaB.latitude
                     ].map(valor => valor.toFixed(5)).join(','),
 
                     longitude: [
-                        longitudeAtual,
-                        pontoB.longitude
+                        areaA.longitude,
+                        areaB.longitude
                     ].map(valor => valor.toFixed(5)).join(','),
 
                     current: [
@@ -201,10 +454,11 @@ export default function ComparacaoMunicipal({
                     wind_speed_unit: 'kmh'
                 });
 
-                const dados: unknown = await consultarOpenMeteoComCache(
-                    `https://api.open-meteo.com/v1/forecast?${parametros.toString()}`,
-                    controlador.signal
-                );
+                const dados: unknown =
+                    await consultarOpenMeteoComCache(
+                        `https://api.open-meteo.com/v1/forecast?${parametros.toString()}`,
+                        controlador.signal
+                    );
 
                 if (!Array.isArray(dados) || dados.length !== 2) {
                     throw new Error(
@@ -235,7 +489,7 @@ export default function ComparacaoMunicipal({
                     setErro(
                         falha instanceof Error
                             ? falha.message
-                            : 'Erro ao comparar municípios.'
+                            : 'Não foi possível comparar as áreas.'
                     );
                 }
             } finally {
@@ -248,48 +502,147 @@ export default function ComparacaoMunicipal({
         void consultar();
 
         return () => controlador.abort();
-    }, [
-        codigoB,
-        pontoB,
-        latitudeAtual,
-        longitudeAtual
-    ]);
+    }, [codigoA, codigoB, areaA, areaB]);
 
     return (
         <div>
             <article className="obs-bloco">
-                <h4>Escolha o segundo município</h4>
+                <h4>Escolha duas áreas para comparar</h4>
 
-                <select
-                    aria-label="Município para comparação"
-                    value={codigoB}
-                    onChange={evento =>
-                        setCodigoB(evento.target.value)
-                    }
+                <div
                     style={{
-                        width: '100%',
-                        marginTop: 12,
-                        padding: 13,
-                        border: '1px solid #DCE8F3',
-                        borderRadius: 11,
-                        background: '#F5F9FD',
-                        color: '#192942',
-                        font: 'inherit'
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                        gap: '10px',
+                        marginTop: '12px'
                     }}
                 >
-                    <option value="">
-                        Selecione um município do Ceará
-                    </option>
-
-                    {listaMunicipios.map(item => (
-                        <option
-                            key={item.codigo}
-                            value={item.codigo}
+                    {(['A', 'B'] as const).map(letra => (
+                        <label
+                            key={letra}
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px',
+                                minWidth: 0,
+                                fontSize: '12px',
+                                color: '#536B80',
+                                fontWeight: 700
+                            }}
                         >
-                            {item.nome}
-                        </option>
+                            Área {letra}
+
+                            <select
+                                aria-label={`Selecionar Área ${letra}`}
+                                value={letra === 'A' ? codigoA : codigoB}
+                                onChange={evento => {
+                                    if (letra === 'A') {
+                                        setCodigoA(evento.target.value);
+                                    } else {
+                                        setCodigoB(evento.target.value);
+                                    }
+                                }}
+                                style={{
+                                    width: '100%',
+                                    minWidth: 0,
+                                    padding: '10px 8px',
+                                    border: '1px solid #DCE8F3',
+                                    borderRadius: '10px',
+                                    background: '#F5F9FD',
+                                    color: '#192942',
+                                    font: 'inherit',
+                                    fontWeight: 600
+                                }}
+                            >
+                                <option value="">Selecione uma área</option>
+
+                                <optgroup label="Municípios do Ceará">
+                                    {listaAreas
+                                        .filter(area => area.tipo === 'municipio')
+                                        .map(area => (
+                                            <option
+                                                key={area.id}
+                                                value={area.id}
+                                                disabled={
+                                                    area.id === (
+                                                        letra === 'A'
+                                                            ? codigoB
+                                                            : codigoA
+                                                    )
+                                                }
+                                            >
+                                                {area.nome}
+                                            </option>
+                                        ))}
+                                </optgroup>
+
+                                <optgroup label="Distritos de Ipaporanga">
+                                    {listaAreas
+                                        .filter(area => area.tipo === 'distrito')
+                                        .map(area => (
+                                            <option
+                                                key={area.id}
+                                                value={area.id}
+                                                disabled={
+                                                    area.id === (
+                                                        letra === 'A'
+                                                            ? codigoB
+                                                            : codigoA
+                                                    )
+                                                }
+                                            >
+                                                {area.nome}
+                                            </option>
+                                        ))}
+                                </optgroup>
+
+                                <optgroup label="Regionais de Fortaleza">
+                                    {listaAreas
+                                        .filter(area => area.tipo === 'regional')
+                                        .map(area => (
+                                            <option
+                                                key={area.id}
+                                                value={area.id}
+                                                disabled={
+                                                    area.id === (
+                                                        letra === 'A'
+                                                            ? codigoB
+                                                            : codigoA
+                                                    )
+                                                }
+                                            >
+                                                {area.nome}
+                                            </option>
+                                        ))}
+                                </optgroup>
+                            </select>
+                        </label>
                     ))}
-                </select>
+                </div>
+
+                {avisosTerritoriais.length > 0 && (
+                    <p
+                        style={{
+                            fontSize: '11px',
+                            color: '#A64B3B',
+                            marginTop: '10px'
+                        }}
+                    >
+                        {avisosTerritoriais.join(' ')}
+                    </p>
+                )}
+
+                <p
+                    style={{
+                        fontSize: '11px',
+                        color: '#718096',
+                        lineHeight: 1.5,
+                        marginTop: '10px'
+                    }}
+                >
+                    Estimativas Open-Meteo em pontos de referência
+                    das áreas selecionadas.
+                </p>
             </article>
 
             <div style={{
@@ -301,7 +654,7 @@ export default function ComparacaoMunicipal({
             }}>
                 {[
                     {
-                        titulo: 'Município A',
+                        titulo: 'Área B',
                         nome: municipioAtual,
                         cor: '#168FC4'
                     },
@@ -485,17 +838,21 @@ export default function ComparacaoMunicipal({
                                         {
                                             letra: 'A',
                                             valor: valorA,
-                                            cor: '#168FC4'
+                                            cor: valorA > valorB
+                                                ? indicador.cores.escura
+                                                : indicador.cores.clara
                                         },
                                         {
                                             letra: 'B',
                                             valor: valorB,
-                                            cor: '#E98645'
+                                            cor: valorB > valorA
+                                                ? indicador.cores.escura
+                                                : indicador.cores.clara
                                         }
                                     ].map(item => (
                                         <div
                                             key={item.letra}
-                                            style={{ marginTop: 15 }}
+                                            style={{ marginTop: 8 }}
                                         >
                                             <div style={{
                                                 display: 'flex',
@@ -504,7 +861,7 @@ export default function ComparacaoMunicipal({
                                                 alignItems: 'center',
                                                 gap: 8,
                                                 fontSize: 12,
-                                                marginBottom: 7
+                                                marginBottom: 4
                                             }}>
                                                 <span style={{
                                                     color: '#718096'
@@ -516,7 +873,7 @@ export default function ComparacaoMunicipal({
 
                                                 <strong style={{
                                                     color: '#192942',
-                                                    fontSize: 16
+                                                    fontSize: 13
                                                 }}>
                                                     {formatar(item.valor)}
                                                     {' '}
@@ -525,7 +882,7 @@ export default function ComparacaoMunicipal({
                                             </div>
 
                                             <div style={{
-                                                height: 9,
+                                                height: 6,
                                                 background: '#EAF0F6',
                                                 borderRadius: 20,
                                                 overflow: 'hidden'
@@ -545,8 +902,8 @@ export default function ComparacaoMunicipal({
                                     ))}
 
                                     <div style={{
-                                        marginTop: 17,
-                                        paddingTop: 12,
+                                        marginTop: 10,
+                                        paddingTop: 8,
                                         borderTop:
                                             '1px solid #E6EDF5',
                                         color: '#536B80',
@@ -569,7 +926,7 @@ export default function ComparacaoMunicipal({
 
                     <p className="comparacao-nota">
                         Fonte: Open-Meteo • Estimativas pontuais,
-                        não médias municipais.
+                        não médias territoriais.
                     </p>
                 </>
             )}

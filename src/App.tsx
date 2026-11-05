@@ -3684,7 +3684,7 @@ function App() {
             }}
           >
             {/* CABEÇALHO */}
-            <div>
+            <div className="meteorologia-cabecalho">
               <span
                 style={{
                   fontSize: '11px',

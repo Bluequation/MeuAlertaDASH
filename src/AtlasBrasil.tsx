@@ -1943,11 +1943,14 @@ export default function AtlasBrasil({
 
     return (
         <div className="atlas-cuidai" style={{ width: '100%' }}>
-            <div style={{
-                display: 'flex', alignItems: 'center',
-                justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap',
-                marginBottom: '16px'
-            }}>
+            <div
+                className="atlas-cabecalho"
+                style={{
+                    display: 'flex', alignItems: 'center',
+                    justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap',
+                    marginBottom: '16px'
+                }}>
+
                 <div>
                     <div style={{
                         color: '#168FC4', fontSize: '11px', fontWeight: 800,
@@ -2550,6 +2553,7 @@ export default function AtlasBrasil({
 
 
                     <div
+                        className="atlas-controles-superiores"
                         style={{
                             order: 1,
                             display: 'flex',

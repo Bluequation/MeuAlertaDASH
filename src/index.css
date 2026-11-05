@@ -3230,3 +3230,83 @@ body,
   filter: none !important;
   opacity: 1 !important;
 }
+
+/* TABLET HORIZONTAL — ATLAS VISÍVEL NA PRIMEIRA TELA */
+@media (pointer: coarse) and (orientation: landscape) {
+
+  .meteorologia-cabecalho {
+    display: none;
+  }
+
+  .atlas-cabecalho {
+    margin-bottom: 8px !important;
+  }
+
+  .atlas-layout:not(.atlas-layout--municipio) .atlas-layout__mapa {
+    height: min(60dvh, 480px) !important;
+    min-height: 0 !important;
+  }
+}
+
+/* CONTROLES DO ATLAS EM LARGURA TOTAL */
+@media (min-width: 1101px),
+(min-width: 900px) and (pointer: coarse) and (orientation: landscape) {
+
+  .atlas-layout--municipio {
+    display: grid;
+    grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .atlas-layout--municipio>.atlas-layout__coluna-mapa {
+    display: contents !important;
+  }
+
+  .atlas-layout--municipio .atlas-controles-superiores {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .atlas-layout--municipio .atlas-layout__mapa {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .atlas-layout--municipio>.atlas-layout__painel {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+  }
+
+  .atlas-layout--municipio .atlas-leitura-local {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .atlas-layout--municipio .atlas-toolbar__acoes {
+    flex-wrap: nowrap;
+    overflow-x: visible;
+  }
+}
+
+/* COMPARAÇÃO — GRÁFICOS MAIS COMPACTOS */
+.comparacao-grade {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.comparacao-grade .comparacao-grafico {
+  padding: 11px;
+}
+
+.comparacao-grafico h4 {
+  font-size: 12px;
+}
+
+@media (max-width: 420px) {
+  .comparacao-grade {
+    grid-template-columns: 1fr;
+  }
+}

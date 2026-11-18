@@ -10,7 +10,6 @@ import {
     FiGrid,
     FiCircle,
     FiThermometer,
-    FiActivity,
     FiArrowLeft
 } from 'react-icons/fi';
 import ObservatorioMunicipal from './ObservatorioMunicipal';
@@ -27,7 +26,6 @@ import {
     useMap
 } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet.heat';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 
 type EstadoAtlas = {
@@ -221,8 +219,7 @@ function MalhaTermicaPontilhada({
     modoEscala,
     modoInspecao,
     onSelecionar,
-    focoInspecionado,
-    quenturaEmDestaque
+    focoInspecionado
 }: {
     geometria: Geometry;
     pontos: PerfilTermicoMunicipal['pontos'];
@@ -232,7 +229,6 @@ function MalhaTermicaPontilhada({
     modoInspecao: boolean;
     onSelecionar: (ponto: PontoInspecionado | null) => void;
     focoInspecionado: PontoInspecionado | null;
-    quenturaEmDestaque: boolean;
 }) {
     const map = useMap();
 
@@ -452,13 +448,9 @@ function MalhaTermicaPontilhada({
                         ? 2.2 + 4.8 * influencia
                         : raio;
 
-                    contexto.globalAlpha = quenturaEmDestaque
-                        ? centroFoco
-                            ? 0.14 + 0.28 * influencia
-                            : 0.23
-                        : centroFoco
-                            ? 0.18 + 0.82 * influencia
-                            : 1;
+                    contexto.globalAlpha = centroFoco
+                        ? 0.18 + 0.82 * influencia
+                        : 1;
 
                     const cor =
                         modoEscala === 'contraste'
@@ -472,9 +464,7 @@ function MalhaTermicaPontilhada({
                                 temperatura
                             );
 
-                    contexto.fillStyle = quenturaEmDestaque
-                        ? '#9AA8B5'
-                        : cor;
+                    contexto.fillStyle = cor;
 
                     contexto.beginPath();
                     contexto.arc(
@@ -660,8 +650,7 @@ function MalhaTermicaPontilhada({
         modoEscala,
         modoInspecao,
         onSelecionar,
-        focoInspecionado,
-        quenturaEmDestaque
+        focoInspecionado
     ]);
 
     return null;
@@ -811,71 +800,14 @@ type RelatoQuenturaAtlas = {
     hora?: string;
 };
 
-// CUIDAÍ — CONCENTRAÇÃO COMUNITÁRIA DE QUENTURA
-function CamadaConcentracaoQuentura({
-    relatos
-}: {
-    relatos: RelatoQuenturaAtlas[];
-}) {
-    const map = useMap();
-
-    useEffect(() => {
-        if (relatos.length < 2) return;
-
-        // Camada acima da malha térmica,
-        // mas abaixo dos contornos territoriais.
-        const nomePane = 'cuidaiConcentracaoQuentura';
-
-        const pane = map.getPane(nomePane)
-            ?? map.createPane(nomePane);
-
-        pane.style.zIndex = '370';
-        pane.style.pointerEvents = 'none';
-        pane.style.opacity = '0.78';
-
-        const pontos: [number, number, number][] =
-            relatos.map(relato => [
-                relato.latitude,
-                relato.longitude,
-                0.75
-            ]);
-
-        const opcoesCamada = {
-            pane: nomePane,
-            radius: 38,
-            blur: 22,
-            maxZoom: 15,
-            max: 1.5,
-            minOpacity: 0.12,
-            gradient: {
-                0.2: '#F7C58E',
-                0.45: '#F4A261',
-                0.7: '#DC7147',
-                1.0: '#AD4038'
-            }
-        };
-
-        const camada = L.heatLayer(pontos, opcoesCamada);
-
-        camada.addTo(map);
-
-        return () => {
-            map.removeLayer(camada);
-        };
-    }, [map, relatos]);
-
-    return null;
-}
-
 // MARCADOR DE RELATO COMUNITÁRIO DE QUENTURA
 const ICONE_QUENTURA = L.divIcon({
     className: 'atlas-relato-quentura',
     html: `
-        <span class="atlas-relato-quentura__halo"></span>
         <span class="atlas-relato-quentura__centro">
             <svg
-                width="19"
-                height="19"
+                width="13"
+                height="13"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -888,9 +820,9 @@ const ICONE_QUENTURA = L.divIcon({
             </svg>
         </span>
     `,
-    iconSize: [42, 42],
-    iconAnchor: [21, 21],
-    popupAnchor: [0, -22]
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -17]
 });
 
 type PropsAtlas = {
@@ -1148,11 +1080,6 @@ export default function AtlasBrasil({
 
     const [mostrarRelatosQuentura, setMostrarRelatosQuentura] =
         useState(false);
-
-    const [
-        mostrarConcentracaoQuentura,
-        setMostrarConcentracaoQuentura
-    ] = useState(false);
 
     const [erroAmostras, setErroAmostras] =
         useState<string | null>(null);
@@ -1523,52 +1450,6 @@ export default function AtlasBrasil({
         geometriaDistritoSelecionado,
         geometriaMunicipio
     ]);
-
-    // PROXIMIDADE ENTRE RELATOS COMUNITÁRIOS
-    const RAIO_CONCENTRACAO_METROS = 1200;
-
-    const relatosEmConcentracao = useMemo(() => {
-        const validos = relatosQuenturaDoTerritorio.filter(
-            relato =>
-                Number.isFinite(relato.latitude) &&
-                Number.isFinite(relato.longitude)
-        );
-
-        if (validos.length < 2) return [];
-
-        const coordenadas = validos.map(relato =>
-            L.latLng(relato.latitude, relato.longitude)
-        );
-
-        const indicesProximos = new Set<number>();
-
-        for (let i = 0; i < validos.length; i++) {
-            for (let j = i + 1; j < validos.length; j++) {
-                const distancia = coordenadas[i].distanceTo(
-                    coordenadas[j]
-                );
-
-                if (distancia <= RAIO_CONCENTRACAO_METROS) {
-                    indicesProximos.add(i);
-                    indicesProximos.add(j);
-                }
-            }
-        }
-
-        return validos.filter(
-            (_, indice) => indicesProximos.has(indice)
-        );
-
-    }, [relatosQuenturaDoTerritorio]);
-    // Dá prioridade visual aos relatos comunitários.
-    const quenturaEmDestaque =
-        (
-            mostrarRelatosQuentura &&
-            relatosQuenturaDoTerritorio.length > 0
-        ) || (
-            mostrarConcentracaoQuentura &&
-            relatosEmConcentracao.length >= 2
-        );
 
     const idEstacaoAtiva = estacoesDoTerritorio.some(
         estacao => estacao.id === idEstacaoSelecionada
@@ -2340,7 +2221,6 @@ export default function AtlasBrasil({
                                                 modoInspecao={inspecaoTermica}
                                                 onSelecionar={selecionarInspecao}
                                                 focoInspecionado={pontoInspecionado}
-                                                quenturaEmDestaque={quenturaEmDestaque}
                                             />
                                         )
                                     }
@@ -2418,15 +2298,6 @@ export default function AtlasBrasil({
                                 </>
                             )}
 
-                            {/* CONCENTRAÇÃO ESPACIAL DE RELATOS DE QUENTURA */}
-                            {municipio &&
-                                mostrarConcentracaoQuentura &&
-                                relatosEmConcentracao.length >= 2 && (
-                                    <CamadaConcentracaoQuentura
-                                        relatos={relatosEmConcentracao}
-                                    />
-                                )}
-
                             {/* RELATOS COMUNITÁRIOS DE QUENTURA */}
                             {municipio &&
                                 mostrarRelatosQuentura &&
@@ -2440,7 +2311,7 @@ export default function AtlasBrasil({
                                         icon={ICONE_QUENTURA}
                                         title={`Quentura: ${relato.titulo}`}
                                     >
-                                        <Tooltip direction="top" offset={[0, -18]}>
+                                        <Tooltip direction="top" offset={[0, -12]}>
                                             Relato de Quentura • {relato.titulo}
                                         </Tooltip>
 
@@ -2785,28 +2656,6 @@ export default function AtlasBrasil({
                                         <span className="atlas-toolbar__contador">
                                             {relatosQuenturaDoTerritorio.length}
                                         </span>
-                                    </button>
-
-                                    {/* CONCENTRAÇÃO DE RELATOS */}
-                                    <button
-                                        type="button"
-                                        title="Destaca relatos comunitários próximos entre si."
-                                        disabled={relatosEmConcentracao.length < 2}
-                                        className={`atlas-toolbar__botao atlas-toolbar__botao--avulso ${mostrarConcentracaoQuentura &&
-                                            relatosEmConcentracao.length >= 2
-                                            ? 'atlas-toolbar__botao--quentura'
-                                            : ''
-                                            }`}
-                                        aria-pressed={
-                                            mostrarConcentracaoQuentura &&
-                                            relatosEmConcentracao.length >= 2
-                                        }
-                                        onClick={() =>
-                                            setMostrarConcentracaoQuentura(atual => !atual)
-                                        }
-                                    >
-                                        <FiActivity size={16} />
-                                        <span>Concentração</span>
                                     </button>
 
                                     <span className="atlas-toolbar__espaco" />

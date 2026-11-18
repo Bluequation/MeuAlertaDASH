@@ -738,7 +738,7 @@ export default function HistoricoEstacoes({
                     p[`${campo}Maxima` as keyof PontoGrafico]
                 ])
                 : []),
-            ...(mostrarOpenMeteo && !aoVivo
+            ...(mostrarOpenMeteo && !erroOpenMeteo
                 ? pontosOpenMeteo.map(p => p[campo])
                 : [])
         ].filter((valor): valor is number =>
@@ -1173,8 +1173,9 @@ export default function HistoricoEstacoes({
 
             {!carregando && !erro &&
                 (leituras.length > 0 ||
-                    (!aoVivo && mostrarOpenMeteo && amostrasOpenMeteo.length > 0) ||
-                    (comparar && !carregandoComparacao && leiturasComparacao.length > 0)) && (
+                    (mostrarOpenMeteo && amostrasOpenMeteo.length > 0) ||
+                    (!aoVivo && comparar && !carregandoComparacao &&
+                        leiturasComparacao.length > 0)) && (
                 <>
                     {parcial && (
                         <p className="historico-periodo-alerta" role="alert">
@@ -1291,6 +1292,8 @@ export default function HistoricoEstacoes({
                                                 tick={{ fontSize: 11 }}
                                             />
                                             <Tooltip
+                                                labelFormatter={instante =>
+                                                    formatarData(Number(instante), true)}
                                                 formatter={valor =>
                                                     `${Number(valor).toFixed(1).replace('.', ',')} ${grafico.unidade}`
                                                 }
@@ -1439,7 +1442,7 @@ export default function HistoricoEstacoes({
                                         </button>
                                     </>
                                 )}
-                                {!aoVivo && mostrarOpenMeteo &&
+                                {mostrarOpenMeteo &&
                                     !carregandoOpenMeteo && !erroOpenMeteo &&
                                     amostrasOpenMeteo.length > 0 && (
                                     <button type="button" onClick={baixarOpenMeteoCSV}>
@@ -1480,7 +1483,7 @@ export default function HistoricoEstacoes({
                         {!aoVivo
                             ? ' Os arquivos exportados diferenciam médias e medições originais.'
                             : ''}
-                        {!aoVivo && mostrarOpenMeteo
+                        {mostrarOpenMeteo
                             ? ' Open-Meteo: estimativas horárias de modelo para a coordenada da estação, não medições locais.'
                             : ''}
                     </p>

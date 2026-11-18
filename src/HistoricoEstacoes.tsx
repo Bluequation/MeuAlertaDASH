@@ -561,24 +561,54 @@ export default function HistoricoEstacoes({
         comparar, inicioComparacao, fimComparacao, revisao, aoVivo
     ]);
 
-    // Janela fixa de duas horas no modo Ao vivo. Os espaços sem
-    // transmissão continuam nulos; nunca interpolamos leituras do sensor.
-    const fimVisualizacao = aoVivo ? instanteAoVivo : instanteConsulta;
+    // Ao vivo: mostra as 72 últimas medições reais, mesmo se a estação
+    // estiver temporariamente offline. A Open-Meteo não controla essa janela.
+    const ultimaLeituraAoVivo = aoVivo ? leituras[leituras.length - 1] : null;
     const inicioVisualizacao = aoVivo
-        ? fimVisualizacao - 2 * HORA
+        ? (leituras[0]?.recebidoEm ?? instanteAoVivo - 2 * HORA)
         : inicioPeriodo;
+    const fimVisualizacao = aoVivo
+        ? Math.max(
+            ultimaLeituraAoVivo?.recebidoEm ?? instanteAoVivo,
+            inicioVisualizacao + 60_000
+        )
+        : instanteConsulta;
+    const ultimaLeituraRecente = !!ultimaLeituraAoVivo &&
+        instanteAoVivo >= ultimaLeituraAoVivo.recebidoEm &&
+        instanteAoVivo - ultimaLeituraAoVivo.recebidoEm <= 30 * 60_000;
 
-    const pontos = useMemo<PontoConsolidado[]>(() =>
-        consolidarLeituras(
-            leituras,
-            aoVivo ? 'hora' : periodo,
-            inicioVisualizacao,
-            fimVisualizacao
-        ), [
-            leituras, aoVivo, periodo,
-            inicioVisualizacao, fimVisualizacao
-        ]
-    );
+    const pontos = useMemo<PontoConsolidado[]>(() => {
+        if (!aoVivo) {
+            return consolidarLeituras(
+                leituras, periodo, inicioVisualizacao, fimVisualizacao
+            );
+        }
+
+        // Não reamostra as medições ao vivo e não une falhas de transmissão.
+        const serie: PontoConsolidado[] = [];
+        const ponto = (horario: number, leitura?: Leitura): PontoConsolidado => ({
+            recebidoEm: horario,
+            momento: formatarPonto(horario, 'hora'),
+            temperatura: leitura?.temperatura ?? null,
+            umidade: leitura?.umidade ?? null,
+            temperaturaMinima: leitura?.temperatura ?? null,
+            temperaturaMaxima: leitura?.temperatura ?? null,
+            umidadeMinima: leitura?.umidade ?? null,
+            umidadeMaxima: leitura?.umidade ?? null,
+            quantidade: leitura ? 1 : 0
+        });
+        leituras.forEach((leitura, indice) => {
+            const anterior = leituras[indice - 1];
+            if (anterior && leitura.recebidoEm - anterior.recebidoEm > 3 * 60_000) {
+                serie.push(ponto((anterior.recebidoEm + leitura.recebidoEm) / 2));
+            }
+            serie.push(ponto(leitura.recebidoEm, leitura));
+        });
+        return serie;
+    }, [
+        leituras, aoVivo, periodo,
+        inicioVisualizacao, fimVisualizacao
+    ]);
 
     const pontosComparacao = useMemo(
         () => !aoVivo && comparar

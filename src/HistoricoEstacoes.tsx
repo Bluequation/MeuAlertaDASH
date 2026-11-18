@@ -631,19 +631,26 @@ export default function HistoricoEstacoes({
         [pontosComparacao]
     );
 
-    // A Open-Meteo é opcional em ambos os modos.
-    // No Ao vivo, atualiza o modelo a cada 15 min (não a cada minuto).
+    // A verificação de atualidade da estação é independente da Open-Meteo.
     useEffect(() => {
-        if (!aoVivo || !mostrarOpenMeteo) return;
+        if (!aoVivo) return;
         const timer = window.setInterval(() => {
             setInstanteAoVivo(Date.now());
-        }, 15 * 60_000);
+        }, 60_000);
         return () => window.clearInterval(timer);
-    }, [aoVivo, mostrarOpenMeteo]);
+    }, [aoVivo]);
 
-    const janelaOpenMeteo = aoVivo
-        ? Math.floor(fimVisualizacao / (15 * 60_000))
-        : 0;
+    // Busca horas vizinhas para possibilitar a comparação visual com as
+    // medições minuto a minuto, sem sintetizar medições do sensor.
+    const inicioConsultaMeteo = aoVivo
+        ? Math.floor(inicioVisualizacao / HORA) * HORA - 2 * HORA
+        : inicioPeriodo - 2 * HORA;
+    const fimConsultaMeteo = aoVivo
+        ? Math.ceil(fimVisualizacao / HORA) * HORA + 2 * HORA
+        : instanteConsulta + 2 * HORA;
+    const chaveJanelaMeteo = aoVivo
+        ? `${Math.floor(inicioVisualizacao / HORA)}:${Math.floor(fimVisualizacao / HORA)}`
+        : 'historico';
 
     useEffect(() => {
         if (!mostrarOpenMeteo || !estacao) {
@@ -654,8 +661,8 @@ export default function HistoricoEstacoes({
         }
 
         const controlador = new AbortController();
-        const fim = aoVivo ? Date.now() : instanteConsulta;
-        const inicio = aoVivo ? fim - 2 * HORA : inicioPeriodo;
+        const inicio = inicioConsultaMeteo;
+        const fim = fimConsultaMeteo;
         setCarregandoOpenMeteo(true);
         setErroOpenMeteo(null);
         // Mantém a série anterior visível enquanto renova os dados.
@@ -677,7 +684,7 @@ export default function HistoricoEstacoes({
     }, [
         aoVivo, mostrarOpenMeteo, estacao?.id,
         estacao?.latitude, estacao?.longitude,
-        inicioPeriodo, instanteConsulta, janelaOpenMeteo
+        inicioPeriodo, instanteConsulta, chaveJanelaMeteo
     ]);
 
     const pontosOpenMeteo = useMemo(() => {
@@ -690,11 +697,8 @@ export default function HistoricoEstacoes({
                 dados, periodo, inicioVisualizacao, fimVisualizacao
             ).filter(ponto => ponto.quantidade > 0);
         }
-        // Os valores de origem são horários; sem fabricar minutagem.
-        return dados.filter(amostra =>
-            amostra.recebidoEm >= inicioVisualizacao &&
-            amostra.recebidoEm <= fimVisualizacao
-        ).map(amostra => ({
+        // Preserva as horas vizinhas para interpolação visual do modelo.
+        return dados.map(amostra => ({
             ...amostra,
             momento: formatarPonto(amostra.recebidoEm, aoVivo ? 'hora' : periodo),
             temperaturaMinima: amostra.temperatura,
@@ -708,25 +712,55 @@ export default function HistoricoEstacoes({
         inicioVisualizacao, fimVisualizacao
     ]);
 
-    // Todas as fontes compartilham os mesmos instantes do eixo horizontal.
-    // A série B histórica é alinhada ao início da série A para comparação.
+    // Modelo horário interpolado SOMENTE para desenhar sua linha.
+    // Os valores reais da estação continuam sem qualquer interpolação.
     const pontosGrafico = useMemo<PontoGrafico[]>(() => {
-        const tamanho = aoVivo ? 60_000 : opcaoPeriodo.agrupamento;
-        const porInstante = new Map<number, typeof pontosOpenMeteo[number]>();
-        if (mostrarOpenMeteo && !erroOpenMeteo) {
-            pontosOpenMeteo.forEach(ponto => {
-                porInstante.set(inicioDoBloco(ponto.recebidoEm, tamanho), ponto);
-            });
-        }
-
-        return pontos.map((principal, indice) => {
-            const segundo = pontosComparacao[indice];
-            const meteo = porInstante.get(principal.recebidoEm);
+        const modelo = mostrarOpenMeteo && !erroOpenMeteo
+            ? pontosOpenMeteo
+            : [];
+        const lerModeloNoHorario = (instante: number) => {
+            if (modelo.length === 0) return null;
+            const posterior = modelo.findIndex(item => item.recebidoEm >= instante);
+            if (posterior < 0) return null;
+            const seguinte = modelo[posterior];
+            if (seguinte.recebidoEm === instante) return seguinte;
+            const anterior = modelo[posterior - 1];
+            if (!anterior) return null;
+            const intervalo = seguinte.recebidoEm - anterior.recebidoEm;
+            if (intervalo <= 0 || intervalo > 2 * HORA) return null;
+            const fracao = (instante - anterior.recebidoEm) / intervalo;
             return {
-                ...principal,
+                temperatura: anterior.temperatura +
+                    (seguinte.temperatura - anterior.temperatura) * fracao,
+                umidade: anterior.umidade +
+                    (seguinte.umidade - anterior.umidade) * fracao
+            };
+        };
+
+        const principal = pontos.length > 0
+            ? pontos
+            : modelo.filter(amostra =>
+                amostra.recebidoEm >= inicioVisualizacao &&
+                amostra.recebidoEm <= fimVisualizacao
+            ).map(amostra => ({
+                ...amostra,
+                temperatura: null,
+                umidade: null,
+                temperaturaMinima: null,
+                temperaturaMaxima: null,
+                umidadeMinima: null,
+                umidadeMaxima: null,
+                quantidade: 0
+            }));
+
+        return principal.map((ponto, indice) => {
+            const segundo = pontosComparacao[indice];
+            const meteo = lerModeloNoHorario(ponto.recebidoEm);
+            return {
+                ...ponto,
                 momento: !aoVivo && comparar && periodo === 'mes'
                     ? `Dia ${indice + 1}`
-                    : principal.momento,
+                    : ponto.momento,
                 temperaturaComparacao: segundo?.temperatura ?? null,
                 umidadeComparacao: segundo?.umidade ?? null,
                 temperaturaOpenMeteo: meteo?.temperatura ?? null,
@@ -736,8 +770,8 @@ export default function HistoricoEstacoes({
         });
     }, [
         pontos, pontosComparacao, pontosOpenMeteo,
-        mostrarOpenMeteo, erroOpenMeteo,
-        aoVivo, comparar, periodo, opcaoPeriodo.agrupamento
+        mostrarOpenMeteo, erroOpenMeteo, aoVivo,
+        comparar, periodo, inicioVisualizacao, fimVisualizacao
     ]);
 
     const resumoCampo = (campo: 'temperatura' | 'umidade') => {

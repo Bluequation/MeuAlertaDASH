@@ -13,6 +13,7 @@ import {
   type AlertaTerritorial,
   type Sombra
 } from './territorioOcorrencias';
+import EnergiaAnalise from './EnergiaAnalise';
 import './mapaCalorAnalitico.css';
 
 type Modo = 'atuais' | 'historico';
@@ -453,6 +454,18 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
           </div>
         )}
       </div>
+
+      {categoria === 'Energia' && (
+        <EnergiaAnalise
+          alertas={alertas}
+          modo={modo}
+          inicioPeriodo={intervalo.inicio}
+          fimPeriodo={intervalo.fim}
+          periodoValido={intervalo.valido}
+          subcategoria={subcategoria}
+          agora={agora}
+        />
+      )}
 
       {(categoria === 'Quentura' || modo === 'historico') && (
         <div className="territorio-analise__analiticos">

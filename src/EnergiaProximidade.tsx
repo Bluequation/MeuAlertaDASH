@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiCloudRain, FiMapPin, FiWind } from 'react-icons/fi';
 import { consultarOpenMeteoComCache } from './openMeteoCache';
-import type { AlertaTerritorial } from './territorioOcorrencias';
+import { subcategoriasDoAlerta, type AlertaTerritorial } from './territorioOcorrencias';
 
 type Props = {
   registros: AlertaTerritorial[];
@@ -143,17 +143,19 @@ async function consultarClimaEntorno(
   const chuva: number[] = [];
   const rajadas: number[] = [];
   let horariosValidos = 0;
+  const inicioLocal = new Date(inicio - 3 * HORA).toISOString().slice(0, 13);
+  const fimLocal = new Date(fim - 3 * HORA).toISOString().slice(0, 13);
   horarios.time.forEach((hora: unknown, indice: number) => {
     if (typeof hora !== 'string') return;
     const horaConsulta = hora.slice(0, 13);
-    const inicioLocal = new Date(inicio - 3 * HORA).toISOString().slice(0, 13);
-    const fimLocal = new Date(fim - 3 * HORA).toISOString().slice(0, 13);
     if (horaConsulta < inicioLocal || horaConsulta > fimLocal) return;
-    horariosValidos += 1;
     const p = Array.isArray(horarios.precipitation) ? horarios.precipitation[indice] : null;
     const v = Array.isArray(horarios.wind_gusts_10m) ? horarios.wind_gusts_10m[indice] : null;
-    if (typeof p === 'number' && Number.isFinite(p)) chuva.push(p);
-    if (typeof v === 'number' && Number.isFinite(v)) rajadas.push(v);
+    const temChuva = typeof p === 'number' && Number.isFinite(p);
+    const temVento = typeof v === 'number' && Number.isFinite(v);
+    if (temChuva || temVento) horariosValidos += 1;
+    if (temChuva) chuva.push(p as number);
+    if (temVento) rajadas.push(v as number);
   });
   if (chuva.length === 0 && rajadas.length === 0) {
     throw new Error('Sem valores de chuva ou rajadas para o período.');
@@ -211,7 +213,8 @@ export default function EnergiaProximidade({ registros, agora }: Props) {
               onClick={() => setIdSelecionado(atual => atual === grupo.id ? null : grupo.id)}>
               <strong>Grupo {indice + 1} <span>· {grupo.relatos.length} relatos</span></strong>
               <small>{formatoData(grupo.primeiro)} – {formatoData(grupo.ultimo)}</small>
-              <span>Até {formatoNumero(grupo.distanciaMaxima)} km entre o relato inicial e os demais</span>
+              <span>Até {formatoNumero(grupo.distanciaMaxima)} km do primeiro relato</span>
+              <small>Tipos: {[...new Set(grupo.relatos.flatMap(subcategoriasDoAlerta))].join(' · ')}</small>
               <em>{idSelecionado === grupo.id ? 'Ocultar análise' : 'Analisar chuva e vento'}</em>
             </button>
           ))}

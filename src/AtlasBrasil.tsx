@@ -2532,7 +2532,7 @@ export default function AtlasBrasil({
                 </div>
             </div>
 
-            {erro && <p style={{ color: '#B42318' }}>{erro}</p>
+            {erro && <p style={{ color: '#B42318' }}>{erro}</p>}
 
             {/* ATLAS COM PAINEL ESTATÍSTICO LATERAL */}
             <div

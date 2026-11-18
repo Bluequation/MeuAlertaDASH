@@ -1851,6 +1851,11 @@ export default function AtlasBrasil({
                     : null
             );
             setEstado(resultado.estado);
+            // Reutiliza a malha municipal já carregada pela busca:
+            // o clique abre o território sem depender de outro download.
+            if (resultado.estado.sigla === 'CE' && !municipios && municipiosBusca) {
+                setMunicipios(municipiosBusca);
+            }
             setMunicipio(resultado.tipo === 'estado'
                 ? null : resultado.municipio ?? null);
         });

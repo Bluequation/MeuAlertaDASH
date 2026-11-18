@@ -2748,6 +2748,125 @@ body,
   box-shadow: 0 1px 3px rgba(80, 35, 20, 0.18);
 }
 
+
+/* Quentura: agrupamento visual distinto dos pontos da malha térmica. */
+.atlas-quentura-agrupada {
+  position: relative;
+  background: transparent;
+  border: none;
+}
+
+.atlas-quentura-agrupada__conteudo {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 26px;
+  min-width: 38px;
+  padding: 0 8px;
+  white-space: nowrap;
+  box-sizing: border-box;
+  background: #FFFFFF;
+  color: #B54B31;
+  border: 1.5px solid #C55A3F;
+  border-radius: 16px;
+  box-shadow: 0 2px 5px rgba(70, 39, 31, 0.14);
+}
+
+.atlas-quentura-agrupada__conteudo strong {
+  font-size: 12px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.atlas-quentura-popup {
+  font-size: 12px;
+  color: #263C50;
+  line-height: 1.5;
+}
+
+.atlas-quentura-popup > strong {
+  display: block;
+  font-size: 14px;
+  color: #192942;
+}
+
+.atlas-quentura-popup > p {
+  margin: 5px 0 10px;
+  color: #63778A;
+}
+
+.atlas-quentura-popup__lista {
+  max-height: 235px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid #E4EBF0;
+  border-bottom: 1px solid #E4EBF0;
+  margin-bottom: 8px;
+}
+
+.atlas-quentura-popup__item {
+  border-bottom: 1px solid #ECF1F5;
+}
+
+.atlas-quentura-popup__item:last-child {
+  border-bottom: none;
+}
+
+.atlas-quentura-popup__item summary {
+  cursor: pointer;
+  padding: 8px 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #263C50;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  overflow-wrap: anywhere;
+}
+
+.atlas-quentura-popup__item summary::before {
+  content: '›';
+  color: #C55A3F;
+  font-size: 16px;
+  line-height: 0.8;
+  transform: rotate(0);
+  transition: transform 150ms ease;
+}
+
+.atlas-quentura-popup__item[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.atlas-quentura-popup__item summary span {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: #B54B31;
+}
+
+.atlas-quentura-popup__detalhes {
+  padding: 0 7px 9px 27px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #546A7C;
+  overflow-wrap: anywhere;
+}
+
+.atlas-quentura-popup__detalhes p {
+  margin: 0 0 3px;
+}
+
+.atlas-quentura-popup > small,
+.atlas-quentura-popup__detalhes small {
+  color: #6B7F8C;
+}
+
 /* ==========================================
    CUIDAÍ — CONTROLES COMPACTOS DO ATLAS
    ========================================== */

@@ -103,6 +103,18 @@ const formatarData = (data: number, longo = false) =>
             : { hour: '2-digit', minute: '2-digit' })
     });
 
+const formatarDataCompleta = (data: number) =>
+    new Date(data).toLocaleString('pt-BR', {
+        timeZone: FUSO_FORTALEZA,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+
 const formatarPonto = (data: number, periodo: Periodo) => {
     const opcoes: Intl.DateTimeFormatOptions = periodo === 'mes'
         ? { timeZone: FUSO_FORTALEZA, day: '2-digit', month: '2-digit' }
@@ -391,7 +403,7 @@ export default function HistoricoEstacoes({
                 ponto.quantidade
             ].join(';'))
             : leituras.map(leitura => [
-                formatarData(leitura.recebidoEm, true),
+                formatarDataCompleta(leitura.recebidoEm),
                 leitura.temperatura.toFixed(2).replace('.', ','),
                 leitura.umidade.toFixed(2).replace('.', ',')
             ].join(';'));
@@ -471,7 +483,6 @@ export default function HistoricoEstacoes({
                             <button
                                 key={opcao.id}
                                 type="button"
-                                disabled={carregando}
                                 aria-pressed={periodo === opcao.id}
                                 className={periodo === opcao.id
                                     ? 'historico-periodo-botao historico-periodo-botao--ativo'

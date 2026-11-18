@@ -955,6 +955,30 @@ export default function HistoricoEstacoes({
                         Histórico
                     </button>
                 </div>
+                <div className="historico-meteo-controle">
+                    <button
+                        type="button"
+                        className={mostrarOpenMeteo
+                            ? 'historico-analise-botao historico-analise-botao--ativo'
+                            : 'historico-analise-botao'}
+                        aria-pressed={mostrarOpenMeteo}
+                        onClick={() => setMostrarOpenMeteo(atual => !atual)}
+                    >
+                        <FiCloud aria-hidden="true" />
+                        {mostrarOpenMeteo ? 'Ocultar Open-Meteo' : 'Mostrar Open-Meteo'}
+                    </button>
+                    {mostrarOpenMeteo && (
+                        <span role="status">
+                            {carregandoOpenMeteo
+                                ? 'Consultando estimativas...'
+                                : erroOpenMeteo
+                                    ? erroOpenMeteo
+                                    : amostrasOpenMeteo.length
+                                        ? 'Estimativas horárias no mesmo gráfico'
+                                        : 'Sem estimativas neste intervalo'}
+                        </span>
+                    )}
+                </div>
                 {aoVivo ? (
                     <p className="historico-modos__ao-vivo" role="status">
                         <span className="historico-modos__indicador" aria-hidden="true" />
@@ -1059,17 +1083,6 @@ export default function HistoricoEstacoes({
                     </p>
 
                     <div className="historico-opcoes-analise">
-                        <button
-                            type="button"
-                            className={mostrarOpenMeteo
-                                ? 'historico-analise-botao historico-analise-botao--ativo'
-                                : 'historico-analise-botao'}
-                            aria-pressed={mostrarOpenMeteo}
-                            onClick={() => setMostrarOpenMeteo(atual => !atual)}
-                        >
-                            <FiCloud aria-hidden="true" />
-                            {mostrarOpenMeteo ? 'Ocultar Open-Meteo' : 'Comparar com Open-Meteo'}
-                        </button>
                         <button
                             type="button"
                             className={mostrarExtremos
@@ -1197,7 +1210,7 @@ export default function HistoricoEstacoes({
                     )}
 
                     {(pontosDisponiveis.length >= 2 ||
-                        (!aoVivo && mostrarOpenMeteo && pontosOpenMeteo.length > 0) ||
+                        (mostrarOpenMeteo && pontosOpenMeteo.length > 0) ||
                         (!aoVivo && comparar && pontosComparacaoDisponiveis.length >= 2)) ? (
                         ([
                             {
@@ -1228,6 +1241,12 @@ export default function HistoricoEstacoes({
                                     </span>
                                     <h4>{grafico.titulo}</h4>
                                 </div>
+                                {mostrarOpenMeteo && (
+                                    <div className="historico-legenda-fontes" aria-label="Fontes do gráfico">
+                                        <span><i style={{ borderColor: grafico.cor }} /> Estação CUIDAÍ</span>
+                                        <span><i className="historico-legenda-fontes__meteo" /> Open-Meteo • estimativa horária</span>
+                                    </div>
+                                )}
                                 {resumoCampo(grafico.campo) && (
                                     <div className="historico-resumo-extremos">
                                         <span>Mín. <b>{resumoCampo(grafico.campo)!.minimo.toFixed(1).replace('.', ',')} {grafico.unidade}</b></span>
@@ -1256,18 +1275,17 @@ export default function HistoricoEstacoes({
                                                 vertical={false}
                                             />
                                             <XAxis
-                                                dataKey={aoVivo ? 'recebidoEm' : 'momento'}
-                                                type={aoVivo ? 'number' : 'category'}
-                                                scale={aoVivo ? 'time' : 'auto'}
-                                                domain={aoVivo ? ['dataMin', 'dataMax'] : undefined}
-                                                tickFormatter={aoVivo
-                                                    ? (valor: number) => formatarPonto(valor, 'hora')
-                                                    : undefined}
+                                                dataKey="recebidoEm"
+                                                type="number"
+                                                scale="time"
+                                                domain={[inicioVisualizacao, fimVisualizacao]}
+                                                tickFormatter={(valor: number) =>
+                                                    formatarPonto(valor, aoVivo ? 'hora' : periodo)}
                                                 minTickGap={34}
                                                 tick={{ fontSize: 10 }}
                                             />
                                             <YAxis
-                                                domain={!aoVivo && mostrarOpenMeteo
+                                                domain={mostrarOpenMeteo
                                                     ? dominioCompartilhado(grafico.campo)
                                                     : ['auto', 'auto']}
                                                 tick={{ fontSize: 11 }}
@@ -1334,76 +1352,24 @@ export default function HistoricoEstacoes({
                                                     activeDot={{ r: 4 }}
                                                 />
                                             )}
+                                            {mostrarOpenMeteo && !erroOpenMeteo && (
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey={`${grafico.campo}OpenMeteo`}
+                                                    name="Open-Meteo (estimativa horária)"
+                                                    stroke="#64748B"
+                                                    strokeWidth={2}
+                                                    strokeDasharray="5 4"
+                                                    dot={{ r: 2.5 }}
+                                                    activeDot={{ r: 4 }}
+                                                    connectNulls={true}
+                                                    isAnimationActive={false}
+                                                />
+                                            )}
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </div>
 
-                                {!aoVivo && mostrarOpenMeteo && (
-                                    <div className="historico-open-comparacao">
-                                        <div className="historico-open-comparacao__cabecalho">
-                                            <FiCloud aria-hidden="true" />
-                                            <strong>Open-Meteo</strong>
-                                            <span>Estimativa de modelo • {periodo === 'mes' ? 'médias diárias' : 'valores horários'}{comparar ? ' • período A' : ''}</span>
-                                        </div>
-                                        {carregandoOpenMeteo ? (
-                                            <p role="status">Consultando Open-Meteo...</p>
-                                        ) : erroOpenMeteo ? (
-                                            <p role="alert">{erroOpenMeteo}</p>
-                                        ) : pontosOpenMeteo.length === 0 ? (
-                                            <p>Sem estimativas disponíveis neste intervalo.</p>
-                                        ) : (
-                                            <div className="historico-open-comparacao__grafico">
-                                                <ResponsiveContainer
-                                                    width="100%"
-                                                    height="100%"
-                                                    initialDimension={{ width: 300, height: 140 }}
-                                                >
-                                                    <LineChart
-                                                        data={pontosOpenMeteo}
-                                                        margin={{ top: 8, right: 12, left: -20, bottom: 8 }}
-                                                    >
-                                                        <CartesianGrid
-                                                            stroke="#E6EDF5"
-                                                            strokeDasharray="3 3"
-                                                            vertical={false}
-                                                        />
-                                                        <XAxis
-                                                            type="number"
-                                                            scale="time"
-                                                            dataKey="recebidoEm"
-                                                            domain={[inicioPeriodo, instanteConsulta]}
-                                                            tickFormatter={(valor: number) =>
-                                                                formatarPonto(valor, periodo)}
-                                                            minTickGap={34}
-                                                            tick={{ fontSize: 10 }}
-                                                        />
-                                                        <YAxis
-                                                            domain={dominioCompartilhado(grafico.campo)}
-                                                            tick={{ fontSize: 10 }}
-                                                        />
-                                                        <Tooltip
-                                                            labelFormatter={valor =>
-                                                                formatarData(Number(valor), true)}
-                                                            formatter={valor =>
-                                                                `${Number(valor).toFixed(1).replace('.', ',')} ${grafico.unidade}`}
-                                                        />
-                                                        <Line
-                                                            type="monotone"
-                                                            dataKey={grafico.campo}
-                                                            name="Estimativa Open-Meteo"
-                                                            stroke="#718AA4"
-                                                            strokeWidth={1.9}
-                                                            dot={pontosOpenMeteo.length <= 3}
-                                                            activeDot={{ r: 4 }}
-                                                            isAnimationActive={false}
-                                                            connectNulls={false}
-                                                        />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
                             </article>
                         ))
                     ) : (

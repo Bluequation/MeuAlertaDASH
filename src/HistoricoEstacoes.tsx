@@ -982,7 +982,7 @@ export default function HistoricoEstacoes({
                 {aoVivo ? (
                     <p className="historico-modos__ao-vivo" role="status">
                         <span className="historico-modos__indicador" aria-hidden="true" />
-                        Atualização automática • últimas 72 medições
+                        Atualização automática • últimas 2 horas
                     </p>
                 ) : (
                 <div className="historico-periodo-controles">
@@ -1386,7 +1386,8 @@ export default function HistoricoEstacoes({
                             <div className="historico-resumo-total">
                                 <FiDatabase aria-hidden="true" />
                                 <strong>
-                                    {aoVivo ? '' : 'A: '}{leituras.length.toLocaleString('pt-BR')} medições
+                                    {aoVivo ? '' : 'A: '}
+                                    {(aoVivo ? pontosDisponiveis.length : leituras.length).toLocaleString('pt-BR')} medições
                                 </strong>
                                 <span className="historico-periodo-resumo">
                                     {aoVivo ? 'atualização automática'

@@ -5410,7 +5410,7 @@ function App() {
                       lineHeight: '1.7',
                       fontSize: '13px',
                       margin: 0,
-                      textAlign: 'justify'
+                      textAlign: isMobile ? 'left' : 'justify'
                     }}
                   >
                     O <strong>CUIDAÍ</strong> é um aplicativo móvel colaborativo
@@ -5445,7 +5445,7 @@ function App() {
                       lineHeight: '1.7',
                       fontSize: '13px',
                       margin: 0,
-                      textAlign: 'justify'
+                      textAlign: isMobile ? 'left' : 'justify'
 
                     }}
                   >
@@ -5478,7 +5478,7 @@ function App() {
                       lineHeight: '1.7',
                       fontSize: '13px',
                       margin: 0,
-                      textAlign: 'justify'
+                      textAlign: isMobile ? 'left' : 'justify'
                     }}
                   >
                     Os registros do aplicativo são relatos comunitários,

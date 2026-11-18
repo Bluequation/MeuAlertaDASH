@@ -240,6 +240,12 @@ type InformacoesConsolidacao = {
     agregacao: string;
     totalMedicoes: number;
     incompleto: boolean;
+    resumoMedicoes?: {
+        temperaturaMinima: number;
+        temperaturaMedia: number;
+        temperaturaMaxima: number;
+        umidadeMedia: number;
+    };
 };
 
 export function abrirRelatorioHistorico(
@@ -327,6 +333,8 @@ export function abrirRelatorioHistorico(
             (soma, valor) => soma + valor,
             0
         ) / umidades.length;
+
+    const resumoReal = consolidacao?.resumoMedicoes;
 
     // Documento completo para impressão.
     const html = `
@@ -700,40 +708,40 @@ export function abrirRelatorioHistorico(
     <section class="secao">
 
         <h2>
-            ${consolidacao ? 'Resumo das médias por intervalo' : 'Resumo das medições'}
+            ${resumoReal ? 'Resumo das medições originais' : consolidacao ? 'Resumo das médias por intervalo' : 'Resumo das medições'}
         </h2>
 
         <div class="indicadores">
 
             <div class="indicador">
-                <span>${consolidacao ? 'Menor média de temp.' : 'Temp. mínima'}</span>
+                <span>${consolidacao && !resumoReal ? 'Menor média de temp.' : 'Temp. mínima'}</span>
 
                 <strong>
-                    ${formatarNumero(temperaturaMinima)} °C
+                    ${formatarNumero(resumoReal?.temperaturaMinima ?? temperaturaMinima)} °C
                 </strong>
             </div>
 
             <div class="indicador">
-                <span>${consolidacao ? 'Média dos intervalos' : 'Temp. média'}</span>
+                <span>${consolidacao && !resumoReal ? 'Média dos intervalos' : 'Temp. média'}</span>
 
                 <strong>
-                    ${formatarNumero(temperaturaMedia)} °C
+                    ${formatarNumero(resumoReal?.temperaturaMedia ?? temperaturaMedia)} °C
                 </strong>
             </div>
 
             <div class="indicador">
-                <span>${consolidacao ? 'Maior média de temp.' : 'Temp. máxima'}</span>
+                <span>${consolidacao && !resumoReal ? 'Maior média de temp.' : 'Temp. máxima'}</span>
 
                 <strong>
-                    ${formatarNumero(temperaturaMaxima)} °C
+                    ${formatarNumero(resumoReal?.temperaturaMaxima ?? temperaturaMaxima)} °C
                 </strong>
             </div>
 
             <div class="indicador">
-                <span>${consolidacao ? 'Média dos intervalos' : 'Umidade média'}</span>
+                <span>${consolidacao && !resumoReal ? 'Média dos intervalos' : 'Umidade média'}</span>
 
                 <strong>
-                    ${formatarNumero(umidadeMedia)} %
+                    ${formatarNumero(resumoReal?.umidadeMedia ?? umidadeMedia)} %
                 </strong>
             </div>
 
@@ -815,8 +823,9 @@ export function abrirRelatorioHistorico(
             (${escaparHTML(consolidacao.periodo)}).
             ${escaparHTML(consolidacao.agregacao)}.
             Cada ponto representa a média das leituras disponíveis naquele intervalo.
-            As estatísticas acima descrevem os pontos consolidados,
-            não os extremos individuais medidos pelo sensor.
+            ${resumoReal
+                ? 'As estatísticas acima são calculadas sobre as medições originais; o gráfico usa médias por intervalo.'
+                : 'As estatísticas acima descrevem os pontos consolidados, não os extremos individuais medidos pelo sensor.'}
             Intervalos sem leituras não são preenchidos.
             ${consolidacao.incompleto
                 ? 'Atenção: o limite de consulta foi atingido; os resultados são parciais.'

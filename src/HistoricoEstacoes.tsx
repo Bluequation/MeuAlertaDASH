@@ -755,14 +755,32 @@ export default function HistoricoEstacoes({
             if (seguinte.recebidoEm === instante) return seguinte;
             const anterior = modelo[posterior - 1];
             if (!anterior) return null;
+
+            // A série mensal pode conter intervalos vazios. Interpolamos
+            // somente estimativas numéricas válidas, nunca valores ausentes.
+            const temperaturaAnterior = anterior.temperatura;
+            const temperaturaSeguinte = seguinte.temperatura;
+            const umidadeAnterior = anterior.umidade;
+            const umidadeSeguinte = seguinte.umidade;
+            if (
+                typeof temperaturaAnterior !== 'number' ||
+                typeof temperaturaSeguinte !== 'number' ||
+                typeof umidadeAnterior !== 'number' ||
+                typeof umidadeSeguinte !== 'number' ||
+                !Number.isFinite(temperaturaAnterior) ||
+                !Number.isFinite(temperaturaSeguinte) ||
+                !Number.isFinite(umidadeAnterior) ||
+                !Number.isFinite(umidadeSeguinte)
+            ) return null;
+
             const intervalo = seguinte.recebidoEm - anterior.recebidoEm;
             if (intervalo <= 0 || intervalo > 2 * HORA) return null;
             const fracao = (instante - anterior.recebidoEm) / intervalo;
             return {
-                temperatura: anterior.temperatura +
-                    (seguinte.temperatura - anterior.temperatura) * fracao,
-                umidade: anterior.umidade +
-                    (seguinte.umidade - anterior.umidade) * fracao
+                temperatura: temperaturaAnterior +
+                    (temperaturaSeguinte - temperaturaAnterior) * fracao,
+                umidade: umidadeAnterior +
+                    (umidadeSeguinte - umidadeAnterior) * fracao
             };
         };
 

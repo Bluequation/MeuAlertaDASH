@@ -23,7 +23,8 @@ import {
     CircleMarker,
     Tooltip,
     Popup,
-    useMap
+    useMap,
+    useMapEvents
 } from 'react-leaflet';
 import L from 'leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
@@ -824,6 +825,222 @@ const ICONE_QUENTURA = L.divIcon({
     iconAnchor: [17, 17],
     popupAnchor: [0, -17]
 });
+
+
+/**
+ * Agrupa apenas os relatos cujos marcadores se sobrepõem na tela.
+ * A posição exibida pertence sempre a um relato real: nenhum dado é alterado.
+ * O agrupamento é recalculado ao mudar o zoom/tamanho do mapa.
+ */
+function MarcadoresQuentura({
+    relatos
+}: {
+    relatos: RelatoQuenturaAtlas[];
+}) {
+    const [revisaoMapa, setRevisaoMapa] = useState(0);
+    const map = useMapEvents({
+        zoomend: () => setRevisaoMapa(atual => atual + 1),
+        moveend: () => setRevisaoMapa(atual => atual + 1),
+        resize: () => setRevisaoMapa(atual => atual + 1)
+    });
+
+    const grupos = useMemo(() => {
+        // A revisão invalida as coordenadas projetadas após mudanças no mapa.
+        void revisaoMapa;
+        const zoom = map.getZoom();
+        const itens = relatos
+            .filter(relato =>
+                Number.isFinite(relato.latitude) &&
+                Number.isFinite(relato.longitude)
+            )
+            .map(relato => ({
+                relato,
+                pixel: map.project(
+                    L.latLng(relato.latitude, relato.longitude),
+                    zoom
+                )
+            }));
+
+        // O círculo visível mede 20 px. Com 28 px, evitamos
+        // chamas encostadas e mantemos os agrupamentos compactos.
+        const raioPixels = 28;
+        const raiz = itens.map((_, indice) => indice);
+        const localizarRaiz = (indiceInicial: number): number => {
+            let indice = indiceInicial;
+            while (raiz[indice] !== indice) {
+                raiz[indice] = raiz[raiz[indice]];
+                indice = raiz[indice];
+            }
+            return indice;
+        };
+        const unir = (primeiro: number, segundo: number) => {
+            const a = localizarRaiz(primeiro);
+            const b = localizarRaiz(segundo);
+            if (a !== b) raiz[b] = a;
+        };
+
+        // Grade espacial: compara apenas ícones em células próximas.
+        const celulas = new Map<string, number[]>();
+        itens.forEach(({ pixel }, indice) => {
+            const coluna = Math.floor(pixel.x / raioPixels);
+            const linha = Math.floor(pixel.y / raioPixels);
+
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    const vizinhos = celulas.get(
+                        `${coluna + dx}:${linha + dy}`
+                    ) ?? [];
+                    for (const outro of vizinhos) {
+                        const distanciaX = pixel.x - itens[outro].pixel.x;
+                        const distanciaY = pixel.y - itens[outro].pixel.y;
+                        if (
+                            distanciaX * distanciaX +
+                            distanciaY * distanciaY <= raioPixels * raioPixels
+                        ) {
+                            unir(indice, outro);
+                        }
+                    }
+                }
+            }
+
+            const chave = `${coluna}:${linha}`;
+            const celula = celulas.get(chave) ?? [];
+            celula.push(indice);
+            celulas.set(chave, celula);
+        });
+
+        const gruposPorRaiz = new Map<number, number[]>();
+        itens.forEach((_, indice) => {
+            const id = localizarRaiz(indice);
+            const membros = gruposPorRaiz.get(id) ?? [];
+            membros.push(indice);
+            gruposPorRaiz.set(id, membros);
+        });
+
+        return Array.from(gruposPorRaiz.values()).map(indices => {
+            const centroX = indices.reduce(
+                (total, indice) => total + itens[indice].pixel.x, 0
+            ) / indices.length;
+            const centroY = indices.reduce(
+                (total, indice) => total + itens[indice].pixel.y, 0
+            ) / indices.length;
+
+            // Marcador na coordenada verdadeira mais próxima do centro visual.
+            const representante = indices.reduce((escolhido, indice) => {
+                const distancia = (i: number) =>
+                    (itens[i].pixel.x - centroX) ** 2 +
+                    (itens[i].pixel.y - centroY) ** 2;
+                return distancia(indice) < distancia(escolhido)
+                    ? indice
+                    : escolhido;
+            }, indices[0]);
+
+            return {
+                id: indices.map(indice => itens[indice].relato.id).sort().join('|'),
+                posicao: [
+                    itens[representante].relato.latitude,
+                    itens[representante].relato.longitude
+                ] as [number, number],
+                relatos: indices.map(indice => itens[indice].relato)
+            };
+        });
+    }, [map, relatos, revisaoMapa]);
+
+    return (
+        <>
+            {grupos.map(grupo => {
+                const quantidade = grupo.relatos.length;
+                const individual = quantidade === 1;
+                const primeiro = grupo.relatos[0];
+
+                return (
+                    <Marker
+                        key={`relatos-quentura-${grupo.id}`}
+                        position={grupo.posicao}
+                        icon={individual
+                            ? ICONE_QUENTURA
+                            : criarIconeQuenturaAgrupada(quantidade)}
+                        title={individual
+                            ? `Quentura: ${primeiro.titulo}`
+                            : `${quantidade} relatos de Quentura`}
+                    >
+                        <Tooltip direction="top" offset={[0, -12]}>
+                            {individual
+                                ? `Relato de Quentura • ${primeiro.titulo}`
+                                : `${quantidade} relatos de Quentura • Clique para consultar`}
+                        </Tooltip>
+
+                        <Popup minWidth={individual ? 180 : 270} maxWidth={360}>
+                            {individual ? (
+                                <div style={{ lineHeight: 1.6 }}>
+                                    <strong>Quentura relatada pela comunidade</strong>
+                                    <p>{primeiro.titulo}</p>
+                                    {primeiro.detalhe && <p>{primeiro.detalhe}</p>}
+                                    {primeiro.hora && primeiro.hora !== '--:--' && (
+                                        <small>Horário: {primeiro.hora}</small>
+                                    )}
+                                    <div>
+                                        <small>
+                                            Registro comunitário CUIDAÍ.
+                                            Não representa medição meteorológica.
+                                        </small>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="atlas-quentura-popup">
+                                    <strong>{quantidade} relatos de Quentura</strong>
+                                    <p>Selecione um registro para ver suas informações.</p>
+                                    <div className="atlas-quentura-popup__lista">
+                                        {grupo.relatos.map((relato, indice) => (
+                                            <details key={relato.id} className="atlas-quentura-popup__item">
+                                                <summary>
+                                                    <span>{indice + 1}.</span>
+                                                    {relato.titulo}
+                                                </summary>
+                                                <div className="atlas-quentura-popup__detalhes">
+                                                    {relato.detalhe && <p>{relato.detalhe}</p>}
+                                                    {relato.hora && relato.hora !== '--:--' && (
+                                                        <small>Horário: {relato.hora}</small>
+                                                    )}
+                                                    <small>Registro comunitário CUIDAÍ.</small>
+                                                </div>
+                                            </details>
+                                        ))}
+                                    </div>
+                                    <small>
+                                        Relatos da população; não representam
+                                        medições meteorológicas.
+                                    </small>
+                                </div>
+                            )}
+                        </Popup>
+                    </Marker>
+                );
+            })}
+        </>
+    );
+}
+
+function criarIconeQuenturaAgrupada(quantidade: number): L.DivIcon {
+    const largura = quantidade >= 100 ? 62 : quantidade >= 10 ? 52 : 44;
+    return L.divIcon({
+        className: 'atlas-quentura-agrupada',
+        html: `
+            <span class="atlas-quentura-agrupada__conteudo">
+                <svg width="14" height="14" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2.1"
+                     stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M12 22c4 0 7-3 7-7 0-3-2-6-4-8 0 2-1 3-3 4 0-4-2-7-4-9 0 4-1 6-3 9-1 2-1 3-1 4 0 4 3 7 8 7Z"/>
+                </svg>
+                <strong>${quantidade}</strong>
+            </span>
+        `,
+        iconSize: [largura, 34],
+        iconAnchor: [largura / 2, 17],
+        popupAnchor: [0, -18]
+    });
+}
 
 type PropsAtlas = {
     estacoes: EstacaoPublica[];
@@ -2298,42 +2515,12 @@ export default function AtlasBrasil({
                                 </>
                             )}
 
-                            {/* RELATOS COMUNITÁRIOS DE QUENTURA */}
-                            {municipio &&
-                                mostrarRelatosQuentura &&
-                                relatosQuenturaDoTerritorio.map(relato => (
-                                    <Marker
-                                        key={`quentura-${relato.id}`}
-                                        position={[
-                                            relato.latitude,
-                                            relato.longitude
-                                        ]}
-                                        icon={ICONE_QUENTURA}
-                                        title={`Quentura: ${relato.titulo}`}
-                                    >
-                                        <Tooltip direction="top" offset={[0, -12]}>
-                                            Relato de Quentura • {relato.titulo}
-                                        </Tooltip>
-
-                                        <Popup>
-                                            <div style={{ minWidth: 180, lineHeight: 1.6 }}>
-                                                <strong>Quentura relatada pela comunidade</strong>
-
-                                                <p>{relato.titulo}</p>
-
-                                                {relato.detalhe && (
-                                                    <p>{relato.detalhe}</p>
-                                                )}
-
-                                                <small>
-                                                    Registro comunitário CUIDAÍ.
-                                                    Não representa medição meteorológica.
-                                                </small>
-                                            </div>
-                                        </Popup>
-                                    </Marker>
-                                ))
-                            }
+                            {/* RELATOS COMUNITÁRIOS — AGRUPAMENTO VISUAL POR ZOOM */}
+                            {municipio && mostrarRelatosQuentura && (
+                                <MarcadoresQuentura
+                                    relatos={relatosQuenturaDoTerritorio}
+                                />
+                            )}
 
                             {/* ESTAÇÕES CUIDAÍ DO MUNICÍPIO */}
                             {municipio && estacoesDoTerritorio.map(estacao => {

@@ -183,6 +183,28 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
       const chave = porMes ? diaLocal(alerta.criadoEm).slice(0, 7) : diaLocal(alerta.criadoEm);
       contagem.set(chave, (contagem.get(chave) ?? 0) + 1);
     }
+
+    // Inclui períodos sem registros no eixo: ausência de ocorrências
+    // também faz parte da análise temporal.
+    if (modo === 'historico' && intervalo.valido) {
+      const inicioUTC = Date.parse(diaLocal(intervalo.inicio) + 'T00:00:00Z');
+      const fimUTC = Date.parse(diaLocal(intervalo.fim) + 'T00:00:00Z');
+      if (porMes) {
+        const cursor = new Date(inicioUTC);
+        cursor.setUTCDate(1);
+        while (cursor.getTime() <= fimUTC) {
+          const chave = cursor.toISOString().slice(0, 7);
+          if (!contagem.has(chave)) contagem.set(chave, 0);
+          cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+        }
+      } else {
+        for (let instante = inicioUTC; instante <= fimUTC; instante += DIA) {
+          const chave = new Date(instante).toISOString().slice(0, 10);
+          if (!contagem.has(chave)) contagem.set(chave, 0);
+        }
+      }
+    }
+
     return [...contagem].sort(([a], [b]) => a.localeCompare(b))
       .map(([data, quantidade]) => ({
         data: porMes ? data.slice(5, 7) + '/' + data.slice(0, 4)

@@ -341,31 +341,40 @@
 }
 
 
-/* Topo executivo: três colunas independentes, sem cartões esticados.
-   A escolha de categoria/subcategoria acontece nas próprias distribuições. */
+/* Análise territorial — faixa superior compacta, sem alturas artificiais.
+   O conteúdo das subcategorias usa duas colunas; os cartões têm a mesma
+   altura no desktop sem impor rolagem quando cabem os registros. */
 .territorio-analise {
   gap: 10px;
 }
 
 .territorio-analise__topo {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.73fr) minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .73fr) minmax(0, 1.17fr);
+  align-items: stretch;
   gap: 10px;
   min-width: 0;
 }
 
-.territorio-analise__topo-esquerda {
+.territorio-analise__topo-esquerda,
+.territorio-analise__painel-lateral {
   min-width: 0;
   height: auto;
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  padding: 13px 14px;
+  min-height: 0;
+  max-height: none;
+  box-sizing: border-box;
+  align-self: stretch;
   background: #FFFFFF;
   border: 1px solid #DEE8F1;
   border-radius: 14px;
+}
+
+.territorio-analise__topo-esquerda {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
 }
 
 .territorio-analise__topo-direita {
@@ -373,235 +382,269 @@
 }
 
 .territorio-analise__topo .territorio-analise__cabecalho {
+  display: flex;
   align-items: start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px 10px;
   flex-wrap: wrap;
 }
 
 .territorio-analise__cabecalho > div:first-child {
+  flex: 1 1 160px;
   min-width: 0;
-  flex: 1 1 180px;
 }
 
 .territorio-analise__cabecalho h1 {
+  font-size: clamp(19px, 1.65vw, 23px);
+  letter-spacing: -.025em;
+  line-height: 1.12;
+  margin: 0 0 4px;
   color: #192942;
-  font-size: clamp(19px, 1.6vw, 23px);
-  line-height: 1.15;
-  letter-spacing: -0.025em;
-  margin-bottom: 4px;
 }
 
 .territorio-analise__cabecalho p {
+  margin: 0;
   font-size: 10.5px;
   line-height: 1.35;
-  margin: 0;
-  max-width: 300px;
+  max-width: 290px;
 }
 
 .territorio-analise__topo .territorio-analise__modos {
   flex: 0 0 auto;
   margin-left: auto;
-  background: #EDF3F7;
   border-radius: 9px;
+  background: #EFF4F8;
 }
 
 .territorio-analise__topo .territorio-analise__modos button,
 .territorio-analise__topo .territorio-analise__opcoes button {
-  padding: 6px 9px;
-  font-size: 10.5px;
   min-height: 30px;
+  padding: 6px 8px;
+  font-size: 10.5px;
 }
 
 .territorio-analise__topo .territorio-analise__periodo {
-  padding: 8px 0;
-  border: 0;
-  border-top: 1px solid #ECF0F5;
   background: transparent;
+  border: none;
+  border-top: 1px solid #E8EFF5;
   border-radius: 0;
-  gap: 8px;
+  padding: 8px 0 0;
+  gap: 7px;
 }
 
-.territorio-analise__topo .territorio-analise__periodo .territorio-analise__opcoes {
+.territorio-analise__topo .territorio-analise__opcoes {
   flex-wrap: wrap;
 }
 
-.territorio-analise__topo .territorio-analise__periodo .territorio-analise__datas {
-  gap: 6px;
-}
-
-.territorio-analise__topo .territorio-analise__periodo .territorio-analise__datas label {
-  flex: 1 1 125px;
+.territorio-analise__topo .territorio-analise__datas label {
   min-width: 110px;
+  flex: 1 1 120px;
 }
 
 .territorio-analise__recorte {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 9px;
-  padding: 7px 9px;
+  min-width: 0;
+  gap: 8px;
+  padding: 6px 8px;
   border: 1px solid #D8E8F3;
   border-radius: 8px;
   background: #F2F8FC;
-  min-width: 0;
 }
 
 .territorio-analise__recorte-resumo {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  min-width: 0;
+  gap: 2px;
 }
 
 .territorio-analise__recorte-resumo span {
+  color: #71899C;
   font-size: 9px;
-  color: #678299;
 }
 
 .territorio-analise__recorte-resumo strong {
-  font-size: 11px;
+  color: #205B80;
+  font-size: 10.5px;
   font-weight: 750;
   line-height: 1.3;
-  color: #1B577E;
   overflow-wrap: anywhere;
 }
 
 .territorio-analise__recorte > button {
   flex: 0 0 auto;
-  padding: 6px 8px;
   border: 1px solid #C9DFEE;
   border-radius: 7px;
   background: #FFFFFF;
+  padding: 6px 8px;
+  color: #1E6793;
   font: inherit;
   font-size: 10px;
   font-weight: 750;
-  color: #1E6793;
   cursor: pointer;
 }
 
 .territorio-analise__topo .territorio-analise__metricas {
-  margin-top: 2px;
-  padding-top: 9px;
-  border-top: 1px solid #E8EFF5;
   display: flex;
-  align-items: center;
-  gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 1px;
+  padding-top: 10px;
+  border-top: 1px solid #E8EFF5;
 }
 
 .territorio-analise__topo .territorio-analise__metricas > div {
-  flex: 1 1 75px;
-  min-width: 65px;
+  flex: 1 1 65px;
+  min-width: 58px;
   padding: 0 6px 0 0;
-  background: transparent;
-  border: 0;
-  border-right: 1px solid #E5EDF4;
+  border: none;
+  border-right: 1px solid #E3ECF3;
   border-radius: 0;
+  background: transparent;
   gap: 2px;
 }
 
 .territorio-analise__topo .territorio-analise__metricas strong {
-  font-size: 20px;
-  line-height: 1.1;
-  letter-spacing: -0.025em;
-  font-weight: 760;
+  color: #192942;
+  font-size: 21px;
+  line-height: 1.05;
+  letter-spacing: -.02em;
+  font-weight: 750;
 }
 
 .territorio-analise__topo .territorio-analise__metricas span {
+  color: #71859A;
   font-size: 9.5px;
-  line-height: 1.2;
+  line-height: 1.25;
+  overflow-wrap: break-word;
 }
 
 .territorio-analise__topo .territorio-analise__metricas > button {
-  align-self: center;
   flex: 0 0 auto;
-  padding: 7px 8px;
+  align-self: center;
   min-height: 31px;
-  background: #F0F7FC;
-  color: #1B6B98;
-  border-color: #D0E3F0;
+  padding: 7px 9px;
+  font-size: 10.5px;
+  color: #1E6B97;
+  background: #EFF7FC;
   border-radius: 8px;
-  font-size: 10px;
+  border-color: #CFE3F0;
 }
 
 .territorio-analise__painel-lateral {
   display: block;
-  align-self: start;
-  height: auto;
-  min-width: 0;
-  max-height: 210px;
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #C8DCEB transparent;
-  padding: 12px 13px 10px;
-  background: #FFFFFF;
-  border: 1px solid #DEE8F1;
-  border-radius: 14px;
+  overflow: visible;
+  padding: 12px 13px 11px;
 }
 
 .territorio-analise__painel-lateral h2 {
-  position: sticky;
-  top: -12px;
-  z-index: 1;
+  position: static;
+  z-index: auto;
+  background: transparent;
   margin: 0 0 7px;
   padding: 0 0 8px;
-  border-bottom: 1px solid #EBF0F5;
-  background: #FFFFFF;
-  font-size: 12px;
-  line-height: 1.25;
-  font-weight: 750;
+  border-bottom: 1px solid #ECF1F6;
   color: #192942;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
 }
 
 .territorio-analise__painel-lateral p {
-  margin: 6px 0;
+  margin: 5px 0;
+  color: #73879A;
   font-size: 10.5px;
-  color: #708599;
   line-height: 1.4;
 }
 
 .territorio-analise__painel-lateral .territorio-analise__barra {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   width: 100%;
+  min-width: 0;
   margin: 0;
-  padding: 5px 5px 6px;
   gap: 3px 7px;
-  border-radius: 6px;
+  padding: 5px 5px 6px;
+  border-radius: 7px;
   transition: background-color 130ms ease;
 }
 
 .territorio-analise__painel-lateral .territorio-analise__barra:hover,
 .territorio-analise__painel-lateral .territorio-analise__barra[aria-pressed="true"] {
-  background: #EDF5FC;
+  background: #F0F6FB;
 }
 
 .territorio-analise__painel-lateral .territorio-analise__barra span {
+  min-width: 0;
+  color: #4B637B;
   font-size: 10.5px;
   line-height: 1.25;
-  color: #4B637B;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .territorio-analise__painel-lateral .territorio-analise__barra b {
+  color: #243D55;
   font-size: 11px;
-  font-weight: 780;
+  font-weight: 760;
 }
 
 .territorio-analise__painel-lateral .territorio-analise__barra i {
-  height: 4px;
-  border-radius: 999px;
+  min-width: 2px;
+  max-width: 100%;
+  height: 3px;
+  border-radius: 99px;
 }
 
 .territorio-analise__barra-descricao {
-  min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 1px;
 }
 
 .territorio-analise__barra-descricao small {
-  color: #899CAC;
-  font-size: 9px;
+  font-size: 8.5px;
+  line-height: 1.15;
+  color: #879CAF;
+}
+
+.territorio-analise__subcategorias-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 3px 9px;
+  min-width: 0;
+  max-height: 265px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #C8DCEB transparent;
+}
+
+.territorio-analise__painel-subcategorias .territorio-analise__barra {
+  padding: 4px 4px 5px;
+  align-self: start;
+  gap: 2px 5px;
   line-height: 1.2;
+}
+
+.territorio-analise__painel-subcategorias .territorio-analise__barra i {
+  height: 3px;
+}
+
+.territorio-analise__painel-subcategorias .territorio-analise__barra b {
+  font-size: 10px;
+}
+
+.territorio-analise__painel-categorias {
+  overflow-y: auto;
+  max-height: 340px;
+  scrollbar-width: thin;
+  scrollbar-color: #C8DCEB transparent;
 }
 
 .territorio-analise__topo + .territorio-analise__mapa {
@@ -618,14 +661,28 @@
   gap: 10px;
 }
 
-/* Em tablet, indicadores numa faixa e distribuições em duas colunas. */
-@media (max-width: 1050px) {
+/* Histórico com datas personalizadas pode crescer sem cortar controles. */
+.territorio-analise__topo:has(.territorio-analise__periodo) {
+  align-items: start;
+}
+
+.territorio-analise__topo:has(.territorio-analise__periodo)
+.territorio-analise__topo-esquerda,
+.territorio-analise__topo:has(.territorio-analise__periodo)
+.territorio-analise__painel-lateral {
+  align-self: start;
+}
+
+/* Tablet: filtros na primeira linha, duas distribuições logo abaixo. */
+@media (max-width: 1160px) {
   .territorio-analise__topo {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
   }
 
   .territorio-analise__topo-esquerda {
     grid-column: 1 / -1;
+    align-self: start;
   }
 
   .territorio-analise__topo-direita {
@@ -633,12 +690,12 @@
   }
 
   .territorio-analise__painel-lateral {
-    max-height: 210px;
+    align-self: start;
   }
 }
 
-/* Em celular, os cards usam a altura natural do conteúdo. */
-@media (max-width: 660px) {
+/* Celular: uma coluna e nomes completos. */
+@media (max-width: 680px) {
   .territorio-analise__topo {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -652,8 +709,12 @@
     margin-left: 0;
   }
 
+  .territorio-analise__subcategorias-grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-height: 260px;
+  }
+
   .territorio-analise__painel-lateral {
-    max-height: 205px;
     padding: 11px 12px;
   }
 

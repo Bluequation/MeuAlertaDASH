@@ -3300,6 +3300,15 @@ body,
       #D84443 100%);
 }
 
+.atlas-toolbar__referencia-modelo {
+  display: block;
+  margin-top: 7px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #8093A5;
+  line-height: 1.4;
+}
+
 .atlas-toolbar__marcas {
   display: flex;
   justify-content: space-between;

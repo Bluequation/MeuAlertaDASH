@@ -3556,3 +3556,246 @@ body,
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Histórico navegável — calendários e comparação */
+.historico-navegacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.historico-navegacao__rotulo {
+  font-size: 11px;
+  font-weight: 750;
+  color: #192942;
+  flex: 0 0 auto;
+  margin-right: 3px;
+}
+
+.historico-navegacao__seta {
+  width: 33px;
+  height: 33px;
+  border: 1px solid #DFE8F2;
+  border-radius: 9px;
+  background: #FFFFFF;
+  color: #385875;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.historico-navegacao__seta:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.historico-navegacao > input,
+.historico-comparacao-seletor input {
+  flex: 1 1 150px;
+  min-width: 125px;
+  min-height: 34px;
+  box-sizing: border-box;
+  border: 1px solid #DCE8F3;
+  border-radius: 9px;
+  background: #FFFFFF;
+  color: #192942;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  color-scheme: light;
+}
+
+.historico-navegacao__atual,
+.historico-comparacao-seletor__linha > button {
+  border: none;
+  border-radius: 8px;
+  background: #E9F3FA;
+  color: #176F9D;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 34px;
+}
+
+.historico-comparar {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #60758B;
+  padding: 6px 4px;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.historico-comparar--ativo {
+  color: #168FC4;
+}
+
+.historico-comparacao-seletor {
+  margin-top: 6px;
+  padding: 10px 0 2px 11px;
+  border-left: 2px dashed #95B2C8;
+}
+
+.historico-comparacao-seletor > label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 11px;
+  font-weight: 750;
+  color: #45627E;
+}
+
+.historico-comparacao-seletor__linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.historico-comparacao-seletor .historico-periodo-descricao {
+  margin-top: 7px;
+}
+
+.historico-navegacao button:focus-visible,
+.historico-navegacao input:focus-visible,
+.historico-comparar:focus-visible,
+.historico-comparacao-seletor input:focus-visible,
+.historico-comparacao-seletor button:focus-visible {
+  outline: 2px solid #168FC4;
+  outline-offset: 2px;
+}
+
+.historico-legenda-comparacao {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #587085;
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 11px 0 12px 3px;
+}
+
+.historico-legenda-comparacao > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.historico-legenda-comparacao i {
+  display: block;
+  flex: 0 0 25px;
+  border-top: 2.5px solid #192942;
+}
+
+.historico-legenda-comparacao__b {
+  border-top-style: dashed !important;
+  border-top-color: #72879F !important;
+}
+
+.historico-carregando-comparacao {
+  color: #54758D;
+  font-size: 11px;
+  margin: 6px 2px;
+}
+
+/* Dados e exportação abaixo dos gráficos, sem um card adicional. */
+.historico-resumo.historico-resumo--rodape {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 11px 0 5px;
+  margin: 13px 0 4px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid #DFE8F2;
+  border-radius: 0;
+}
+
+.historico-resumo--rodape__informacoes {
+  flex: 1 1 230px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.historico-resumo--rodape .historico-resumo-total {
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.historico-resumo--rodape .historico-resumo-total > svg {
+  width: 13px;
+  height: 13px;
+  color: #5D7C92;
+}
+
+.historico-resumo--rodape .historico-resumo-total strong {
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.historico-resumo--rodape .historico-resumo-periodo {
+  font-size: 10px;
+  color: #718397;
+}
+
+.historico-resumo--rodape .historico-exportacao {
+  align-self: center;
+  margin: 0 0 0 auto;
+}
+
+.historico-resumo--rodape .historico-exportacao > summary {
+  padding: 7px 10px;
+  border-radius: 8px;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.historico-resumo--rodape .historico-exportacao > summary svg {
+  width: 13px;
+  height: 13px;
+}
+
+.historico-resumo--rodape .historico-exportacao-opcoes {
+  margin-top: 5px;
+  padding: 4px;
+}
+
+.historico-resumo--rodape .historico-exportacao-opcoes button {
+  padding: 8px 9px;
+  gap: 7px;
+  font-size: 11px;
+}
+
+@media (max-width: 600px) {
+  .historico-navegacao__rotulo {
+    width: 100%;
+  }
+
+  .historico-navegacao > input {
+    flex-basis: 140px;
+  }
+
+  .historico-resumo.historico-resumo--rodape {
+    gap: 8px;
+  }
+}
+

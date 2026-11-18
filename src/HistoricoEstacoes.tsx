@@ -4,6 +4,7 @@ import {
     collection,
     getDocs,
     limit,
+    onSnapshot,
     orderBy,
     query,
     startAfter,
@@ -32,7 +33,8 @@ import {
     FiRefreshCw,
     FiChevronLeft,
     FiChevronRight,
-    FiGitMerge
+    FiGitMerge,
+    FiRadio
 } from 'react-icons/fi';
 import { db } from './firebase';
 import { abrirRelatorioHistorico } from './RelatorioHistorico';
@@ -46,6 +48,7 @@ type Leitura = {
 };
 
 type Periodo = 'hora' | 'dia' | 'semana' | 'mes';
+type ModoHistorico = 'ao-vivo' | 'historico';
 
 type PontoConsolidado = {
     recebidoEm: number;
@@ -331,6 +334,8 @@ export default function HistoricoEstacoes({
 }: Props) {
     const [idEscolhido, setIdEscolhido] =
         useState<string | null>(null);
+    const [modo, setModo] = useState<ModoHistorico>('ao-vivo');
+    const aoVivo = modo === 'ao-vivo';
     const [periodo, setPeriodo] = useState<Periodo>('hora');
     const [instanteConsulta, setInstanteConsulta] = useState(Date.now);
     const [seguindoAgora, setSeguindoAgora] = useState(true);
@@ -388,7 +393,63 @@ export default function HistoricoEstacoes({
         setInstanteConsulta(proximo);
     };
 
+    // Modo Ao vivo: restaura a série original, com as últimas 72
+    // medições individuais e atualização automática pelo Firestore.
     useEffect(() => {
+        if (!aoVivo) return;
+        setLeituras([]);
+        setErro(null);
+        setParcial(false);
+        setCarregando(true);
+        if (!idConsulta) {
+            setCarregando(false);
+            return;
+        }
+
+        const consulta = query(
+            collection(db, 'estacoesMeteorologicas', idConsulta, 'leituras'),
+            orderBy('recebidoEm', 'desc'),
+            limit(72)
+        );
+        return onSnapshot(consulta, snapshot => {
+            const agora = Date.now();
+            const recentes: Leitura[] = [];
+            snapshot.forEach(documento => {
+                const dados = documento.data();
+                const instante = typeof dados.recebidoEm?.toMillis === 'function'
+                    ? dados.recebidoEm.toMillis()
+                    : dados.recebidoEm;
+                if (
+                    typeof dados.temperatura !== 'number' ||
+                    !Number.isFinite(dados.temperatura) ||
+                    dados.temperatura < -50 || dados.temperatura > 70 ||
+                    typeof dados.umidade !== 'number' ||
+                    !Number.isFinite(dados.umidade) ||
+                    dados.umidade < 0 || dados.umidade > 100 ||
+                    typeof instante !== 'number' ||
+                    !Number.isFinite(instante) ||
+                    instante <= 0 || instante > agora + 300000
+                ) return;
+                recentes.push({
+                    id: documento.id,
+                    temperatura: dados.temperatura,
+                    umidade: dados.umidade,
+                    recebidoEm: instante
+                });
+            });
+            recentes.sort((a, b) => a.recebidoEm - b.recebidoEm);
+            setLeituras(recentes);
+            setErro(null);
+            setCarregando(false);
+        }, falha => {
+            console.error('Erro ao acompanhar estação ao vivo:', falha);
+            setErro('Não foi possível acompanhar as leituras ao vivo.');
+            setCarregando(false);
+        });
+    }, [aoVivo, idConsulta]);
+
+    useEffect(() => {
+        if (aoVivo) return;
         let ativo = true;
         const continuar = () => ativo;
         const cacheLocal = cache.current;
@@ -465,24 +526,30 @@ export default function HistoricoEstacoes({
         return () => { ativo = false; };
     }, [
         idConsulta, inicioPeriodo, instanteConsulta,
-        comparar, inicioComparacao, fimComparacao, revisao
+        comparar, inicioComparacao, fimComparacao, revisao, aoVivo
     ]);
 
     const pontos = useMemo(
-        () => consolidarLeituras(
-            leituras, periodo, inicioPeriodo, instanteConsulta
-        ),
-        [leituras, periodo, inicioPeriodo, instanteConsulta]
+        () => aoVivo
+            ? leituras.map(leitura => ({
+                ...leitura,
+                momento: formatarPonto(leitura.recebidoEm, 'hora'),
+                quantidade: 1
+            }))
+            : consolidarLeituras(
+                leituras, periodo, inicioPeriodo, instanteConsulta
+            ),
+        [aoVivo, leituras, periodo, inicioPeriodo, instanteConsulta]
     );
 
     const pontosComparacao = useMemo(
-        () => comparar
+        () => !aoVivo && comparar
             ? consolidarLeituras(
                 leiturasComparacao, periodo, inicioComparacao, fimComparacao
             )
             : [],
         [
-            comparar, leiturasComparacao, periodo,
+            aoVivo, comparar, leiturasComparacao, periodo,
             inicioComparacao, fimComparacao
         ]
     );
@@ -505,7 +572,7 @@ export default function HistoricoEstacoes({
             const segundo = pontosComparacao[indice];
             return {
                 recebidoEm: principal?.recebidoEm ?? segundo?.recebidoEm ?? 0,
-                momento: comparar && periodo === 'mes'
+                momento: !aoVivo && comparar && periodo === 'mes'
                     ? `Dia ${indice + 1}`
                     : principal?.momento ?? `Intervalo ${indice + 1}`,
                 temperatura: principal?.temperatura ?? null,
@@ -516,7 +583,7 @@ export default function HistoricoEstacoes({
                 momentoComparacao: segundo?.momento
             };
         }),
-        [pontos, pontosComparacao]
+        [pontos, pontosComparacao, comparar, periodo, aoVivo]
     );
 
 

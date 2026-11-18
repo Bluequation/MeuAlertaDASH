@@ -751,7 +751,11 @@ export default function HistoricoEstacoes({
             ? [
                 'Início do intervalo (Fortaleza)',
                 'Temperatura média (°C)',
+                'Temperatura mínima (°C)',
+                'Temperatura máxima (°C)',
                 'Umidade média (%)',
+                'Umidade mínima (%)',
+                'Umidade máxima (%)',
                 'Quantidade de medições'
             ]
             : [
@@ -764,7 +768,11 @@ export default function HistoricoEstacoes({
             ? dados.pontos.map(ponto => [
                 formatarData(ponto.recebidoEm, true),
                 ponto.temperatura!.toFixed(2).replace('.', ','),
+                ponto.temperaturaMinima!.toFixed(2).replace('.', ','),
+                ponto.temperaturaMaxima!.toFixed(2).replace('.', ','),
                 ponto.umidade!.toFixed(2).replace('.', ','),
+                ponto.umidadeMinima!.toFixed(2).replace('.', ','),
+                ponto.umidadeMaxima!.toFixed(2).replace('.', ','),
                 ponto.quantidade
             ].join(';'))
             : dados.leituras.map(leitura => [
@@ -784,6 +792,30 @@ export default function HistoricoEstacoes({
         const link = document.createElement('a');
         link.href = url;
         link.download = `cuidai-historico-${periodo}-${serie}-${consolidado ? 'medias' : 'originais'}-${estacao.id.replace(/[^a-zA-Z0-9_-]/g, '-')}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+
+    const baixarOpenMeteoCSV = () => {
+        if (carregandoOpenMeteo || erroOpenMeteo ||
+            amostrasOpenMeteo.length === 0 || !estacao) return;
+        const conteudo = '\uFEFF' + [
+            'Fonte;Data e hora (Fortaleza);Temperatura estimada (°C);Umidade estimada (%)',
+            ...amostrasOpenMeteo.map(amostra => [
+                'Open-Meteo (modelo)',
+                formatarDataCompleta(amostra.recebidoEm),
+                amostra.temperatura.toFixed(2).replace('.', ','),
+                amostra.umidade.toFixed(2).replace('.', ',')
+            ].join(';'))
+        ].join('\r\n');
+        const url = URL.createObjectURL(new Blob(
+            [conteudo], { type: 'text/csv;charset=utf-8;' }
+        ));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `cuidai-open-meteo-${periodo}-${estacao.id.replace(/[^a-zA-Z0-9_-]/g, '-')}.csv`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -1404,6 +1436,14 @@ export default function HistoricoEstacoes({
                                             {aoVivo ? 'Medições (CSV)' : 'Medições A (CSV)'}
                                         </button>
                                     </>
+                                )}
+                                {!aoVivo && mostrarOpenMeteo &&
+                                    !carregandoOpenMeteo && !erroOpenMeteo &&
+                                    amostrasOpenMeteo.length > 0 && (
+                                    <button type="button" onClick={baixarOpenMeteoCSV}>
+                                        <FiDownload aria-hidden="true" />
+                                        Estimativas Open-Meteo (CSV)
+                                    </button>
                                 )}
                                 {!aoVivo && comparar && !carregandoComparacao &&
                                     !erroComparacao && leiturasComparacao.length > 0 && (

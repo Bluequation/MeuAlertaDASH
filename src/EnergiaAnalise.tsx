@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiCheckCircle, FiCloudRain, FiClock, FiWind, FiZap } from 'react-icons/fi';
 import { consultarOpenMeteoComCache } from './openMeteoCache';
+import EnergiaProximidade from './EnergiaProximidade';
 import {
   duracaoObservadaEnergiaMs,
   statusDoAlerta,
@@ -185,6 +186,8 @@ export default function EnergiaAnalise({
         não é a duração oficial da interrupção. {encerradosSemHorario > 0 &&
           `${encerradosSemHorario} relato(s) resolvido(s) sem horário de retorno não entraram na média.`}
       </p>
+
+      <EnergiaProximidade registros={registrados} agora={agora} />
 
       {registrados.length ? (
         <div className="energia-analise__registros">

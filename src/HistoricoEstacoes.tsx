@@ -1157,12 +1157,20 @@ export default function HistoricoEstacoes({
                                                 vertical={false}
                                             />
                                             <XAxis
-                                                dataKey="momento"
+                                                dataKey={aoVivo ? 'recebidoEm' : 'momento'}
+                                                type={aoVivo ? 'number' : 'category'}
+                                                scale={aoVivo ? 'time' : 'auto'}
+                                                domain={aoVivo ? ['dataMin', 'dataMax'] : undefined}
+                                                tickFormatter={aoVivo
+                                                    ? (valor: number) => formatarPonto(valor, 'hora')
+                                                    : undefined}
                                                 minTickGap={34}
                                                 tick={{ fontSize: 10 }}
                                             />
                                             <YAxis
-                                                domain={['auto', 'auto']}
+                                                domain={!aoVivo && mostrarOpenMeteo
+                                                    ? dominioCompartilhado(grafico.campo)
+                                                    : ['auto', 'auto']}
                                                 tick={{ fontSize: 11 }}
                                             />
                                             <Tooltip
@@ -1182,6 +1190,34 @@ export default function HistoricoEstacoes({
                                                 animationDuration={650}
                                                 activeDot={{ r: 5 }}
                                             />
+                                            {!aoVivo && mostrarExtremos && (
+                                                <>
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey={`${grafico.campo}Minima`}
+                                                        name="Mínima no intervalo"
+                                                        stroke={grafico.cor}
+                                                        strokeOpacity={0.5}
+                                                        strokeWidth={1.2}
+                                                        strokeDasharray="3 4"
+                                                        dot={false}
+                                                        connectNulls={false}
+                                                        isAnimationActive={false}
+                                                    />
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey={`${grafico.campo}Maxima`}
+                                                        name="Máxima no intervalo"
+                                                        stroke={grafico.cor}
+                                                        strokeOpacity={0.5}
+                                                        strokeWidth={1.2}
+                                                        strokeDasharray="3 4"
+                                                        dot={false}
+                                                        connectNulls={false}
+                                                        isAnimationActive={false}
+                                                    />
+                                                </>
+                                            )}
                                             {!aoVivo && comparar && !carregandoComparacao &&
                                                 !erroComparacao && (
                                                 <Line
@@ -1202,6 +1238,73 @@ export default function HistoricoEstacoes({
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </div>
+
+                                {!aoVivo && mostrarOpenMeteo && (
+                                    <div className="historico-open-comparacao">
+                                        <div className="historico-open-comparacao__cabecalho">
+                                            <FiCloud aria-hidden="true" />
+                                            <strong>Open-Meteo</strong>
+                                            <span>Estimativa de modelo • horários</span>
+                                        </div>
+                                        {carregandoOpenMeteo ? (
+                                            <p role="status">Consultando Open-Meteo...</p>
+                                        ) : erroOpenMeteo ? (
+                                            <p role="alert">{erroOpenMeteo}</p>
+                                        ) : pontosOpenMeteo.length === 0 ? (
+                                            <p>Sem estimativas disponíveis neste intervalo.</p>
+                                        ) : (
+                                            <div className="historico-open-comparacao__grafico">
+                                                <ResponsiveContainer
+                                                    width="100%"
+                                                    height="100%"
+                                                    initialDimension={{ width: 300, height: 140 }}
+                                                >
+                                                    <LineChart
+                                                        data={pontosOpenMeteo}
+                                                        margin={{ top: 8, right: 12, left: -20, bottom: 8 }}
+                                                    >
+                                                        <CartesianGrid
+                                                            stroke="#E6EDF5"
+                                                            strokeDasharray="3 3"
+                                                            vertical={false}
+                                                        />
+                                                        <XAxis
+                                                            type="number"
+                                                            scale="time"
+                                                            dataKey="recebidoEm"
+                                                            domain={[inicioPeriodo, instanteConsulta]}
+                                                            tickFormatter={(valor: number) =>
+                                                                formatarPonto(valor, periodo)}
+                                                            minTickGap={34}
+                                                            tick={{ fontSize: 10 }}
+                                                        />
+                                                        <YAxis
+                                                            domain={dominioCompartilhado(grafico.campo)}
+                                                            tick={{ fontSize: 10 }}
+                                                        />
+                                                        <Tooltip
+                                                            labelFormatter={valor =>
+                                                                formatarData(Number(valor), true)}
+                                                            formatter={valor =>
+                                                                `${Number(valor).toFixed(1).replace('.', ',')} ${grafico.unidade}`}
+                                                        />
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey={grafico.campo}
+                                                            name="Estimativa Open-Meteo"
+                                                            stroke="#718AA4"
+                                                            strokeWidth={1.9}
+                                                            dot={pontosOpenMeteo.length <= 3}
+                                                            activeDot={{ r: 4 }}
+                                                            isAnimationActive={false}
+                                                            connectNulls={false}
+                                                        />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </article>
                         ))
                     ) : (
@@ -1304,6 +1407,9 @@ export default function HistoricoEstacoes({
                             : ''}
                         {!aoVivo
                             ? ' Os arquivos exportados diferenciam médias e medições originais.'
+                            : ''}
+                        {!aoVivo && mostrarOpenMeteo
+                            ? ' Open-Meteo: estimativas horárias de modelo para a coordenada da estação, não medições locais.'
                             : ''}
                     </p>
                 </>

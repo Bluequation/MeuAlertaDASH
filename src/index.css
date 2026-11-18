@@ -2726,16 +2726,6 @@ body,
   border: none;
 }
 
-/* Halo visual, sem indicar raio geográfico */
-.atlas-relato-quentura__halo {
-  position: absolute;
-  inset: 1px;
-  border-radius: 50%;
-
-  background: rgba(219, 91, 47, 0.18);
-  border: 1px solid rgba(196, 65, 31, 0.4);
-}
-
 /* Símbolo central — acabamento fosco */
 .atlas-relato-quentura__centro {
   position: absolute;
@@ -2746,8 +2736,8 @@ body,
   align-items: center;
   justify-content: center;
 
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   box-sizing: border-box;
 
   border-radius: 50%;
@@ -2755,7 +2745,7 @@ body,
   border: 2px solid #FFFFFF;
   color: #FFFFFF;
 
-  box-shadow: 0 2px 6px rgba(80, 35, 20, 0.22);
+  box-shadow: 0 1px 3px rgba(80, 35, 20, 0.18);
 }
 
 /* ==========================================

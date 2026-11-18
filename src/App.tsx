@@ -5309,7 +5309,7 @@ function App() {
                   marginTop: '6px'
                 }}
               >
-                Tecnologia, território e participação comunitária.
+                Tecnologia, ciência cidadã e cuidado com o território.
               </p>
             </div>
 
@@ -5414,12 +5414,14 @@ function App() {
                     }}
                   >
                     O <strong>CUIDAÍ</strong> é um aplicativo móvel colaborativo
-                    criado para apoiar a comunicação comunitária durante o período
-                    chuvoso. Por meio dele, os usuários podem registrar ocorrências
-                    georreferenciadas relacionadas a chuvas, passagens, energia e
-                    condições das estradas, consultar alertas próximos e contribuir
-                    com informações sobre a continuidade ou resolução das situações
-                    registradas.
+                    desenvolvido por estudantes da EEMTI Maria Vieira de Pinho
+                    para apoiar a comunicação comunitária sobre situações que
+                    afetam a vida no Sertão. Permite registrar ocorrências
+                    georreferenciadas de chuvas, passagens molhadas, estradas,
+                    energia e Quentura, incluindo condições de calor percebido
+                    e presença de sombra. A comunidade pode consultar alertas
+                    e contribuir com informações sobre sua continuidade ou
+                    resolução.
                   </p>
                 </div>
 
@@ -5448,14 +5450,49 @@ function App() {
                     }}
                   >
                     O <strong>CUIDAÍ Painel</strong> é o ambiente web de
-                    acompanhamento e análise dos dados produzidos pelo aplicativo.
-                    Conectado à mesma base de dados, organiza os registros em
-                    indicadores, gráficos, mapas, concentração espacial de
-                    ocorrências e informações recentes, facilitando a visualização
-                    do que está acontecendo no território.
+                    acompanhamento e análise territorial dos relatos do aplicativo.
+                    Conectado à mesma base de dados, reúne mapas de calor,
+                    distribuição por categorias e condições, histórico,
+                    indicadores e análises espaciais. O Atlas Meteorológico
+                    combina estimativas da Open-Meteo com a visualização de
+                    estações experimentais CUIDAÍ, quando há leituras disponíveis.
+                    Os dados são apresentados com indicação de sua origem.
                   </p>
                 </div>
 
+
+                {/* FONTES E LIMITES DOS DADOS */}
+                <div>
+                  <h2
+                    style={{
+                      color: '#007AFF',
+                      fontSize: '17px',
+                      margin: '0 0 8px'
+                    }}
+                  >
+                    Fontes de informação e limites
+                  </h2>
+                  <p
+                    style={{
+                      color: '#1C1C1E',
+                      lineHeight: '1.7',
+                      fontSize: '13px',
+                      margin: 0,
+                      textAlign: 'justify'
+                    }}
+                  >
+                    Os registros do aplicativo são relatos comunitários,
+                    não medições oficiais. A Open-Meteo fornece estimativas
+                    de temperatura, umidade, vento e chuva; a malha térmica
+                    representa uma interpolação de amostras meteorológicas,
+                    não sensores distribuídos por todo o território.
+                    As leituras de estações próprias, quando disponíveis,
+                    são indicadas separadamente. O acompanhamento de Energia
+                    permite observar relatos próximos no espaço e no tempo,
+                    sem demonstrar que as condições meteorológicas causaram
+                    interrupções elétricas.
+                  </p>
+                </div>
 
                 {/* COMO FUNCIONA */}
                 <div>
@@ -5673,8 +5710,8 @@ function App() {
                       lineHeight: '1.5'
                     }}
                   >
-                    CUIDAÍ: ecossistema digital colaborativo de alertas e
-                    informações no período chuvoso
+                    CUIDAÍ: ecossistema digital colaborativo de alertas,
+                    Quentura e informações territoriais
                   </p>
 
 

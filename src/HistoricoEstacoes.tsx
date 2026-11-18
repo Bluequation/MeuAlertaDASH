@@ -838,7 +838,10 @@ export default function HistoricoEstacoes({
                 ])
                 : []),
             ...(mostrarOpenMeteo && !erroOpenMeteo
-                ? pontosOpenMeteo.map(p => p[campo])
+                ? pontosOpenMeteo
+                    .filter(p => p.recebidoEm >= inicioVisualizacao &&
+                        p.recebidoEm <= fimVisualizacao)
+                    .map(p => p[campo])
                 : [])
         ].filter((valor): valor is number =>
             typeof valor === 'number' && Number.isFinite(valor)
@@ -1359,7 +1362,7 @@ export default function HistoricoEstacoes({
                                 {mostrarOpenMeteo && (
                                     <div className="historico-legenda-fontes" aria-label="Fontes do gráfico">
                                         <span><i style={{ borderColor: grafico.cor }} /> Estação CUIDAÍ</span>
-                                        <span><i className="historico-legenda-fontes__meteo" /> Open-Meteo • estimativa horária</span>
+                                        <span><i className="historico-legenda-fontes__meteo" /> Open-Meteo • modelo horário</span>
                                     </div>
                                 )}
                                 {resumoCampo(grafico.campo) && (
@@ -1418,7 +1421,9 @@ export default function HistoricoEstacoes({
                                                 name={!aoVivo && comparar ? 'Período A' : grafico.titulo}
                                                 stroke={grafico.cor}
                                                 strokeWidth={2.5}
-                                                dot={pontosDisponiveis.length <= 12}
+                                                dot={aoVivo
+                                                    ? { r: 1.35, strokeWidth: 0 }
+                                                    : pontosDisponiveis.length <= 12}
                                                 connectNulls={false}
                                                 isAnimationActive={true}
                                                 animationDuration={650}
@@ -1473,7 +1478,7 @@ export default function HistoricoEstacoes({
                                                 <Line
                                                     type="monotone"
                                                     dataKey={`${grafico.campo}OpenMeteo`}
-                                                    name="Open-Meteo (estimativa horária)"
+                                                    name="Open-Meteo (modelo horário)"
                                                     stroke="#64748B"
                                                     strokeWidth={2}
                                                     strokeDasharray="5 4"
@@ -1599,7 +1604,7 @@ export default function HistoricoEstacoes({
                             ? ' Os arquivos exportados diferenciam médias e medições originais.'
                             : ''}
                         {mostrarOpenMeteo
-                            ? ' Open-Meteo: estimativas horárias de modelo para a coordenada da estação, não medições locais.'
+                            ? ' Open-Meteo: estimativas de modelo para a coordenada da estação, interpoladas visualmente entre horas para comparação no mesmo gráfico. Não são medições locais.'
                             : ''}
                     </p>
                 </>

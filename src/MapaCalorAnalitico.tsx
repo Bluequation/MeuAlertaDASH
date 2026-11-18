@@ -24,7 +24,6 @@ type Props = {
 
 const DIA = 24 * 60 * 60 * 1000;
 const SOMBRAS: Sombra[] = ['Sim', 'Não', 'Parcialmente', 'Não informado'];
-const PADRAO_CATEGORIAS = ['Chuvas', 'Passagem', 'Energia', 'Estrada', 'Quentura'];
 const gradienteTodas = { 0.10: '#B8E2FF', 0.325: '#329EED', 0.55: '#46D898', 0.775: '#F9E14D', 1.00: '#FF6155' };
 const gradientes: Record<string, Record<number, string>> = {
   Todas: gradienteTodas,
@@ -127,14 +126,6 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
       a.criadoEm >= intervalo.inicio &&
       a.criadoEm <= intervalo.fim
   ), [alertas, modo, agora, intervalo]);
-
-  const categorias = useMemo(() => {
-    const valores = new Set(alertas.map(a => a.categoria));
-    return [
-      ...PADRAO_CATEGORIAS.filter(c => valores.has(c)),
-      ...[...valores].filter(c => !PADRAO_CATEGORIAS.includes(c)).sort()
-    ];
-  }, [alertas]);
 
   const categoriasPeriodo = useMemo(() => agruparContagem(
     base.map(a => a.categoria)
@@ -290,47 +281,26 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
             </div>
           )}
 
-          <div className="territorio-analise__filtros">
-            <div className="territorio-analise__filtro-categorias" role="group" aria-label="Categoria">
-              <button type="button" className={categoria === 'Todas' ? 'ativo' : ''}
-                aria-pressed={categoria === 'Todas'}
-                onClick={() => { setCategoria('Todas'); setSubcategoria('Todas'); setSombra('Todas'); }}>
-                Todas
-              </button>
-              {categorias.map(nome => (
-                <button type="button" key={nome} aria-pressed={categoria === nome}
-                  className={categoria === nome ? 'ativo' : ''}
-                  style={categoria === nome ? { borderColor: CORES_OCORRENCIAS[nome] ?? '#718399' } : undefined}
-                  onClick={() => { setCategoria(nome); setSubcategoria('Todas'); setSombra('Todas'); }}>
-                  <i style={{ backgroundColor: CORES_OCORRENCIAS[nome] ?? '#718399' }} />
-                  {nome}
-                </button>
-              ))}
-            </div>
-
-            {categoria !== 'Todas' && (
-              <div className="territorio-analise__selecao">
-                <label>Subcategoria
-                  <select value={subcategoria} onChange={e => setSubcategoria(e.target.value)}>
-                    <option value="Todas">Todas as subcategorias</option>
-                    {subcategorias.map(s => <option key={s.nome} value={s.nome}>
-                      {s.nome} ({s.quantidade})
-                    </option>)}
-                  </select>
-                </label>
-                {categoria === 'Quentura' && (
-                  <label>Sombra
-                    <select value={sombra} onChange={e => setSombra(e.target.value as Sombra | 'Todas')}>
-                      <option value="Todas">Todas as respostas</option>
-                      {SOMBRAS.map(nome => <option key={nome} value={nome}>
-                        {nome}
-                      </option>)}
-                    </select>
-                  </label>
-                )}
+          {(categoria !== 'Todas' || subcategoria !== 'Todas' || sombra !== 'Todas') && (
+            <div className="territorio-analise__recorte" aria-live="polite">
+              <div className="territorio-analise__recorte-resumo">
+                <span>Exibindo</span>
+                <strong>{[
+                  categoria,
+                  ...(subcategoria !== 'Todas' ? [subcategoria] : []),
+                  ...(sombra !== 'Todas' ? [`Sombra: ${sombra}`] : [])
+                ].join(' · ')}</strong>
               </div>
-            )}
-          </div>
+              <button type="button" title="Remover filtros de categoria, subcategoria e sombra"
+                onClick={() => {
+                  setCategoria('Todas');
+                  setSubcategoria('Todas');
+                  setSombra('Todas');
+                }}>
+                Limpar
+              </button>
+            </div>
+          )}
 
           <div className="territorio-analise__metricas">
             <div><strong>{filtrados.length.toLocaleString('pt-BR')}</strong>
@@ -357,8 +327,9 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
               : categoriasPeriodo.map(d => (
                 <button className="territorio-analise__barra" type="button" key={d.nome}
                   aria-pressed={categoria === d.nome}
+                  title={categoria === d.nome ? 'Mostrar todas as categorias' : `Filtrar ${d.nome}`}
                   onClick={() => {
-                    setCategoria(d.nome);
+                    setCategoria(atual => atual === d.nome ? 'Todas' : d.nome);
                     setSubcategoria('Todas');
                     setSombra('Todas');
                   }}>
@@ -384,6 +355,7 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
                   className="territorio-analise__barra"
                   type="button"
                   key={JSON.stringify([item.categoria, item.nome])}
+                  title={`Filtrar ${item.categoria}: ${item.nome}`}
                   onClick={() => {
                     setCategoria(item.categoria);
                     setSubcategoria(item.nome);
@@ -408,6 +380,7 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
                 {subcategorias.map(d => (
                   <button className="territorio-analise__barra" type="button" key={d.nome}
                     onClick={() => setSubcategoria(atual => atual === d.nome ? 'Todas' : d.nome)}
+                    title={subcategoria === d.nome ? 'Mostrar todas as subcategorias' : `Filtrar ${d.nome}`}
                     aria-pressed={subcategoria === d.nome}>
                     <span>{d.nome}</span>
                     <b>{d.quantidade}</b>

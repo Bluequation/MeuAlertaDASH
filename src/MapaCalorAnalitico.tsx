@@ -183,6 +183,19 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
     categoria !== 'Quentura' || sombra === 'Todas' || sombraDoAlerta(a) === sombra
   ), [porSubcategoria, categoria, sombra]);
 
+  // Para Energia, exporta também retornos confirmados no período analisado.
+  // Na visão de ativos a comparação usa relatos criados nos últimos 30 dias.
+  const registrosCSV = useMemo(() => categoria !== 'Energia' ? filtrados :
+    alertas.filter(alerta => {
+      if (alerta.categoria !== 'Energia' || !alerta.criadoEm) return false;
+      if (subcategoria !== 'Todas' && !subcategoriasDoAlerta(alerta).includes(subcategoria))
+        return false;
+      return modo === 'historico'
+        ? intervalo.valido && alerta.criadoEm >= intervalo.inicio &&
+          alerta.criadoEm <= intervalo.fim
+        : alerta.criadoEm >= agora - 30 * DIA && alerta.criadoEm <= agora;
+    }), [categoria, filtrados, alertas, subcategoria, modo, intervalo, agora]);
+
   const coresLegenda = Object.entries(gradientes[categoria] ?? gradienteTodas)
     .sort(([a], [b]) => Number(a) - Number(b))
     .map(([, cor]) => cor);
@@ -435,8 +448,8 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
             {sombra !== 'Todas' ? ` · Sombra: ${sombra}` : ''}
           </span>
         )}
-        <button type="button" onClick={() => exportarCSV(filtrados, agora)}
-          disabled={filtrados.length === 0} title="Exportar registros filtrados sem dados pessoais">
+        <button type="button" onClick={() => exportarCSV(registrosCSV, agora)}
+          disabled={registrosCSV.length === 0} title="Exportar registros do recorte, incluindo restabelecimentos de Energia, sem dados pessoais">
           Exportar CSV
         </button>
       </div>

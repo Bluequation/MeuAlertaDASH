@@ -2498,6 +2498,9 @@ function App() {
 
   const alertasAtivosVisao = alertasVisaoGeral.filter(a => alertaAtivo(a, agoraMeteo));
   const alertasResolvidosVisao = alertasVisaoGeral.filter(a => (a.votosResolvido || 0) >= 3);
+  const alertasExpiradosVisao = alertasVisaoGeral.filter(a =>
+    statusDoAlerta(a, agoraMeteo) === 'expirado'
+  );
 
   const alertasPorCategoria = alertasVisaoGeral.reduce((acc: Record<string, number>, alerta) => {
     acc[alerta.categoria] = (acc[alerta.categoria] || 0) + 1;
@@ -3164,7 +3167,7 @@ function App() {
                 </span>
 
                 <span style={{ color: '#8E8E93', fontSize: '12px', marginTop: '3px' }}>
-                  {alertasAtivosVisao.length} ativos • {alertasResolvidosVisao.length} resolvidos
+                  {alertasAtivosVisao.length} ativos • {alertasResolvidosVisao.length} resolvidos • {alertasExpiradosVisao.length} expirados
                 </span>
               </div>
 

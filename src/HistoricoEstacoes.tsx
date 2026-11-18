@@ -15,9 +15,10 @@ import {
     type QueryConstraint
 } from 'firebase/firestore';
 import {
+    Area,
     CartesianGrid,
+    ComposedChart,
     Line,
-    LineChart,
     ResponsiveContainer,
     Tooltip,
     XAxis,
@@ -613,27 +614,25 @@ export default function HistoricoEstacoes({
             );
         }
 
-        // Não reamostra as medições ao vivo e não une falhas de transmissão.
-        const serie: PontoConsolidado[] = [];
-        const ponto = (horario: number, leitura?: Leitura): PontoConsolidado => ({
-            recebidoEm: horario,
-            momento: formatarPonto(horario, 'hora'),
-            temperatura: leitura?.temperatura ?? null,
-            umidade: leitura?.umidade ?? null,
-            temperaturaMinima: leitura?.temperatura ?? null,
-            temperaturaMaxima: leitura?.temperatura ?? null,
-            umidadeMinima: leitura?.umidade ?? null,
-            umidadeMaxima: leitura?.umidade ?? null,
-            quantidade: leitura ? 1 : 0
-        });
-        leiturasAoVivo.forEach((leitura, indice) => {
-            const anterior = leiturasAoVivo[indice - 1];
-            if (anterior && leitura.recebidoEm - anterior.recebidoEm > 3 * 60_000) {
-                serie.push(ponto((anterior.recebidoEm + leitura.recebidoEm) / 2));
-            }
-            serie.push(ponto(leitura.recebidoEm, leitura));
-        });
-        return serie;
+        // Recupera o traçado original: cada leitura real ocupa uma posição
+        // cronológica, sem encaixar a série em uma janela fixa de relógio.
+        // Não fabricamos registros durante interrupções de transmissão.
+        const variasDatas = leiturasAoVivo.length > 1 &&
+            leiturasAoVivo[leiturasAoVivo.length - 1].recebidoEm -
+                leiturasAoVivo[0].recebidoEm >= 24 * HORA;
+        return leiturasAoVivo.map(leitura => ({
+            recebidoEm: leitura.recebidoEm,
+            momento: variasDatas
+                ? formatarData(leitura.recebidoEm)
+                : formatarPonto(leitura.recebidoEm, 'hora'),
+            temperatura: leitura.temperatura,
+            umidade: leitura.umidade,
+            temperaturaMinima: leitura.temperatura,
+            temperaturaMaxima: leitura.temperatura,
+            umidadeMinima: leitura.umidade,
+            umidadeMaxima: leitura.umidade,
+            quantidade: 1
+        }));
     }, [
         leituras, leiturasAoVivo, aoVivo, periodo,
         inicioVisualizacao, fimVisualizacao
@@ -1401,7 +1400,7 @@ export default function HistoricoEstacoes({
                                         height="100%"
                                         initialDimension={{ width: 300, height: 240 }}
                                     >
-                                        <LineChart
+                                        <ComposedChart
                                             data={pontosGrafico}
                                             margin={{ top: 8, right: 12, left: -20, bottom: 8 }}
                                         >
@@ -1411,12 +1410,9 @@ export default function HistoricoEstacoes({
                                                 vertical={false}
                                             />
                                             <XAxis
-                                                dataKey="recebidoEm"
-                                                type="number"
-                                                scale="time"
-                                                domain={[inicioVisualizacao, fimVisualizacao]}
-                                                tickFormatter={(valor: number) =>
-                                                    formatarPonto(valor, aoVivo ? 'hora' : periodo)}
+                                                dataKey="momento"
+                                                type="category"
+                                                interval="preserveStartEnd"
                                                 minTickGap={34}
                                                 tick={{ fontSize: 10 }}
                                             />
@@ -1427,26 +1423,39 @@ export default function HistoricoEstacoes({
                                                 tick={{ fontSize: 11 }}
                                             />
                                             <Tooltip
-                                                labelFormatter={instante =>
-                                                    formatarData(Number(instante), true)}
                                                 formatter={valor =>
                                                     `${Number(valor).toFixed(1).replace('.', ',')} ${grafico.unidade}`
                                                 }
                                             />
-                                            <Line
-                                                type="monotone"
-                                                dataKey={grafico.campo}
-                                                name={!aoVivo && comparar ? 'Período A' : grafico.titulo}
-                                                stroke={grafico.cor}
-                                                strokeWidth={2.5}
-                                                dot={aoVivo
-                                                    ? { r: 1.35, strokeWidth: 0 }
-                                                    : pontosDisponiveis.length <= 12}
-                                                connectNulls={false}
-                                                isAnimationActive={true}
-                                                animationDuration={650}
-                                                activeDot={{ r: 5 }}
-                                            />
+                                            {aoVivo ? (
+                                                <Area
+                                                    type="linear"
+                                                    dataKey={grafico.campo}
+                                                    name="Estação CUIDAÍ"
+                                                    stroke={grafico.cor}
+                                                    strokeWidth={2.8}
+                                                    fill={grafico.cor}
+                                                    fillOpacity={0.09}
+                                                    dot={pontosDisponiveis.length <= 15
+                                                        ? { r: 2.8 }
+                                                        : false}
+                                                    connectNulls={false}
+                                                    isAnimationActive={false}
+                                                    activeDot={{ r: 5 }}
+                                                />
+                                            ) : (
+                                                <Line
+                                                    type="linear"
+                                                    dataKey={grafico.campo}
+                                                    name={comparar ? 'Estação • período A' : 'Estação CUIDAÍ'}
+                                                    stroke={grafico.cor}
+                                                    strokeWidth={2.5}
+                                                    dot={pontosDisponiveis.length <= 12}
+                                                    connectNulls={false}
+                                                    isAnimationActive={false}
+                                                    activeDot={{ r: 5 }}
+                                                />
+                                            )}
                                             {!aoVivo && mostrarExtremos && (
                                                 <>
                                                     <Line
@@ -1494,19 +1503,21 @@ export default function HistoricoEstacoes({
                                             )}
                                             {mostrarOpenMeteo && !erroOpenMeteo && (
                                                 <Line
-                                                    type="monotone"
+                                                    type="linear"
                                                     dataKey={`${grafico.campo}OpenMeteo`}
                                                     name="Open-Meteo (modelo horário)"
                                                     stroke="#64748B"
                                                     strokeWidth={2}
                                                     strokeDasharray="5 4"
-                                                    dot={{ r: 2.5 }}
+                                                    dot={pontosGrafico.filter(ponto =>
+                                                        ponto[`${grafico.campo}OpenMeteo`] !== null
+                                                    ).length <= 1}
                                                     activeDot={{ r: 4 }}
                                                     connectNulls={true}
                                                     isAnimationActive={false}
                                                 />
                                             )}
-                                        </LineChart>
+                                        </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
 
@@ -1613,7 +1624,7 @@ export default function HistoricoEstacoes({
                         Fonte: Estação CUIDAÍ • Dados medidos pelos sensores,
                         não estimativas da Open-Meteo.
                         {aoVivo
-                            ? 'O gráfico se atualiza automaticamente com as medições individuais recentes.'
+                            ? 'O gráfico distribui cronologicamente as últimas 72 leituras, como na versão original. Intervalos sem registros não são preenchidos.'
                             : 'No histórico, os gráficos apresentam médias por intervalo, sem preencher horários sem dados.'}
                         {!aoVivo && comparar
                             ? ' As séries A e B usam a mesma escala de tempo relativo, em datas diferentes.'

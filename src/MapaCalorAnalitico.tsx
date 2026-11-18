@@ -6,6 +6,7 @@ import 'leaflet.heat';
 import { FiArrowLeft, FiCloudRain, FiDroplet, FiMap, FiSun, FiThermometer, FiWind, FiZap, FiAlertCircle } from 'react-icons/fi';
 import {
   alertaAtivo,
+  duracaoObservadaEnergiaMs,
   CORES_OCORRENCIAS,
   sombraDoAlerta,
   statusDoAlerta,
@@ -93,7 +94,8 @@ function exportarCSV(alertas: AlertaTerritorial[], agora: number) {
   const cabecalho = [
     'ID', 'Data de criação', 'Categoria', 'Subcategoria(s)', 'Detalhe original',
     'Sombra', 'Status atual', 'Validade (ms)', 'Confirmacoes', 'Resolucoes',
-    'Latitude', 'Longitude'
+    'Latitude', 'Longitude', 'Restabelecido em (comunidade)',
+    'Tempo desde o relato (min)', 'Origem do restabelecimento'
   ];
   const linhas = alertas.map(a => [
     a.id,
@@ -107,7 +109,13 @@ function exportarCSV(alertas: AlertaTerritorial[], agora: number) {
     a.votosConfirma ?? 0,
     a.votosResolvido ?? 0,
     a.latitude,
-    a.longitude
+    a.longitude,
+    a.restabelecidoEm
+      ? new Date(a.restabelecidoEm).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })
+      : '',
+    duracaoObservadaEnergiaMs(a) === null
+      ? '' : Math.round(duracaoObservadaEnergiaMs(a)! / 60_000),
+    a.restabelecimentoFonte ?? ''
   ].map(campo).join(';'));
   const blob = new Blob(['\uFEFF', cabecalho.map(campo).join(';'), '\r\n', linhas.join('\r\n')],
     { type: 'text/csv;charset=utf-8' });

@@ -161,6 +161,11 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
     categoria !== 'Quentura' || sombra === 'Todas' || sombraDoAlerta(a) === sombra
   ), [porSubcategoria, categoria, sombra]);
 
+  const coresLegenda = Object.entries(gradientes[categoria] ?? gradienteTodas)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([, cor]) => cor);
+  const fundoLegenda = `linear-gradient(to right, ${coresLegenda.join(', ')})`;
+
   const totalVencidos = base.filter(a => statusDoAlerta(a, agora) === 'expirado').length;
   const totalResolvidos = base.filter(a => statusDoAlerta(a, agora) === 'resolvido').length;
   const maxCategoria = Math.max(1, ...categoriasPeriodo.map(a => a.quantidade));
@@ -301,7 +306,7 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
         </MapContainer>
         <div className="territorio-analise__legenda">
           <strong>Concentração de registros</strong>
-          <span>Menor <i /> Maior</span>
+          <span>Menor <i style={{ background: fundoLegenda }} /> Maior</span>
           <small>{modo === 'atuais'
             ? 'Somente alertas com validade vigente'
             : 'Ocorrências criadas no período selecionado'}</small>

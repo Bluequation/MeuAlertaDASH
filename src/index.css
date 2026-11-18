@@ -2867,6 +2867,39 @@ body,
   color: #6B7F8C;
 }
 
+/* Mesmo marcador de estação do app CUIDAÍ: branco e azul. */
+.atlas-estacao-icone {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+}
+
+.atlas-estacao-icone__centro {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  border: 1px solid #1683D8;
+  border-radius: 50%;
+  background: #FFFFFF;
+  color: #1683D8;
+  box-shadow: 0 1px 3px rgba(15, 80, 125, 0.18);
+}
+
+.atlas-estacao-icone__centro svg {
+  display: block;
+  width: 65%;
+  height: 65%;
+  fill: currentColor;
+}
+
+.atlas-estacao-icone--selecionada .atlas-estacao-icone__centro {
+  box-shadow: 0 0 0 2px rgba(22, 131, 216, 0.18);
+}
+
 /* ==========================================
    CUIDAÍ — CONTROLES COMPACTOS DO ATLAS
    ========================================== */

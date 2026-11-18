@@ -238,6 +238,8 @@ type ResultadoConsulta = { leituras: Leitura[]; parcial: boolean };
 type PontoGrafico = PontoConsolidado & {
     temperaturaComparacao: number | null;
     umidadeComparacao: number | null;
+    temperaturaOpenMeteo: number | null;
+    umidadeOpenMeteo: number | null;
     momentoComparacao?: string;
 };
 
@@ -361,6 +363,7 @@ export default function HistoricoEstacoes({
     const aoVivo = modo === 'ao-vivo';
     const [periodo, setPeriodo] = useState<Periodo>('hora');
     const [instanteConsulta, setInstanteConsulta] = useState(Date.now);
+    const [instanteAoVivo, setInstanteAoVivo] = useState(Date.now);
     const [seguindoAgora, setSeguindoAgora] = useState(true);
     const [comparar, setComparar] = useState(false);
     const [instanteComparacao, setInstanteComparacao] =
@@ -441,6 +444,7 @@ export default function HistoricoEstacoes({
         );
         return onSnapshot(consulta, snapshot => {
             const agora = Date.now();
+            setInstanteAoVivo(agora);
             const recentes: Leitura[] = [];
             snapshot.forEach(documento => {
                 const dados = documento.data();
@@ -557,36 +561,24 @@ export default function HistoricoEstacoes({
         comparar, inicioComparacao, fimComparacao, revisao, aoVivo
     ]);
 
-    const pontos = useMemo<PontoConsolidado[]>(() => {
-        if (!aoVivo) {
-            return consolidarLeituras(
-                leituras, periodo, inicioPeriodo, instanteConsulta
-            );
-        }
+    // Janela fixa de duas horas no modo Ao vivo. Os espaços sem
+    // transmissão continuam nulos; nunca interpolamos leituras do sensor.
+    const fimVisualizacao = aoVivo ? instanteAoVivo : instanteConsulta;
+    const inicioVisualizacao = aoVivo
+        ? fimVisualizacao - 2 * HORA
+        : inicioPeriodo;
 
-        const serie: PontoConsolidado[] = [];
-        const adicionar = (instante: number, leitura?: Leitura) => {
-            serie.push({
-                recebidoEm: instante,
-                momento: formatarPonto(instante, 'hora'),
-                temperatura: leitura?.temperatura ?? null,
-                umidade: leitura?.umidade ?? null,
-                temperaturaMinima: leitura?.temperatura ?? null,
-                temperaturaMaxima: leitura?.temperatura ?? null,
-                umidadeMinima: leitura?.umidade ?? null,
-                umidadeMaxima: leitura?.umidade ?? null,
-                quantidade: leitura ? 1 : 0
-            });
-        };
-        leituras.forEach((leitura, indice) => {
-            if (indice > 0 && leitura.recebidoEm - leituras[indice - 1].recebidoEm > 3 * 60_000) {
-                // Rompe a linha quando a estação deixou de transmitir.
-                adicionar((leitura.recebidoEm + leituras[indice - 1].recebidoEm) / 2);
-            }
-            adicionar(leitura.recebidoEm, leitura);
-        });
-        return serie;
-    }, [aoVivo, leituras, periodo, inicioPeriodo, instanteConsulta]);
+    const pontos = useMemo<PontoConsolidado[]>(() =>
+        consolidarLeituras(
+            leituras,
+            aoVivo ? 'hora' : periodo,
+            inicioVisualizacao,
+            fimVisualizacao
+        ), [
+            leituras, aoVivo, periodo,
+            inicioVisualizacao, fimVisualizacao
+        ]
+    );
 
     const pontosComparacao = useMemo(
         () => !aoVivo && comparar
@@ -609,55 +601,44 @@ export default function HistoricoEstacoes({
         [pontosComparacao]
     );
 
-    // Sobreposição por posição no intervalo, sem misturar os instantes reais.
-    const pontosGrafico: PontoGrafico[] = useMemo(
-        () => Array.from({
-            length: Math.max(pontos.length, pontosComparacao.length)
-        }, (_, indice) => {
-            const principal = pontos[indice];
-            const segundo = pontosComparacao[indice];
-            return {
-                recebidoEm: principal?.recebidoEm ?? segundo?.recebidoEm ?? 0,
-                momento: !aoVivo && comparar && periodo === 'mes'
-                    ? `Dia ${indice + 1}`
-                    : principal?.momento ?? `Intervalo ${indice + 1}`,
-                temperatura: principal?.temperatura ?? null,
-                umidade: principal?.umidade ?? null,
-                temperaturaMinima: principal?.temperaturaMinima ?? null,
-                temperaturaMaxima: principal?.temperaturaMaxima ?? null,
-                umidadeMinima: principal?.umidadeMinima ?? null,
-                umidadeMaxima: principal?.umidadeMaxima ?? null,
-                quantidade: principal?.quantidade ?? 0,
-                temperaturaComparacao: segundo?.temperatura ?? null,
-                umidadeComparacao: segundo?.umidade ?? null,
-                momentoComparacao: segundo?.momento
-            };
-        }),
-        [pontos, pontosComparacao, comparar, periodo, aoVivo]
-    );
-
-
-    // Estimativa de modelo opcional; não é uma leitura da estação.
+    // A Open-Meteo é opcional em ambos os modos.
+    // No Ao vivo, atualiza o modelo a cada 15 min (não a cada minuto).
     useEffect(() => {
-        if (aoVivo || !mostrarOpenMeteo || !estacao) {
+        if (!aoVivo || !mostrarOpenMeteo) return;
+        const timer = window.setInterval(() => {
+            setInstanteAoVivo(Date.now());
+        }, 15 * 60_000);
+        return () => window.clearInterval(timer);
+    }, [aoVivo, mostrarOpenMeteo]);
+
+    const janelaOpenMeteo = aoVivo
+        ? Math.floor(fimVisualizacao / (15 * 60_000))
+        : 0;
+
+    useEffect(() => {
+        if (!mostrarOpenMeteo || !estacao) {
             setAmostrasOpenMeteo([]);
             setCarregandoOpenMeteo(false);
             setErroOpenMeteo(null);
             return;
         }
+
         const controlador = new AbortController();
+        const fim = aoVivo ? Date.now() : instanteConsulta;
+        const inicio = aoVivo ? fim - 2 * HORA : inicioPeriodo;
         setCarregandoOpenMeteo(true);
         setErroOpenMeteo(null);
-        setAmostrasOpenMeteo([]);
+        // Mantém a série anterior visível enquanto renova os dados.
         void consultarHistoricoOpenMeteo(
             estacao.latitude, estacao.longitude,
-            inicioPeriodo, instanteConsulta, controlador.signal
+            inicio, fim, controlador.signal
         ).then(amostras => {
             if (!controlador.signal.aborted) setAmostrasOpenMeteo(amostras);
         }).catch(falha => {
             if (!controlador.signal.aborted) {
-                console.error('Histórico Open-Meteo:', falha);
-                setErroOpenMeteo('Estimativas Open-Meteo indisponíveis neste período.');
+                console.error('Open-Meteo:', falha);
+                setErroOpenMeteo('Estimativas Open-Meteo indisponíveis.');
+                setAmostrasOpenMeteo([]);
             }
         }).finally(() => {
             if (!controlador.signal.aborted) setCarregandoOpenMeteo(false);
@@ -666,27 +647,68 @@ export default function HistoricoEstacoes({
     }, [
         aoVivo, mostrarOpenMeteo, estacao?.id,
         estacao?.latitude, estacao?.longitude,
-        inicioPeriodo, instanteConsulta
+        inicioPeriodo, instanteConsulta, janelaOpenMeteo
     ]);
 
     const pontosOpenMeteo = useMemo(() => {
-        if (periodo === 'mes') {
+        const dados = amostrasOpenMeteo.map((item, indice) => ({
+            ...item,
+            id: String(indice)
+        }));
+        if (!aoVivo && periodo === 'mes') {
             return consolidarLeituras(
-                amostrasOpenMeteo.map((item, i) => ({ ...item, id: String(i) })),
-                periodo, inicioPeriodo, instanteConsulta
+                dados, periodo, inicioVisualizacao, fimVisualizacao
             ).filter(ponto => ponto.quantidade > 0);
         }
-        // A API fornece amostras horárias, não valores minuto a minuto.
-        return amostrasOpenMeteo.map(amostra => ({
+        // Os valores de origem são horários; sem fabricar minutagem.
+        return dados.filter(amostra =>
+            amostra.recebidoEm >= inicioVisualizacao &&
+            amostra.recebidoEm <= fimVisualizacao
+        ).map(amostra => ({
             ...amostra,
-            momento: formatarPonto(amostra.recebidoEm, periodo),
+            momento: formatarPonto(amostra.recebidoEm, aoVivo ? 'hora' : periodo),
             temperaturaMinima: amostra.temperatura,
             temperaturaMaxima: amostra.temperatura,
             umidadeMinima: amostra.umidade,
             umidadeMaxima: amostra.umidade,
             quantidade: 1
         }));
-    }, [amostrasOpenMeteo, periodo, inicioPeriodo, instanteConsulta]);
+    }, [
+        amostrasOpenMeteo, aoVivo, periodo,
+        inicioVisualizacao, fimVisualizacao
+    ]);
+
+    // Todas as fontes compartilham os mesmos instantes do eixo horizontal.
+    // A série B histórica é alinhada ao início da série A para comparação.
+    const pontosGrafico = useMemo<PontoGrafico[]>(() => {
+        const tamanho = aoVivo ? 60_000 : opcaoPeriodo.agrupamento;
+        const porInstante = new Map<number, typeof pontosOpenMeteo[number]>();
+        if (mostrarOpenMeteo && !erroOpenMeteo) {
+            pontosOpenMeteo.forEach(ponto => {
+                porInstante.set(inicioDoBloco(ponto.recebidoEm, tamanho), ponto);
+            });
+        }
+
+        return pontos.map((principal, indice) => {
+            const segundo = pontosComparacao[indice];
+            const meteo = porInstante.get(principal.recebidoEm);
+            return {
+                ...principal,
+                momento: !aoVivo && comparar && periodo === 'mes'
+                    ? `Dia ${indice + 1}`
+                    : principal.momento,
+                temperaturaComparacao: segundo?.temperatura ?? null,
+                umidadeComparacao: segundo?.umidade ?? null,
+                temperaturaOpenMeteo: meteo?.temperatura ?? null,
+                umidadeOpenMeteo: meteo?.umidade ?? null,
+                momentoComparacao: segundo?.momento
+            };
+        });
+    }, [
+        pontos, pontosComparacao, pontosOpenMeteo,
+        mostrarOpenMeteo, erroOpenMeteo,
+        aoVivo, comparar, periodo, opcaoPeriodo.agrupamento
+    ]);
 
     const resumoCampo = (campo: 'temperatura' | 'umidade') => {
         if (leituras.length === 0) return null;

@@ -3908,48 +3908,6 @@ body,
   outline: 2px solid #168FC4;
   outline-offset: 2px;
 }
-.historico-open-comparacao {
-  margin-top: 9px;
-  padding-top: 11px;
-  border-top: 1px solid #E2EBF4;
-}
-.historico-open-comparacao__cabecalho {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  color: #687F94;
-  font-size: 10px;
-  line-height: 1.4;
-  margin: 0 0 5px;
-}
-.historico-open-comparacao__cabecalho svg {
-  width: 13px;
-  height: 13px;
-  color: #718AA4;
-}
-.historico-open-comparacao__cabecalho strong {
-  font-weight: 750;
-  color: #405B73;
-  font-size: 11px;
-}
-.historico-open-comparacao__cabecalho span {
-  color: #8799A8;
-  font-size: 10px;
-}
-.historico-open-comparacao__grafico {
-  width: 100%;
-  height: 140px;
-  min-width: 0;
-}
-.historico-open-comparacao > p {
-  margin: 7px 2px;
-  color: #6D8092;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-
 /* Estatísticas observadas: discreto, sem mais um cartão no gráfico. */
 .historico-resumo-extremos {
   display: flex;
@@ -3968,4 +3926,44 @@ body,
 .historico-resumo-extremos b {
   color: #42576B;
   font-weight: 700;
+}
+
+
+/* A Open-Meteo usa o mesmo gráfico da estação, sem subgráfico. */
+.historico-meteo-controle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 10px;
+  margin-top: 9px;
+}
+.historico-meteo-controle > span {
+  color: #667C90;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.historico-legenda-fontes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 8px 0 -4px 2px;
+  color: #586F85;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.historico-legenda-fontes > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.historico-legenda-fontes i {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 18px;
+  border-top: 2px solid;
+}
+.historico-legenda-fontes__meteo {
+  border-color: #64748B;
+  border-top-style: dashed !important;
 }

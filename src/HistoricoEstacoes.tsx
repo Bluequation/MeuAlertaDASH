@@ -850,7 +850,21 @@ export default function HistoricoEstacoes({
                 periodo: `${opcaoPeriodo.titulo} • série ${serie.toUpperCase()} • ${descricaoIntervalo(dados.inicio, dados.fim)}`,
                 agregacao: opcaoPeriodo.descricao,
                 totalMedicoes: dados.leituras.length,
-                incompleto: dados.parcial
+                incompleto: dados.parcial,
+                resumoMedicoes: dados.leituras.length > 0 ? {
+                    temperaturaMinima: Math.min(
+                        ...dados.leituras.map(leitura => leitura.temperatura)
+                    ),
+                    temperaturaMaxima: Math.max(
+                        ...dados.leituras.map(leitura => leitura.temperatura)
+                    ),
+                    temperaturaMedia: dados.leituras.reduce(
+                        (soma, leitura) => soma + leitura.temperatura, 0
+                    ) / dados.leituras.length,
+                    umidadeMedia: dados.leituras.reduce(
+                        (soma, leitura) => soma + leitura.umidade, 0
+                    ) / dados.leituras.length
+                } : undefined
             }
         );
     };

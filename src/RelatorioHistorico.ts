@@ -235,9 +235,17 @@ function gerarGrafico(
 }
 
 // FUNÇÃO PRINCIPAL — EXPORTADA PARA O HISTÓRICO.
+type InformacoesConsolidacao = {
+    periodo: string;
+    agregacao: string;
+    totalMedicoes: number;
+    incompleto: boolean;
+};
+
 export function abrirRelatorioHistorico(
     estacao: EstacaoRelatorio,
-    leituras: LeituraRelatorio[]
+    leituras: LeituraRelatorio[],
+    consolidacao?: InformacoesConsolidacao
 ): void {
 
     if (leituras.length === 0) {
@@ -634,7 +642,7 @@ export function abrirRelatorioHistorico(
         </h1>
 
         <p class="subtitulo">
-            Histórico de medições da estação CUIDAÍ
+            Histórico meteorológico da estação CUIDAÍ
         </p>
 
     </header>
@@ -663,11 +671,11 @@ export function abrirRelatorioHistorico(
 
         <div class="informacao">
             <span class="rotulo">
-                Medições disponíveis
+                ${consolidacao ? 'Intervalos consolidados' : 'Medições disponíveis'}
             </span>
 
             <strong>
-                ${dados.length} registros
+                ${dados.length} ${consolidacao ? 'intervalos' : 'registros'}
             </strong>
         </div>
 
@@ -692,13 +700,13 @@ export function abrirRelatorioHistorico(
     <section class="secao">
 
         <h2>
-            Resumo das medições
+            ${consolidacao ? 'Resumo das médias por intervalo' : 'Resumo das medições'}
         </h2>
 
         <div class="indicadores">
 
             <div class="indicador">
-                <span>Temp. mínima</span>
+                <span>${consolidacao ? 'Menor média de temp.' : 'Temp. mínima'}</span>
 
                 <strong>
                     ${formatarNumero(temperaturaMinima)} °C
@@ -706,7 +714,7 @@ export function abrirRelatorioHistorico(
             </div>
 
             <div class="indicador">
-                <span>Temp. média</span>
+                <span>${consolidacao ? 'Média dos intervalos' : 'Temp. média'}</span>
 
                 <strong>
                     ${formatarNumero(temperaturaMedia)} °C
@@ -714,7 +722,7 @@ export function abrirRelatorioHistorico(
             </div>
 
             <div class="indicador">
-                <span>Temp. máxima</span>
+                <span>${consolidacao ? 'Maior média de temp.' : 'Temp. máxima'}</span>
 
                 <strong>
                     ${formatarNumero(temperaturaMaxima)} °C
@@ -722,7 +730,7 @@ export function abrirRelatorioHistorico(
             </div>
 
             <div class="indicador">
-                <span>Umidade média</span>
+                <span>${consolidacao ? 'Média dos intervalos' : 'Umidade média'}</span>
 
                 <strong>
                     ${formatarNumero(umidadeMedia)} %
@@ -760,7 +768,7 @@ export function abrirRelatorioHistorico(
     <section class="secao">
 
         <h2>
-            Tabela de medições
+            ${consolidacao ? 'Tabela de médias por intervalo' : 'Tabela de medições'}
         </h2>
 
         <table>
@@ -768,7 +776,7 @@ export function abrirRelatorioHistorico(
             <thead>
                 <tr>
                     <th>
-                        Data e hora
+                        ${consolidacao ? 'Início do intervalo' : 'Data e hora'}
                     </th>
 
                     <th class="numero">
@@ -801,13 +809,22 @@ export function abrirRelatorioHistorico(
     </p>
 
     <p>
-        O relatório apresenta
-        ${dados.length} registros válidos
-        (limite de 72).
-        Os gráficos conectam medições disponíveis,
-        sem representar observação contínua.
-        As médias são calculadas por registro,
-        sem ponderação pelo tempo.
+        ${consolidacao
+            ? `Este relatório apresenta ${dados.length} intervalos com dados,
+            consolidados a partir de ${consolidacao.totalMedicoes} medições
+            (${escaparHTML(consolidacao.periodo)}).
+            ${escaparHTML(consolidacao.agregacao)}.
+            Cada ponto representa a média das leituras disponíveis naquele intervalo.
+            As estatísticas acima descrevem os pontos consolidados,
+            não os extremos individuais medidos pelo sensor.
+            Intervalos sem leituras não são preenchidos.
+            ${consolidacao.incompleto
+                ? 'Atenção: o limite de consulta foi atingido; os resultados são parciais.'
+                : ''}`
+            : `O relatório apresenta ${dados.length} medições válidas.
+            Os gráficos conectam leituras disponíveis e não representam
+            observação contínua. As médias são calculadas por registro,
+            sem ponderação pelo tempo.`}
     </p>
 
     <p>

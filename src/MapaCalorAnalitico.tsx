@@ -153,6 +153,32 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
     subcategoriasDoAlerta(a).includes(subcategoria)
   ), [porCategoria, subcategoria]);
 
+  // Quando "Todas" está selecionado, o painel já apresenta uma visão
+  // cruzada de categoria + subcategoria, sem uma segunda área vazia.
+  const subcategoriasGerais = useMemo(() => {
+    const grupos = new Map<string, {
+      categoria: string; nome: string; quantidade: number;
+    }>();
+    base.forEach(alerta => {
+      subcategoriasDoAlerta(alerta).forEach(nome => {
+        const chave = JSON.stringify([alerta.categoria, nome]);
+        const atual = grupos.get(chave);
+        if (atual) atual.quantidade += 1;
+        else grupos.set(chave, {
+          categoria: alerta.categoria, nome, quantidade: 1
+        });
+      });
+    });
+    return [...grupos.values()].sort((a, b) =>
+      b.quantidade - a.quantidade ||
+      a.categoria.localeCompare(b.categoria, 'pt-BR') ||
+      a.nome.localeCompare(b.nome, 'pt-BR')
+    );
+  }, [base]);
+  const maxSubcategoriaGeral = Math.max(
+    1, ...subcategoriasGerais.map(item => item.quantidade)
+  );
+
   const sombras = useMemo(() => agruparContagem(
     porSubcategoria.filter(a => a.categoria === 'Quentura').map(sombraDoAlerta)
   ), [porSubcategoria]);
@@ -220,6 +246,8 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
 
   return (
     <section className="territorio-analise">
+      <div className="territorio-analise__topo">
+        <div className="territorio-analise__topo-esquerda">
       <header className="territorio-analise__cabecalho">
         <div>
           <h1>Mapa de Calor</h1>
@@ -320,6 +348,84 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
           Exportar CSV
         </button>
       </div>
+        </div>
+
+        <div className="territorio-analise__topo-direita">
+        <section className="territorio-analise__painel-lateral">
+          <h2>Distribuição por categoria</h2>
+          {categoriasPeriodo.length === 0 ? <p>Sem ocorrências no período.</p>
+            : categoriasPeriodo.map(d => (
+              <button className="territorio-analise__barra" type="button" key={d.nome}
+                aria-pressed={categoria === d.nome}
+                onClick={() => {
+                  setCategoria(d.nome);
+                  setSubcategoria('Todas');
+                  setSombra('Todas');
+                }}>
+                <span>{d.nome}</span>
+                <b>{d.quantidade}</b>
+                <i style={{
+                  width: `${100 * d.quantidade / maxCategoria}%`,
+                  backgroundColor: CORES_OCORRENCIAS[d.nome] ?? '#718399'
+                }} />
+              </button>
+            ))}
+        </section>
+
+        <section className="territorio-analise__painel-lateral">
+          <h2>{categoria === 'Quentura'
+            ? 'Condições de Quentura'
+            : 'Distribuição por subcategoria'}</h2>
+          {categoria === 'Todas' ? (
+            subcategoriasGerais.length === 0 ? (
+              <p>Sem subcategorias registradas neste recorte.</p>
+            ) : subcategoriasGerais.map(item => (
+              <button
+                className="territorio-analise__barra"
+                type="button"
+                key={JSON.stringify([item.categoria, item.nome])}
+                onClick={() => {
+                  setCategoria(item.categoria);
+                  setSubcategoria(item.nome);
+                  setSombra('Todas');
+                }}
+              >
+                <span className="territorio-analise__barra-descricao">
+                  <small>{item.categoria}</small>
+                  {item.nome}
+                </span>
+                <b>{item.quantidade}</b>
+                <i style={{
+                  width: `${100 * item.quantidade / maxSubcategoriaGeral}%`,
+                  backgroundColor: CORES_OCORRENCIAS[item.categoria] ?? '#6E91B1'
+                }} />
+              </button>
+            ))
+          ) : subcategorias.length === 0 ? (
+            <p>Nenhuma subcategoria registrada neste período.</p>
+          ) : (
+            <>
+              {subcategorias.map(d => (
+                <button className="territorio-analise__barra" type="button" key={d.nome}
+                  onClick={() => setSubcategoria(atual => atual === d.nome ? 'Todas' : d.nome)}
+                  aria-pressed={subcategoria === d.nome}>
+                  <span>{d.nome}</span>
+                  <b>{d.quantidade}</b>
+                  <i style={{
+                    width: `${100 * d.quantidade / maxSubcategoria}%`,
+                    backgroundColor: categoria === 'Quentura' ? '#D65B39' : '#6E91B1'
+                  }} />
+                </button>
+              ))}
+              {categoria === 'Quentura' && <p>
+                Um relato pode indicar mais de uma condição. Por isso, a soma das condições
+                pode superar o número de ocorrências.
+              </p>}
+            </>
+          )}
+        </section>
+        </div>
+      </div>
 
       <div className="territorio-analise__mapa" role="region"
         aria-label="Mapa de calor das ocorrências selecionadas">
@@ -344,55 +450,6 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
       </div>
 
       <div className="territorio-analise__analiticos">
-        <section>
-          <h2>Distribuição por categoria</h2>
-          {categoriasPeriodo.length === 0 ? <p>Sem ocorrências no período.</p>
-            : categoriasPeriodo.map(d => (
-              <button className="territorio-analise__barra" type="button" key={d.nome}
-                onClick={() => {
-                  setCategoria(d.nome);
-                  setSubcategoria('Todas');
-                  setSombra('Todas');
-                }}>
-                <span>{d.nome}</span>
-                <b>{d.quantidade}</b>
-                <i style={{
-                  width: `${100 * d.quantidade / maxCategoria}%`,
-                  backgroundColor: CORES_OCORRENCIAS[d.nome] ?? '#718399'
-                }} />
-              </button>
-            ))}
-        </section>
-
-        <section>
-          <h2>{categoria === 'Quentura' ? 'Condições de Quentura' :
-            categoria === 'Todas' ? 'Detalhamento territorial' : 'Distribuição por subcategoria'}</h2>
-          {categoria === 'Todas' ? (
-            <p>Selecione uma categoria para ver os tipos de ocorrência e filtrar o mapa.</p>
-          ) : subcategorias.length === 0 ? (
-            <p>Nenhuma subcategoria registrada neste período.</p>
-          ) : (
-            <>
-              {subcategorias.map(d => (
-                <button className="territorio-analise__barra" type="button" key={d.nome}
-                  onClick={() => setSubcategoria(atual => atual === d.nome ? 'Todas' : d.nome)}
-                  aria-pressed={subcategoria === d.nome}>
-                  <span>{d.nome}</span>
-                  <b>{d.quantidade}</b>
-                  <i style={{
-                    width: `${100 * d.quantidade / maxSubcategoria}%`,
-                    backgroundColor: categoria === 'Quentura' ? '#D65B39' : '#6E91B1'
-                  }} />
-                </button>
-              ))}
-              {categoria === 'Quentura' && <p>
-                Um relato pode indicar mais de uma condição. Por isso, a soma das condições
-                pode superar o número de ocorrências.
-              </p>}
-            </>
-          )}
-        </section>
-
         {categoria === 'Quentura' && (
           <section>
             <h2>Distribuição da sombra</h2>

@@ -281,12 +281,12 @@ export default function HistoricoEstacoes({
                         const condicoes: QueryConstraint[] = [
                             where('recebidoEm', '>=', inicio),
                             where('recebidoEm', '<=', fim),
-                            orderBy('recebidoEm', 'desc'),
-                            limit(TAMANHO_PAGINA)
+                            orderBy('recebidoEm', 'desc')
                         ];
                         if (cursor) {
                             condicoes.push(startAfter(cursor));
                         }
+                        condicoes.push(limit(TAMANHO_PAGINA));
                         const pagina = await getDocs(query(
                             referencia,
                             ...condicoes

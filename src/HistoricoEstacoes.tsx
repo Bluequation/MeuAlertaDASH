@@ -479,8 +479,22 @@ export default function HistoricoEstacoes({
         [pontos, pontosComparacao]
     );
 
-    const baixarCSV = (consolidado: boolean) => {
-        if (!estacao || carregando || erro || leituras.length === 0) return;
+
+    const dadosDaSerie = (serie: 'a' | 'b') => {
+        const eComparacao = serie === 'b';
+        return {
+            leituras: eComparacao ? leiturasComparacao : leituras,
+            pontos: eComparacao ? pontosComparacaoDisponiveis : pontosDisponiveis,
+            inicio: eComparacao ? inicioComparacao : inicioPeriodo,
+            fim: eComparacao ? fimComparacao : instanteConsulta,
+            parcial: eComparacao ? parcialComparacao : parcial
+        };
+    };
+
+    const baixarCSV = (consolidado: boolean, serie: 'a' | 'b' = 'a') => {
+        const dados = dadosDaSerie(serie);
+        if (!estacao || carregando || erro || dados.leituras.length === 0 ||
+            (serie === 'b' && (carregandoComparacao || erroComparacao))) return;
 
         const cabecalho = consolidado
             ? [
@@ -496,13 +510,13 @@ export default function HistoricoEstacoes({
             ];
 
         const linhas = consolidado
-            ? pontosDisponiveis.map(ponto => [
+            ? dados.pontos.map(ponto => [
                 formatarData(ponto.recebidoEm, true),
                 ponto.temperatura!.toFixed(2).replace('.', ','),
                 ponto.umidade!.toFixed(2).replace('.', ','),
                 ponto.quantidade
             ].join(';'))
-            : leituras.map(leitura => [
+            : dados.leituras.map(leitura => [
                 formatarDataCompleta(leitura.recebidoEm),
                 leitura.temperatura.toFixed(2).replace('.', ','),
                 leitura.umidade.toFixed(2).replace('.', ',')
@@ -514,16 +528,36 @@ export default function HistoricoEstacoes({
         ].join('\r\n');
 
         const url = URL.createObjectURL(new Blob(
-            [conteudo],
-            { type: 'text/csv;charset=utf-8;' }
+            [conteudo], { type: 'text/csv;charset=utf-8;' }
         ));
         const link = document.createElement('a');
         link.href = url;
-        link.download = `cuidai-historico-${periodo}-${consolidado ? 'medias' : 'originais'}-${estacao.id.replace(/[^a-zA-Z0-9_-]/g, '-')}.csv`;
+        link.download = `cuidai-historico-${periodo}-${serie}-${consolidado ? 'medias' : 'originais'}-${estacao.id.replace(/[^a-zA-Z0-9_-]/g, '-')}.csv`;
         document.body.appendChild(link);
         link.click();
         link.remove();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+
+    const gerarRelatorio = (serie: 'a' | 'b' = 'a') => {
+        if (!estacao || carregando || erro ||
+            (serie === 'b' && (carregandoComparacao || erroComparacao))) return;
+        const dados = dadosDaSerie(serie);
+        if (dados.pontos.length === 0) return;
+        abrirRelatorioHistorico(
+            estacao,
+            dados.pontos.map(ponto => ({
+                recebidoEm: ponto.recebidoEm,
+                temperatura: ponto.temperatura!,
+                umidade: ponto.umidade!
+            })),
+            {
+                periodo: `${opcaoPeriodo.titulo} • série ${serie.toUpperCase()} • ${descricaoIntervalo(dados.inicio, dados.fim)}`,
+                agregacao: opcaoPeriodo.descricao,
+                totalMedicoes: dados.leituras.length,
+                incompleto: dados.parcial
+            }
+        );
     };
 
     if (estacoes.length === 0) {
@@ -561,24 +595,27 @@ export default function HistoricoEstacoes({
                     ))}
                 </select>
 
+
                 <div className="historico-periodo-controles">
                     <div className="historico-periodo-topo">
                         <span>Intervalo do histórico</span>
                         <button
                             type="button"
                             onClick={() => {
-                                cache.current.delete(`${idConsulta}:${periodo}`);
-                                setInstanteConsulta(Date.now());
+                                cache.current.clear();
+                                setRevisao(valor => valor + 1);
                             }}
-                            disabled={carregando}
+                            disabled={carregando || carregandoComparacao}
                             aria-label="Atualizar histórico"
-                            title="Consultar novas medições"
+                            title="Consultar novamente as medições do período"
                         >
                             <FiRefreshCw aria-hidden="true" />
                             Atualizar
                         </button>
                     </div>
-                    <div className="historico-periodo-opcoes" role="group" aria-label="Período do histórico">
+
+                    <div className="historico-periodo-opcoes"
+                         role="group" aria-label="Escala do histórico">
                         {OPCOES_PERIODO.map(opcao => (
                             <button
                                 key={opcao.id}
@@ -588,17 +625,107 @@ export default function HistoricoEstacoes({
                                     ? 'historico-periodo-botao historico-periodo-botao--ativo'
                                     : 'historico-periodo-botao'}
                                 onClick={() => {
+                                    const dataAtual = paraInputData(instanteConsulta, opcao.id === 'hora');
+                                    const novoFim = lerDataSelecionada(dataAtual, opcao.id);
+                                    if (novoFim !== null) setInstanteConsulta(novoFim);
+                                    if (comparar) {
+                                        const dataB = paraInputData(fimComparacao, opcao.id === 'hora');
+                                        const novoB = lerDataSelecionada(dataB, opcao.id);
+                                        if (novoB !== null) setInstanteComparacao(novoB);
+                                    }
                                     setPeriodo(opcao.id);
-                                    setInstanteConsulta(Date.now());
                                 }}
                             >
                                 {opcao.titulo}
                             </button>
                         ))}
                     </div>
+
+                    <div className="historico-navegacao">
+                        <span className="historico-navegacao__rotulo">Período A</span>
+                        <button type="button" className="historico-navegacao__seta"
+                            onClick={() => navegarPeriodo(-1)}
+                            aria-label="Voltar um intervalo"
+                            title="Período anterior">
+                            <FiChevronLeft />
+                        </button>
+                        <input
+                            aria-label={periodo === 'hora'
+                                ? 'Data e hora do período A'
+                                : 'Data final do período A'}
+                            type={periodo === 'hora' ? 'datetime-local' : 'date'}
+                            max={paraInputData(Date.now(), periodo === 'hora')}
+                            value={paraInputData(instanteConsulta, periodo === 'hora')}
+                            onChange={evento => {
+                                const instante = lerDataSelecionada(evento.target.value, periodo);
+                                if (instante !== null) setInstanteConsulta(instante);
+                            }}
+                        />
+                        <button type="button" className="historico-navegacao__seta"
+                            disabled={instanteConsulta >= Date.now() - 60 * 1000}
+                            onClick={() => navegarPeriodo(1)}
+                            aria-label="Avançar um intervalo"
+                            title="Próximo período">
+                            <FiChevronRight />
+                        </button>
+                        <button type="button" className="historico-navegacao__atual"
+                            onClick={() => setInstanteConsulta(Date.now())}>
+                            Agora
+                        </button>
+                    </div>
                     <p className="historico-periodo-descricao">
-                        {opcaoPeriodo.descricao}. Horário de Fortaleza.
+                        {opcaoPeriodo.descricao} • {descricaoIntervalo(inicioPeriodo, instanteConsulta)}
                     </p>
+
+                    <button
+                        type="button"
+                        className={comparar
+                            ? 'historico-comparar historico-comparar--ativo'
+                            : 'historico-comparar'}
+                        aria-pressed={comparar}
+                        onClick={() => {
+                            if (!comparar && instanteComparacao === null) {
+                                setInstanteComparacao(
+                                    instanteConsulta - opcaoPeriodo.duracao
+                                );
+                            }
+                            setComparar(valor => !valor);
+                        }}
+                    >
+                        <FiGitCompare aria-hidden="true" />
+                        {comparar ? 'Ocultar comparação' : 'Comparar com outro período'}
+                    </button>
+
+                    {comparar && (
+                        <div className="historico-comparacao-seletor">
+                            <label htmlFor="historico-data-comparacao">
+                                Período B • comparação
+                            </label>
+                            <div className="historico-comparacao-seletor__linha">
+                                <input
+                                    id="historico-data-comparacao"
+                                    type={periodo === 'hora' ? 'datetime-local' : 'date'}
+                                    max={paraInputData(Date.now(), periodo === 'hora')}
+                                    value={paraInputData(fimComparacao, periodo === 'hora')}
+                                    onChange={evento => {
+                                        const instante = lerDataSelecionada(
+                                            evento.target.value, periodo
+                                        );
+                                        if (instante !== null) setInstanteComparacao(instante);
+                                    }}
+                                />
+                                <button type="button"
+                                    onClick={() => setInstanteComparacao(
+                                        instanteConsulta - opcaoPeriodo.duracao
+                                    )}>
+                                    Anterior
+                                </button>
+                            </div>
+                            <p className="historico-periodo-descricao">
+                                {descricaoIntervalo(inicioComparacao, fimComparacao)}
+                            </p>
+                        </div>
+                    )}
                 </div>
             </article>
 

@@ -2,8 +2,8 @@
  * Consulta opcional de estimativas históricas Open-Meteo, na coordenada
  * real da estação. Nunca trata estimativas como medições físicas.
  *
- * Dados: Historical Weather API (ECMWF IFS / best match).
- * Resolução temporal da fonte: horária.
+ * Dados recentes: Forecast API (inclui past_days). Dados antigos:
+ * Historical Weather API. Ambas fornecem estimativas horárias de modelo.
  */
 import { consultarOpenMeteoComCache } from './openMeteoCache';
 
@@ -44,18 +44,35 @@ export async function consultarHistoricoOpenMeteo(
         throw new Error('Coordenadas ou período inválidos.');
     }
 
+    // O arquivo de reanálise nem sempre inclui as horas recentes.
+    // Para períodos que chegam até hoje, usar a API de previsão,
+    // que também disponibiliza os últimos dias (past_days).
+    const agora = Date.now();
+    const recente = fim >= agora - 2 * DIA && inicio >= agora - 90 * DIA;
     const parametros = new URLSearchParams({
         latitude: latitude.toFixed(5),
         longitude: longitude.toFixed(5),
-        start_date: dataUTC(inicio - DIA),
-        end_date: dataUTC(Math.min(fim + DIA, Date.now())),
         hourly: 'temperature_2m,relative_humidity_2m',
         timezone: 'GMT',
         timeformat: 'unixtime',
         temperature_unit: 'celsius'
     });
 
-    const url = `https://archive-api.open-meteo.com/v1/archive?${parametros.toString()}`;
+    if (recente) {
+        const diasAnteriores = Math.max(
+            1,
+            Math.min(92, Math.ceil((agora - inicio) / DIA) + 1)
+        );
+        parametros.set('past_days', String(diasAnteriores));
+        parametros.set('forecast_days', '1');
+    } else {
+        parametros.set('start_date', dataUTC(inicio - DIA));
+        parametros.set('end_date', dataUTC(Math.min(fim + DIA, agora)));
+    }
+
+    const url = recente
+        ? `https://api.open-meteo.com/v1/forecast?${parametros.toString()}`
+        : `https://archive-api.open-meteo.com/v1/archive?${parametros.toString()}`;
     const resposta = await consultarOpenMeteoComCache(url, sinal) as RespostaOpenMeteo;
 
     if (resposta?.error) {

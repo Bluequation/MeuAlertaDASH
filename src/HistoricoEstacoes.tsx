@@ -773,7 +773,10 @@ export default function HistoricoEstacoes({
             ) return null;
 
             const intervalo = seguinte.recebidoEm - anterior.recebidoEm;
-            if (intervalo <= 0 || intervalo > 2 * HORA) return null;
+            const maiorLacunaDoModelo = !aoVivo && periodo === 'mes'
+                ? 2 * DIA
+                : 2 * HORA;
+            if (intervalo <= 0 || intervalo > maiorLacunaDoModelo) return null;
             const fracao = (instante - anterior.recebidoEm) / intervalo;
             return {
                 temperatura: temperaturaAnterior +

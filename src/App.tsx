@@ -1770,6 +1770,9 @@ function App() {
             milimetrosChuva: dados.milimetrosChuva ?? (mmTitulo ? Number(mmTitulo[1].replace(',', '.')) : undefined),
             votosConfirma: dados.votosConfirma || 0,
             votosResolvido: dados.votosResolvido || 0,
+            restabelecidoEm: dataEmMillis(dados.restabelecidoEm),
+            restabelecimentoFonte: typeof dados.restabelecimentoFonte === 'string'
+              ? dados.restabelecimentoFonte : undefined,
             autor: dados.autor,
             temFoto: dados.temFoto || false,
             fotoUrl: dados.fotoUrl,

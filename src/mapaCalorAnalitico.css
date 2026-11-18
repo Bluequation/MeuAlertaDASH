@@ -339,3 +339,298 @@
   .territorio-analise__legenda { right: 9px; bottom: 9px; padding: 8px; }
   .territorio-analise__sombra { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
+
+
+/* Organização editorial do topo: filtros à esquerda e análises à direita. */
+.territorio-analise {
+  gap: 12px;
+}
+
+.territorio-analise__topo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.territorio-analise__topo-esquerda {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px 16px 13px;
+  background: #FFFFFF;
+  border: 1px solid #DEE8F1;
+  border-radius: 15px;
+}
+
+.territorio-analise__topo-direita {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(0, auto) minmax(0, auto);
+  align-content: start;
+  gap: 10px;
+}
+
+.territorio-analise__topo .territorio-analise__cabecalho {
+  align-items: start;
+  gap: 8px 12px;
+}
+
+.territorio-analise__cabecalho > div:first-child {
+  flex: 1 1 210px;
+  min-width: 0;
+}
+
+.territorio-analise__cabecalho h1 {
+  margin-bottom: 4px;
+  color: #192942;
+  font-size: clamp(20px, 1.7vw, 24px);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.territorio-analise__cabecalho p {
+  margin: 0;
+  max-width: 350px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.territorio-analise__topo .territorio-analise__modos {
+  margin-left: auto;
+  background: #EFF4F8;
+  flex: 0 0 auto;
+}
+
+.territorio-analise__topo .territorio-analise__modos button,
+.territorio-analise__topo .territorio-analise__opcoes button {
+  padding: 7px 9px;
+  font-size: 10.5px;
+}
+
+.territorio-analise__topo .territorio-analise__periodo {
+  padding: 9px 0;
+  border: 0;
+  border-top: 1px solid #EAF0F5;
+  border-bottom: 1px solid #EAF0F5;
+  background: transparent;
+  border-radius: 0;
+}
+
+.territorio-analise__topo .territorio-analise__filtros {
+  background: transparent;
+  padding: 10px 0 2px;
+  border: none;
+  border-top: 1px solid #EAF0F5;
+  border-radius: 0;
+}
+
+.territorio-analise__topo .territorio-analise__periodo + .territorio-analise__filtros {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.territorio-analise__topo .territorio-analise__filtro-categorias {
+  gap: 5px;
+}
+
+.territorio-analise__topo .territorio-analise__filtro-categorias button {
+  padding: 7px 9px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.territorio-analise__topo .territorio-analise__selecao {
+  margin-top: 9px;
+  gap: 8px;
+}
+
+.territorio-analise__topo .territorio-analise__selecao label {
+  flex-basis: 125px;
+  min-width: 125px;
+}
+
+.territorio-analise__topo .territorio-analise__metricas {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #EAF0F5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.territorio-analise__topo .territorio-analise__metricas > div {
+  flex: 1 1 90px;
+  min-width: 0;
+  padding: 0 9px 0 0;
+  border: 0;
+  border-right: 1px solid #E4EBF2;
+  border-radius: 0;
+  background: transparent;
+  gap: 2px;
+}
+
+.territorio-analise__topo .territorio-analise__metricas strong {
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+
+.territorio-analise__topo .territorio-analise__metricas span {
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.territorio-analise__topo .territorio-analise__metricas > button {
+  flex: 0 0 auto;
+  align-self: center;
+  min-height: 33px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: #176F9D;
+  background: #F0F7FC;
+  font-size: 10.5px;
+}
+
+.territorio-analise__painel-lateral {
+  min-width: 0;
+  max-height: 205px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #CBDDEA transparent;
+  padding: 13px 15px 11px;
+  border: 1px solid #DEE8F1;
+  background: #FFFFFF;
+  border-radius: 15px;
+}
+
+.territorio-analise__painel-lateral h2 {
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #EDF2F6;
+  font-size: 12.5px;
+  line-height: 1.25;
+  color: #192942;
+  font-weight: 750;
+}
+
+.territorio-analise__painel-lateral p {
+  margin: 4px 0;
+  color: #73879A;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.territorio-analise__painel-lateral .territorio-analise__barra {
+  gap: 4px 8px;
+  margin: 0;
+  padding: 6px 5px 8px;
+  border-radius: 7px;
+}
+
+.territorio-analise__painel-lateral .territorio-analise__barra:hover,
+.territorio-analise__painel-lateral .territorio-analise__barra[aria-pressed="true"] {
+  background: #F0F6FB;
+}
+
+.territorio-analise__painel-lateral .territorio-analise__barra span {
+  color: #4C647B;
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+
+.territorio-analise__painel-lateral .territorio-analise__barra b {
+  font-size: 11.5px;
+  font-weight: 750;
+}
+
+.territorio-analise__painel-lateral .territorio-analise__barra i {
+  height: 4px;
+  border-radius: 99px;
+}
+
+.territorio-analise__barra-descricao {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.territorio-analise__barra-descricao small {
+  color: #8A9BAA;
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.territorio-analise__topo + .territorio-analise__mapa {
+  margin-top: 0;
+}
+
+.territorio-analise__mapa {
+  height: min(58vh, 560px);
+  min-height: 385px;
+  border-radius: 15px;
+}
+
+.territorio-analise__analiticos {
+  gap: 12px;
+}
+
+/* A divisão responde ao espaço real do painel: tablet e celular sem cortes. */
+@media (max-width: 1120px) {
+  .territorio-analise__topo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .territorio-analise__topo-direita {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
+  }
+
+  .territorio-analise__painel-lateral {
+    max-height: 225px;
+  }
+}
+
+@media (max-width: 720px) {
+  .territorio-analise__topo-esquerda {
+    padding: 12px;
+  }
+
+  .territorio-analise__topo-direita {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .territorio-analise__painel-lateral {
+    max-height: 190px;
+    padding: 12px;
+  }
+
+  .territorio-analise__topo .territorio-analise__metricas {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .territorio-analise__topo .territorio-analise__metricas > div {
+    flex: 1 1 78px;
+  }
+
+  .territorio-analise__mapa {
+    height: 52vh;
+    min-height: 350px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .territorio-analise__barra,
+  .territorio-analise__filtro-categorias button {
+    transition: none;
+  }
+}

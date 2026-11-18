@@ -19,6 +19,9 @@ export type AlertaTerritorial = {
   milimetrosChuva?: number;
   votosConfirma?: number;
   votosResolvido?: number;
+  /** Horário em que a comunidade confirmou o restabelecimento. */
+  restabelecidoEm?: number;
+  restabelecimentoFonte?: string;
   autor?: string;
   temFoto?: boolean;
   fotoUrl?: string;
@@ -67,6 +70,8 @@ export function statusDoAlerta(
   alerta: AlertaTerritorial,
   agora: number
 ): 'ativo' | 'resolvido' | 'expirado' | 'sem-data' {
+  if (alerta.categoria === 'Energia' && typeof alerta.restabelecidoEm === 'number' &&
+      Number.isFinite(alerta.restabelecidoEm) && alerta.restabelecidoEm > 0) return 'resolvido';
   if ((alerta.votosResolvido ?? 0) >= 3) return 'resolvido';
   const validade = prazoDoAlerta(alerta);
   if (validade === null) return 'sem-data';
@@ -80,7 +85,9 @@ export function alertaAtivo(alerta: AlertaTerritorial, agora: number): boolean {
 /** Subcategorias reais. Quentura aceita múltiplas condições por registro. */
 export function subcategoriasDoAlerta(alerta: AlertaTerritorial): string[] {
   if (alerta.categoria !== 'Quentura') {
-    return [alerta.detalhe?.trim() || 'Não informado'];
+    const detalhe = alerta.detalhe?.trim() ||
+      (alerta.titulo?.includes(':') ? alerta.titulo.split(':').slice(1).join(':').trim().replace(/\s*\([\d.,]+mm\)\s*$/i, '') : '');
+    return [detalhe || 'Não informado'];
   }
   const estruturadas = (alerta.condicoesQuentura ?? [])
     .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
@@ -107,6 +114,14 @@ export function sombraDoAlerta(alerta: AlertaTerritorial): Sombra {
   if (normalizada === 'não' || normalizada === 'nao') return 'Não';
   if (normalizada === 'parcial' || normalizada === 'parcialmente') return 'Parcialmente';
   return 'Não informado';
+}
+
+/** Duração entre o primeiro relato e a confirmação do retorno, não a duração oficial. */
+export function duracaoObservadaEnergiaMs(alerta: AlertaTerritorial): number | null {
+  if (alerta.categoria !== 'Energia' || !Number.isFinite(alerta.criadoEm) ||
+      !Number.isFinite(alerta.restabelecidoEm)) return null;
+  const duracao = alerta.restabelecidoEm! - alerta.criadoEm!;
+  return duracao >= 0 ? duracao : null;
 }
 
 export const CORES_OCORRENCIAS: Record<string, string> = {

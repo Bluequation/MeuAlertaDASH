@@ -449,8 +449,9 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
         )}
       </div>
 
-      <div className="territorio-analise__analiticos">
-        {categoria === 'Quentura' && (
+      {(categoria === 'Quentura' || modo === 'historico') && (
+        <div className="territorio-analise__analiticos">
+          {categoria === 'Quentura' && (
           <section>
             <h2>Distribuição da sombra</h2>
             <div className="territorio-analise__sombra">
@@ -488,7 +489,8 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
             ) : <p>Sem registros com data válida neste intervalo.</p>}
           </section>
         )}
-      </div>
+        </div>
+      )}
 
       <footer className="territorio-analise__nota">
         <button type="button" onClick={() => setAjuda(aberta => !aberta)}

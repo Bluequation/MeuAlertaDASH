@@ -42,7 +42,7 @@ type Leitura = {
     recebidoEm: number;
 };
 
-type Periodo = 'dia' | 'semana' | 'mes';
+type Periodo = 'hora' | 'dia' | 'semana' | 'mes';
 
 type PontoConsolidado = {
     recebidoEm: number;
@@ -70,6 +70,13 @@ const OPCOES_PERIODO: {
     agrupamento: number;
     descricao: string;
 }[] = [
+    {
+        id: 'hora',
+        titulo: '1 hora',
+        duracao: HORA,
+        agrupamento: 60 * 1000,
+        descricao: 'Leituras por minuto'
+    },
     {
         id: 'dia',
         titulo: '24 horas',
@@ -203,7 +210,7 @@ export default function HistoricoEstacoes({
 }: Props) {
     const [idEscolhido, setIdEscolhido] =
         useState<string | null>(null);
-    const [periodo, setPeriodo] = useState<Periodo>('dia');
+    const [periodo, setPeriodo] = useState<Periodo>('hora');
     const [instanteConsulta, setInstanteConsulta] = useState(Date.now);
     const [leituras, setLeituras] = useState<Leitura[]>([]);
     const [carregando, setCarregando] = useState(false);

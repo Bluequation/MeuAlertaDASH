@@ -38,6 +38,7 @@ import {
 } from 'react-icons/fi';
 import { db } from './firebase';
 import { abrirRelatorioHistorico } from './RelatorioHistorico';
+import { consultarHistoricoOpenMeteo, type AmostraOpenMeteo } from './openMeteoHistorico';
 import type { EstacaoPublica } from './estacoesMunicipais';
 
 type Leitura = {
@@ -55,6 +56,10 @@ type PontoConsolidado = {
     momento: string;
     temperatura: number | null;
     umidade: number | null;
+    temperaturaMinima: number | null;
+    temperaturaMaxima: number | null;
+    umidadeMinima: number | null;
+    umidadeMaxima: number | null;
     quantidade: number;
 };
 
@@ -164,6 +169,10 @@ function consolidarLeituras(
     const acumulados = new Map<number, {
         somaTemperatura: number;
         somaUmidade: number;
+        temperaturaMinima: number;
+        temperaturaMaxima: number;
+        umidadeMinima: number;
+        umidadeMaxima: number;
         quantidade: number;
     }>();
 
@@ -175,10 +184,18 @@ function consolidarLeituras(
         const anterior = acumulados.get(bloco) ?? {
             somaTemperatura: 0,
             somaUmidade: 0,
+            temperaturaMinima: Number.POSITIVE_INFINITY,
+            temperaturaMaxima: Number.NEGATIVE_INFINITY,
+            umidadeMinima: Number.POSITIVE_INFINITY,
+            umidadeMaxima: Number.NEGATIVE_INFINITY,
             quantidade: 0
         };
         anterior.somaTemperatura += leitura.temperatura;
         anterior.somaUmidade += leitura.umidade;
+        anterior.temperaturaMinima = Math.min(anterior.temperaturaMinima, leitura.temperatura);
+        anterior.temperaturaMaxima = Math.max(anterior.temperaturaMaxima, leitura.temperatura);
+        anterior.umidadeMinima = Math.min(anterior.umidadeMinima, leitura.umidade);
+        anterior.umidadeMaxima = Math.max(anterior.umidadeMaxima, leitura.umidade);
         anterior.quantidade++;
         acumulados.set(bloco, anterior);
     });
@@ -203,6 +220,10 @@ function consolidarLeituras(
             umidade: dados
                 ? dados.somaUmidade / dados.quantidade
                 : null,
+            temperaturaMinima: dados?.temperaturaMinima ?? null,
+            temperaturaMaxima: dados?.temperaturaMaxima ?? null,
+            umidadeMinima: dados?.umidadeMinima ?? null,
+            umidadeMaxima: dados?.umidadeMaxima ?? null,
             quantidade: dados?.quantidade ?? 0
         });
     }
@@ -343,6 +364,11 @@ export default function HistoricoEstacoes({
     const [instanteComparacao, setInstanteComparacao] =
         useState<number | null>(null);
     const [revisao, setRevisao] = useState(0);
+    const [mostrarOpenMeteo, setMostrarOpenMeteo] = useState(false);
+    const [mostrarExtremos, setMostrarExtremos] = useState(false);
+    const [amostrasOpenMeteo, setAmostrasOpenMeteo] = useState<AmostraOpenMeteo[]>([]);
+    const [carregandoOpenMeteo, setCarregandoOpenMeteo] = useState(false);
+    const [erroOpenMeteo, setErroOpenMeteo] = useState<string | null>(null);
 
     const [leituras, setLeituras] = useState<Leitura[]>([]);
     const [carregando, setCarregando] = useState(false);
@@ -529,18 +555,36 @@ export default function HistoricoEstacoes({
         comparar, inicioComparacao, fimComparacao, revisao, aoVivo
     ]);
 
-    const pontos = useMemo(
-        () => aoVivo
-            ? leituras.map(leitura => ({
-                ...leitura,
-                momento: formatarPonto(leitura.recebidoEm, 'hora'),
-                quantidade: 1
-            }))
-            : consolidarLeituras(
+    const pontos = useMemo<PontoConsolidado[]>(() => {
+        if (!aoVivo) {
+            return consolidarLeituras(
                 leituras, periodo, inicioPeriodo, instanteConsulta
-            ),
-        [aoVivo, leituras, periodo, inicioPeriodo, instanteConsulta]
-    );
+            );
+        }
+
+        const serie: PontoConsolidado[] = [];
+        const adicionar = (instante: number, leitura?: Leitura) => {
+            serie.push({
+                recebidoEm: instante,
+                momento: formatarPonto(instante, 'hora'),
+                temperatura: leitura?.temperatura ?? null,
+                umidade: leitura?.umidade ?? null,
+                temperaturaMinima: leitura?.temperatura ?? null,
+                temperaturaMaxima: leitura?.temperatura ?? null,
+                umidadeMinima: leitura?.umidade ?? null,
+                umidadeMaxima: leitura?.umidade ?? null,
+                quantidade: leitura ? 1 : 0
+            });
+        };
+        leituras.forEach((leitura, indice) => {
+            if (indice > 0 && leitura.recebidoEm - leituras[indice - 1].recebidoEm > 3 * 60_000) {
+                // Rompe a linha quando a estação deixou de transmitir.
+                adicionar((leitura.recebidoEm + leituras[indice - 1].recebidoEm) / 2);
+            }
+            adicionar(leitura.recebidoEm, leitura);
+        });
+        return serie;
+    }, [aoVivo, leituras, periodo, inicioPeriodo, instanteConsulta]);
 
     const pontosComparacao = useMemo(
         () => !aoVivo && comparar
@@ -586,6 +630,57 @@ export default function HistoricoEstacoes({
         [pontos, pontosComparacao, comparar, periodo, aoVivo]
     );
 
+
+    // Estimativa de modelo opcional; não é uma leitura da estação.
+    useEffect(() => {
+        if (aoVivo || !mostrarOpenMeteo || !estacao) {
+            setAmostrasOpenMeteo([]);
+            setCarregandoOpenMeteo(false);
+            setErroOpenMeteo(null);
+            return;
+        }
+        const controlador = new AbortController();
+        setCarregandoOpenMeteo(true);
+        setErroOpenMeteo(null);
+        setAmostrasOpenMeteo([]);
+        void consultarHistoricoOpenMeteo(
+            estacao.latitude, estacao.longitude,
+            inicioPeriodo, instanteConsulta, controlador.signal
+        ).then(amostras => {
+            if (!controlador.signal.aborted) setAmostrasOpenMeteo(amostras);
+        }).catch(falha => {
+            if (!controlador.signal.aborted) {
+                console.error('Histórico Open-Meteo:', falha);
+                setErroOpenMeteo('Estimativas Open-Meteo indisponíveis neste período.');
+            }
+        }).finally(() => {
+            if (!controlador.signal.aborted) setCarregandoOpenMeteo(false);
+        });
+        return () => controlador.abort();
+    }, [
+        aoVivo, mostrarOpenMeteo, estacao?.id,
+        estacao?.latitude, estacao?.longitude,
+        inicioPeriodo, instanteConsulta
+    ]);
+
+    const pontosOpenMeteo = useMemo(() => {
+        if (periodo === 'mes') {
+            return consolidarLeituras(
+                amostrasOpenMeteo.map((item, i) => ({ ...item, id: String(i) })),
+                periodo, inicioPeriodo, instanteConsulta
+            ).filter(ponto => ponto.quantidade > 0);
+        }
+        // A API fornece amostras horárias, não valores minuto a minuto.
+        return amostrasOpenMeteo.map(amostra => ({
+            ...amostra,
+            momento: formatarPonto(amostra.recebidoEm, periodo),
+            temperaturaMinima: amostra.temperatura,
+            temperaturaMaxima: amostra.temperatura,
+            umidadeMinima: amostra.umidade,
+            umidadeMaxima: amostra.umidade,
+            quantidade: 1
+        }));
+    }, [amostrasOpenMeteo, periodo, inicioPeriodo, instanteConsulta]);
 
     const dadosDaSerie = (serie: 'a' | 'b') => {
         const eComparacao = serie === 'b';

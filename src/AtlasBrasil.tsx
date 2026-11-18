@@ -30,6 +30,7 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
+import './atlasBusca.css';
 
 type EstadoAtlas = {
     codigo: string;
@@ -2859,6 +2860,23 @@ export default function AtlasBrasil({
                                             />
                                         )
                                     }
+
+                                    {/* RESULTADO DA PESQUISA — bairro real, com contorno sutil */}
+                                    {geometriaBairroBuscado && (
+                                        <GeoJSON
+                                            key={`bairro-pesquisa-${bairroBuscado?.municipioCodigo}-${bairroBuscado?.nome}`}
+                                            data={geometriaBairroBuscado}
+                                            style={() => ({
+                                                color: '#168FC4',
+                                                weight: 2.3,
+                                                dashArray: '5 3',
+                                                opacity: 1,
+                                                fillColor: '#168FC4',
+                                                fillOpacity: 0.10,
+                                                interactive: false
+                                            })}
+                                        />
+                                    )}
 
                                     {/* MALHA TÉRMICA CONTÍNUA */}
                                     {

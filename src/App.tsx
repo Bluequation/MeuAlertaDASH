@@ -23,6 +23,13 @@ import {
   where
 } from 'firebase/firestore';
 import AtlasBrasil from './AtlasBrasil';
+import MapaCalorAnalitico from './MapaCalorAnalitico';
+import {
+  alertaAtivo,
+  dataEmMillis,
+  statusDoAlerta,
+  type AlertaTerritorial
+} from './territorioOcorrencias';
 import { db } from './firebase';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, CartesianGrid } from 'recharts';
 import L, { divIcon } from 'leaflet';
@@ -47,22 +54,7 @@ import {
   FaApple
 } from 'react-icons/fa';
 
-interface Alerta {
-  id: string;
-  latitude: number;
-  longitude: number;
-  categoria: string;
-  titulo: string;
-  detalhe?: string;
-  hora?: string;
-  criadoEm?: number;
-  milimetrosChuva?: number;
-  votosConfirma?: number;
-  votosResolvido?: number;
-  autor?: string;
-  temFoto?: boolean;
-  fotoUrl?: string;
-}
+type Alerta = AlertaTerritorial;
 
 interface EstacaoMeteo {
   id: string;
@@ -95,92 +87,6 @@ const CORES_CATEGORIAS: Record<string, string> = {
 
 const corDaCategoria = (categoria: string): string =>
   CORES_CATEGORIAS[categoria] ?? '#718399';
-
-const GRADIENTES_CALOR: Record<string, Record<number, string>> = {
-
-  // TODAS — ESCALA VIVA, SEM EXTREMOS ESCUROS
-  'Todas': {
-    0.10: '#B8E2FF',
-    0.325: '#329EED',
-    0.55: '#46D898',
-    0.775: '#F9E14D',
-    1.00: '#FF6155'
-  },
-
-  // CHUVAS — AZUL
-  'Chuvas': {
-    0.10: '#C6EAFF',
-    0.325: '#85D4FA',
-    0.55: '#43B9F0',
-    0.775: '#168FDC',
-    1.00: '#176FC4'
-  },
-
-  // PASSAGEM — AMARELO E ÂMBAR
-  'Passagem': {
-    0.10: '#FFF3AA',
-    0.325: '#FFE27A',
-    0.55: '#FFC54C',
-    0.775: '#F7A832',
-    1.00: '#E98C29'
-  },
-
-  // ENERGIA — VIOLETA
-  'Energia': {
-    0.10: '#EBDFFF',
-    0.325: '#D0B7FF',
-    0.55: '#B58BF4',
-    0.775: '#966FE4',
-    1.00: '#805CCD'
-  },
-
-  // ESTRADA — VERDE
-  'Estrada': {
-    0.10: '#D5F3C5',
-    0.325: '#A9E8B0',
-    0.55: '#76D89C',
-    0.775: '#42BE83',
-    1.00: '#249F72'
-  },
-
-  // QUENTURA — CORAL E VERMELHO
-  'Quentura': {
-    0.10: '#FFE1CF',
-    0.325: '#FFB99A',
-    0.55: '#FF936D',
-    0.775: '#F66C50',
-    1.00: '#E84B43'
-  }
-};
-
-const getGradiente = (filtro: string) => {
-  if (filtro.includes('Chuva')) return GRADIENTES_CALOR['Chuvas'];
-  if (filtro.includes('Passagem')) return GRADIENTES_CALOR['Passagem'];
-  if (filtro.includes('Energia')) return GRADIENTES_CALOR['Energia'];
-  if (filtro.includes('Estrada')) return GRADIENTES_CALOR['Estrada'];
-  if (filtro.includes('Quentura')) return GRADIENTES_CALOR['Quentura'];
-  return GRADIENTES_CALOR['Todas'];
-};
-
-function CamadaCalor({
-  alertas,
-  gradiente
-}: {
-  alertas: Alerta[];
-  gradiente: Record<number, string>;
-}) {
-  const map = useMap();
-  useEffect(() => {
-    if (!map || alertas.length === 0) return;
-    const pontos = alertas.map(a => [a.latitude, a.longitude, 0.4] as [number, number, number]);
-    const heatLayer = L.heatLayer(pontos, {
-      radius: 30, blur: 6, maxZoom: 15, max: 1.0, minOpacity: 0.35, gradient: gradiente
-    }).addTo(map);
-    return () => { map.removeLayer(heatLayer); };
-  }, [map, alertas, gradiente]);
-  return null;
-}
-
 
 // DADOS METEOROLÓGICOS ESTIMADOS PELA OPEN-METEO
 interface DadosOpenMeteo {
@@ -1712,13 +1618,11 @@ function App() {
   const [minhaLocalizacao, setMinhaLocalizacao] = useState<[number, number] | null>(null);
   const [carregamentoInicial, setCarregamentoInicial] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState<'visao_geral' | 'mapa_calor' | 'meteorologia' | 'sobre'>('visao_geral');
-  const [filtroCalor, setFiltroCalor] = useState<string>('Todas');
   // Zoom atual da aba Mapa de Calor
   const [filtroCategoria, setFiltroCategoria] = useState<string>('Todas');
   const [online, setOnline] = useState(navigator.onLine);  // 👇 ESTADOS PARA CONTROLAR A RESPONSIVIDADE E O MENU MOBILE
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [menuAberto, setMenuAberto] = useState(false);
-  const [infoMapaCalorAberta, setInfoMapaCalorAberta] = useState(false);
 
   const [tecnologiaAtual, setTecnologiaAtual] = useState(0);
 
@@ -1852,7 +1756,17 @@ function App() {
             titulo: dados.titulo || 'Sem título',
             detalhe: dados.detalhe,
             hora: dados.hora || '--:--',
-            criadoEm: dados.criadoEm || 0,
+            criadoEm: dataEmMillis(dados.criadoEm),
+            expiraEm: dataEmMillis(dados.expiraEm),
+            ultimaConfirmacaoEm: dataEmMillis(dados.ultimaConfirmacaoEm),
+            condicoesQuentura: Array.isArray(dados.condicoesQuentura)
+              ? dados.condicoesQuentura.filter(
+                  (condicao: unknown): condicao is string =>
+                    typeof condicao === 'string' && condicao.trim().length > 0
+                )
+              : undefined,
+            sombraQuentura: typeof dados.sombraQuentura === 'string'
+              ? dados.sombraQuentura : null,
             milimetrosChuva: dados.milimetrosChuva ?? (mmTitulo ? Number(mmTitulo[1].replace(',', '.')) : undefined),
             votosConfirma: dados.votosConfirma || 0,
             votosResolvido: dados.votosResolvido || 0,
@@ -2575,7 +2489,7 @@ function App() {
     ? alertas
     : alertas.filter(a => a.categoria === filtroCategoria);
 
-  const alertasAtivosVisao = alertasVisaoGeral.filter(a => (a.votosResolvido || 0) < 3);
+  const alertasAtivosVisao = alertasVisaoGeral.filter(a => alertaAtivo(a, agoraMeteo));
   const alertasResolvidosVisao = alertasVisaoGeral.filter(a => (a.votosResolvido || 0) >= 3);
 
   const alertasPorCategoria = alertasVisaoGeral.reduce((acc: Record<string, number>, alerta) => {
@@ -2646,20 +2560,9 @@ function App() {
         : a.hora || ''
     }));
 
-  const alertasAtivos = alertas.filter(a => (a.votosResolvido || 0) < 3);
+  const alertasAtivos = alertas.filter(a => alertaAtivo(a, agoraMeteo));
 
   const alertasRecentes = [...alertasVisaoGeral].sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
-  const categoriasUnicas = Array.from(new Set(alertasAtivos.map(a => a.categoria)));
-
-  const alertasParaOMapa = filtroCalor === 'Todas'
-    ? alertasAtivos
-    : alertasAtivos.filter(a => a.categoria === filtroCalor);
-  const gradienteAtual = getGradiente(filtroCalor);
-
-  const valoresOrdenados = Object.entries(gradienteAtual).sort((a, b) => Number(a[0]) - Number(b[0])).map(item => item[1]);
-  const coresLegenda = Array.from(new Set(valoresOrdenados));
-
-  const cssLegenda = `linear-gradient(to right, ${coresLegenda[0]} 0%, ${coresLegenda[0]} 20%, ${coresLegenda[1]} 20%, ${coresLegenda[1]} 40%, ${coresLegenda[2]} 40%, ${coresLegenda[2]} 60%, ${coresLegenda[3]} 60%, ${coresLegenda[3]} 80%, ${coresLegenda[4]} 80%, ${coresLegenda[4]} 100%)`;
 
   const getCorCategoria = (nomeCategoria: string) => {
     return corDaCategoria(nomeCategoria);
@@ -5356,357 +5259,12 @@ function App() {
         )}
 
         {abaAtiva === 'mapa_calor' && (
-          /* =================== MAPA DE CALOR COM FILTROS =================== */
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: isMobile ? 'column' : 'row',
-                justifyContent: 'space-between',
-                alignItems: isMobile ? 'flex-start' : 'center',
-                gap: isMobile ? '12px' : '0',
-                marginBottom: '24px'
-              }}
-            >
-              <h1
-                style={{
-                  color: '#1C1C1E',
-                  fontSize: isMobile ? '24px' : '28px',
-                  fontWeight: '700',
-                  margin: 0
-                }}
-              >
-                Mapa de Calor
-              </h1>
-
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: isMobile ? 'flex-start' : 'flex-end',
-                  gap: '7px'
-                }}
-              >
-                <button
-                  onClick={() => setInfoMapaCalorAberta(true)}
-                  style={{
-                    border: 'none',
-                    backgroundColor: '#FFFFFF',
-                    color: '#007AFF',
-                    padding: '7px 11px',
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.07)'
-                  }}
-                >
-                  <FaInfoCircle size={14} />
-                  Como interpretar o mapa?
-                </button>
-
-                <span
-                  style={{
-                    color: '#8E8E93',
-                    fontSize: '10px',
-                    fontWeight: '600'
-                  }}
-                >
-                  Mostrando {alertasParaOMapa.length} ocorrências
-                </span>
-              </div>
-            </div>
-
-            {infoMapaCalorAberta && (
-              <div
-                onClick={() => setInfoMapaCalorAberta(false)}
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  width: '100vw',
-                  height: '100vh',
-                  backgroundColor: 'rgba(0,0,0,0.35)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 20000,
-                  padding: '16px',
-                  boxSizing: 'border-box'
-                }}
-              >
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    width: isMobile ? '100%' : '520px',
-                    maxWidth: '520px',
-                    maxHeight: '82vh',
-                    overflowY: 'auto',
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '22px',
-                    padding: isMobile ? '22px' : '28px',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.22)',
-                    position: 'relative'
-                  }}
-                >
-
-                  <button
-                    onClick={() => setInfoMapaCalorAberta(false)}
-                    style={{
-                      position: 'absolute',
-                      top: '16px',
-                      right: '16px',
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '50%',
-                      border: 'none',
-                      backgroundColor: '#F2F2F7',
-                      color: '#636366',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <MdClose size={19} />
-                  </button>
-
-                  <div
-                    style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '12px',
-                      backgroundColor: '#EAF5FF',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '14px'
-                    }}
-                  >
-                    <FaInfoCircle size={20} color="#007AFF" />
-                  </div>
-
-                  <h2
-                    style={{
-                      color: '#1C1C1E',
-                      fontSize: '20px',
-                      margin: '0 40px 20px 0'
-                    }}
-                  >
-                    Como interpretar o Mapa de Calor?
-                  </h2>
-
-                  <div style={{ marginBottom: '18px' }}>
-                    <strong
-                      style={{
-                        display: 'block',
-                        color: '#1C1C1E',
-                        fontSize: '14px',
-                        marginBottom: '5px'
-                      }}
-                    >
-                      O que este mapa mostra?
-                    </strong>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        color: '#6E6E73',
-                        fontSize: '13px',
-                        lineHeight: '1.6',
-                        textAlign: 'justify'
-                      }}
-                    >
-                      O mapa mostra onde estão concentradas as ocorrências ativas
-                      registradas pela comunidade por meio do CUIDAÍ.
-                    </p>
-                  </div>
-
-                  <div style={{ marginBottom: '18px' }}>
-                    <strong
-                      style={{
-                        display: 'block',
-                        color: '#1C1C1E',
-                        fontSize: '14px',
-                        marginBottom: '5px'
-                      }}
-                    >
-                      Como interpretar as cores?
-                    </strong>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        color: '#6E6E73',
-                        fontSize: '13px',
-                        lineHeight: '1.6',
-                        textAlign: 'justify'
-                      }}
-                    >
-                      Quanto mais intensa a cor, maior é a concentração de registros
-                      próximos uns dos outros naquela região. Cores menos intensas
-                      indicam uma menor concentração.
-                    </p>
-                  </div>
-
-                  <div style={{ marginBottom: '18px' }}>
-                    <strong
-                      style={{
-                        display: 'block',
-                        color: '#1C1C1E',
-                        fontSize: '14px',
-                        marginBottom: '5px'
-                      }}
-                    >
-                      O que significa “Mostrando X ocorrências”?
-                    </strong>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        color: '#6E6E73',
-                        fontSize: '13px',
-                        lineHeight: '1.6',
-                        textAlign: 'justify'
-                      }}
-                    >
-                      É a quantidade de ocorrências ativas que estão sendo consideradas
-                      para formar o mapa de calor naquele momento.
-                    </p>
-                  </div>
-
-                  <div style={{ marginBottom: '18px' }}>
-                    <strong
-                      style={{
-                        display: 'block',
-                        color: '#1C1C1E',
-                        fontSize: '14px',
-                        marginBottom: '5px'
-                      }}
-                    >
-                      Para que servem os filtros?
-                    </strong>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        color: '#6E6E73',
-                        fontSize: '13px',
-                        lineHeight: '1.6',
-                        textAlign: 'justify'
-                      }}
-                    >
-                      Os filtros permitem visualizar somente uma categoria de ocorrência.
-                      Ao selecionar “Todas”, o mapa considera todas as categorias ativas.
-                    </p>
-                  </div>
-
-                  <div
-                    style={{
-                      backgroundColor: '#F2F2F7',
-                      borderRadius: '14px',
-                      padding: '14px 16px'
-                    }}
-                  >
-                    <strong
-                      style={{
-                        display: 'block',
-                        color: '#214563',
-                        fontSize: '13px',
-                        marginBottom: '5px'
-                      }}
-                    >
-                      Importante
-                    </strong>
-
-                    <span
-                      style={{
-                        display: 'block',
-                        color: '#5E5E63',
-                        fontSize: '12px',
-                        lineHeight: '1.55'
-                      }}
-                    >
-                      Uma cor mais intensa indica mais registros próximos entre si.
-                      Ela não indica, necessariamente, que uma ocorrência é mais grave
-                      do que outra.
-                    </span>
-                  </div>
-
-                </div>
-              </div>
-            )}
-
-            <div style={{ ...cardStyle, flex: 1, padding: 0, overflow: 'hidden', position: 'relative', minHeight: isMobile ? '500px' : 'auto' }}>
-              <div style={{ position: 'absolute', top: isMobile ? 10 : 20, left: isMobile ? 10 : 60, zIndex: 1000, display: 'flex', gap: '8px', flexWrap: 'wrap', maxWidth: isMobile ? '90%' : '60%' }}>
-                <button onClick={() => setFiltroCalor('Todas')} style={{ padding: '8px 16px', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', backgroundColor: filtroCalor === 'Todas' ? '#1C1C1E' : 'rgba(255,255,255,0.9)', color: filtroCalor === 'Todas' ? 'white' : '#8E8E93', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>Todas</button>
-                {categoriasUnicas.map(categoria => <button key={categoria} onClick={() => setFiltroCalor(categoria as string)} style={{
-                  padding: '8px 16px', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', backgroundColor: filtroCalor === categoria
-                    ? corDaCategoria(categoria)
-                    : 'rgba(255,255,255,0.9)', color: filtroCalor === categoria ? 'white' : '#8E8E93', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                }}>{categoria as string}</button>)}
-              </div>
-
-              <div style={{ position: 'absolute', bottom: isMobile ? 20 : 'auto', top: isMobile ? 'auto' : 20, right: isMobile ? '50%' : 20, transform: isMobile ? 'translateX(50%)' : 'none', zIndex: 1000, backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', padding: '16px', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
-                <strong style={{ display: 'block', marginBottom: '12px', fontSize: '14px', textAlign: 'center' }}>
-                  Concentração de registros
-                </strong>
-
-                <div
-                  style={{
-                    width: '200px',
-                    height: '14px',
-                    borderRadius: '8px',
-                    background: cssLegenda
-                  }}
-                />
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: '20px',
-                    marginTop: '7px',
-                    fontSize: '10px',
-                    color: '#8E8E93',
-                    fontWeight: 600
-                  }}
-                >
-                  <span>Menor concentração</span>
-                  <span>Maior concentração</span>
-                </div>
-              </div>
-
-
-
-              <MapContainer
-                center={minhaLocalizacao}
-                zoom={14}
-                style={{
-                  height: '100%',
-                  width: '100%',
-                  zIndex: 1,
-                  backgroundColor: '#FFFFFF'
-                }}
-              >
-                <TileLayer
-                  className="mapa-cuidai"
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-
-                <CamadaCalor
-                  alertas={alertasParaOMapa}
-                  gradiente={gradienteAtual}
-                />
-              </MapContainer>
-            </div>
-          </div>
+          <MapaCalorAnalitico
+            alertas={alertas}
+            centro={minhaLocalizacao}
+            agora={agoraMeteo}
+          />
         )}
-
-
 
         {abaAtiva === 'sobre' && (
           <div

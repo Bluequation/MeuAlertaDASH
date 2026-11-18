@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import L from 'leaflet';
 import 'leaflet.heat';
+import { FiArrowLeft, FiCloudRain, FiDroplet, FiMap, FiSun, FiThermometer, FiWind, FiZap, FiAlertCircle } from 'react-icons/fi';
 import {
   alertaAtivo,
   CORES_OCORRENCIAS,
@@ -24,6 +25,24 @@ type Props = {
 
 const DIA = 24 * 60 * 60 * 1000;
 const SOMBRAS: Sombra[] = ['Sim', 'Não', 'Parcialmente', 'Não informado'];
+
+const CATEGORIAS_ALERTA = [
+  { chave: 'Chuvas', rotulo: 'Chuva', Icone: FiCloudRain },
+  { chave: 'Quentura', rotulo: 'Quentura', Icone: FiSun },
+  { chave: 'Estrada', rotulo: 'Estrada', Icone: FiMap },
+  { chave: 'Passagem', rotulo: 'Passagem molhada', Icone: FiDroplet },
+  { chave: 'Energia', rotulo: 'Energia', Icone: FiZap }
+] as const;
+
+function iconeSubcategoria(categoria: string, nome: string) {
+  const texto = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (categoria === 'Quentura') {
+    if (texto.includes('sol')) return FiSun;
+    if (texto.includes('mormaco')) return FiThermometer;
+    if (texto.includes('ar parado')) return FiWind;
+  }
+  return CATEGORIAS_ALERTA.find(item => item.chave === categoria)?.Icone ?? FiAlertCircle;
+}
 const gradienteTodas = { 0.10: '#B8E2FF', 0.325: '#329EED', 0.55: '#46D898', 0.775: '#F9E14D', 1.00: '#FF6155' };
 const gradientes: Record<string, Record<number, string>> = {
   Todas: gradienteTodas,
@@ -144,32 +163,6 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
     subcategoriasDoAlerta(a).includes(subcategoria)
   ), [porCategoria, subcategoria]);
 
-  // Quando "Todas" está selecionado, o painel já apresenta uma visão
-  // cruzada de categoria + subcategoria, sem uma segunda área vazia.
-  const subcategoriasGerais = useMemo(() => {
-    const grupos = new Map<string, {
-      categoria: string; nome: string; quantidade: number;
-    }>();
-    base.forEach(alerta => {
-      subcategoriasDoAlerta(alerta).forEach(nome => {
-        const chave = JSON.stringify([alerta.categoria, nome]);
-        const atual = grupos.get(chave);
-        if (atual) atual.quantidade += 1;
-        else grupos.set(chave, {
-          categoria: alerta.categoria, nome, quantidade: 1
-        });
-      });
-    });
-    return [...grupos.values()].sort((a, b) =>
-      b.quantidade - a.quantidade ||
-      a.categoria.localeCompare(b.categoria, 'pt-BR') ||
-      a.nome.localeCompare(b.nome, 'pt-BR')
-    );
-  }, [base]);
-  const maxSubcategoriaGeral = Math.max(
-    1, ...subcategoriasGerais.map(item => item.quantidade)
-  );
-
   const sombras = useMemo(() => agruparContagem(
     porSubcategoria.filter(a => a.categoria === 'Quentura').map(sombraDoAlerta)
   ), [porSubcategoria]);
@@ -188,8 +181,46 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
 
   const totalVencidos = base.filter(a => statusDoAlerta(a, agora) === 'expirado').length;
   const totalResolvidos = base.filter(a => statusDoAlerta(a, agora) === 'resolvido').length;
-  const maxCategoria = Math.max(1, ...categoriasPeriodo.map(a => a.quantidade));
   const maxSubcategoria = Math.max(1, ...subcategorias.map(a => a.quantidade));
+
+  // Comparação histórica entre períodos equivalentes do mês atual e anterior.
+  // Usa a data de criação, não o status vigente, para não inventar um histórico de ativos.
+  const comparativoMensal = useMemo(() => {
+    const horaLocal = new Date(agora - 3 * 60 * 60 * 1000);
+    const ano = horaLocal.getUTCFullYear();
+    const mes = horaLocal.getUTCMonth();
+    const dia = horaLocal.getUTCDate();
+    const diasMesAnterior = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+    const diasComparados = Math.min(dia, diasMesAnterior);
+    const inicioAtual = Date.UTC(ano, mes, 1, 3);
+    const fimAtual = Math.min(agora, Date.UTC(ano, mes, diasComparados + 1, 3) - 1);
+    const inicioAnterior = Date.UTC(ano, mes - 1, 1, 3);
+    const fimAnterior = Date.UTC(ano, mes - 1, diasComparados + 1, 3) - 1;
+    const registros = alertas.filter(alerta =>
+      typeof alerta.criadoEm === 'number' &&
+      (categoria === 'Todas' || alerta.categoria === categoria) &&
+      (subcategoria === 'Todas' || subcategoriasDoAlerta(alerta).includes(subcategoria)) &&
+      (categoria !== 'Quentura' || sombra === 'Todas' || sombraDoAlerta(alerta) === sombra)
+    );
+    const contar = (inicio: number, fim: number) =>
+      registros.filter(alerta => (alerta.criadoEm ?? -1) >= inicio &&
+        (alerta.criadoEm ?? -1) <= fim).length;
+    const atual = contar(inicioAtual, fimAtual);
+    const anterior = contar(inicioAnterior, fimAnterior);
+    const nomeAtual = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(ano, mes, 1)));
+    const nomeAnterior = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(ano, mes - 1, 1)));
+    const periodo = `1º a ${diasComparados} de ${nomeAtual}`;
+    if (atual === 0 && anterior === 0)
+      return `Nenhum registro criado de ${periodo} ou no mesmo período de ${nomeAnterior}.`;
+    if (anterior === 0)
+      return `${atual} registro(s) criado(s) de ${periodo}; nenhum no mesmo período de ${nomeAnterior}.`;
+    const variacao = Math.round((atual - anterior) / anterior * 100);
+    if (variacao === 0)
+      return `De ${periodo}: ${atual} registro(s), mesma quantidade do período equivalente de ${nomeAnterior}.`;
+    return `De ${periodo}: ${atual} registro(s), ${Math.abs(variacao)}% ${variacao > 0 ? 'a mais' : 'a menos'} que no mesmo período de ${nomeAnterior} (${anterior}).`;
+  }, [alertas, agora, categoria, subcategoria, sombra]);
 
   // Número por dia ou mês de criação. Não afirma que esses registros
   // estavam ativos na época, porque faltam carimbos de resolução.
@@ -240,21 +271,20 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
       <div className="territorio-analise__topo">
         <div className="territorio-analise__topo-esquerda">
           <header className="territorio-analise__cabecalho">
-            <div>
-              <h1>Mapa de Calor</h1>
-              <p>Concentração territorial das ocorrências registradas pela comunidade.</p>
-            </div>
-            <div className="territorio-analise__modos" role="group" aria-label="Tipo de consulta">
-              <button type="button" className={modo === 'atuais' ? 'ativo' : ''}
-                aria-pressed={modo === 'atuais'} onClick={() => setModo('atuais')}>
-                Ativos agora
-              </button>
-              <button type="button" className={modo === 'historico' ? 'ativo' : ''}
-                aria-pressed={modo === 'historico'} onClick={() => setModo('historico')}>
-                Histórico
-              </button>
-            </div>
+            <h1>Mapa de Calor</h1>
+            <p>Distribuição dos alertas no território.</p>
           </header>
+
+          <div className="territorio-analise__modos" role="group" aria-label="Tipo de consulta">
+            <button type="button" className={modo === 'atuais' ? 'ativo' : ''}
+              aria-pressed={modo === 'atuais'} onClick={() => setModo('atuais')}>
+              Ativos agora
+            </button>
+            <button type="button" className={modo === 'historico' ? 'ativo' : ''}
+              aria-pressed={modo === 'historico'} onClick={() => setModo('historico')}>
+              Histórico
+            </button>
+          </div>
 
           {modo === 'historico' && (
             <div className="territorio-analise__periodo">
@@ -277,133 +307,129 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
                     max={diaLocal(agora)} onChange={e => setDataFim(e.target.value)} /></label>
                 </div>
               )}
-              {!intervalo.valido && <p role="alert">Selecione uma data inicial anterior à data final.</p>}
+              {!intervalo.valido && <p role="alert">Selecione uma data inicial anterior à final.</p>}
             </div>
           )}
 
-          {(categoria !== 'Todas' || subcategoria !== 'Todas' || sombra !== 'Todas') && (
-            <div className="territorio-analise__recorte" aria-live="polite">
-              <div className="territorio-analise__recorte-resumo">
-                <span>Exibindo</span>
-                <strong>{[
-                  categoria,
-                  ...(subcategoria !== 'Todas' ? [subcategoria] : []),
-                  ...(sombra !== 'Todas' ? [`Sombra: ${sombra}`] : [])
-                ].join(' · ')}</strong>
-              </div>
-              <button type="button" title="Remover filtros de categoria, subcategoria e sombra"
-                onClick={() => {
-                  setCategoria('Todas');
-                  setSubcategoria('Todas');
-                  setSombra('Todas');
-                }}>
-                Limpar
-              </button>
-            </div>
-          )}
-
-          <div className="territorio-analise__metricas">
-            <div><strong>{filtrados.length.toLocaleString('pt-BR')}</strong>
-              <span>{modo === 'atuais' ? 'Ativos' : 'No período'}</span></div>
-            <div><strong>{new Set(filtrados.map(a => a.categoria)).size}</strong>
-              <span>Categorias</span></div>
-            <div><strong>{new Set(filtrados.flatMap(subcategoriasDoAlerta)).size}</strong>
-              <span>Tipos/condições</span></div>
-            {modo === 'historico' && (
-              <div><strong>{totalResolvidos + totalVencidos}</strong>
-                <span>Já encerrados</span></div>
-            )}
-            <button type="button" onClick={() => exportarCSV(filtrados, agora)}
-              disabled={filtrados.length === 0} title="Exportar registros filtrados sem dados pessoais">
-              Exportar CSV
-            </button>
-          </div>
+          <p className="territorio-analise__comparativo" aria-live="polite">
+            {comparativoMensal}
+          </p>
         </div>
 
         <div className="territorio-analise__topo-direita">
-          <section className="territorio-analise__painel-lateral territorio-analise__painel-categorias">
-            <h2>Distribuição por categoria</h2>
-            {categoriasPeriodo.length === 0 ? <p>Sem ocorrências no período.</p>
-              : categoriasPeriodo.map(d => (
-                <button className="territorio-analise__barra" type="button" key={d.nome}
-                  aria-pressed={categoria === d.nome}
-                  title={categoria === d.nome ? 'Mostrar todas as categorias' : `Filtrar ${d.nome}`}
-                  onClick={() => {
-                    setCategoria(atual => atual === d.nome ? 'Todas' : d.nome);
-                    setSubcategoria('Todas');
-                    setSombra('Todas');
-                  }}>
-                  <span>{d.nome}</span>
-                  <b>{d.quantidade}</b>
-                  <i style={{
-                    width: `${100 * d.quantidade / maxCategoria}%`,
-                    backgroundColor: CORES_OCORRENCIAS[d.nome] ?? '#718399'
-                  }} />
-                </button>
-              ))}
-          </section>
-
-          <section className="territorio-analise__painel-lateral territorio-analise__painel-subcategorias">
-            <h2>{categoria === 'Quentura'
-              ? 'Condições de Quentura'
-              : 'Distribuição por subcategoria'}</h2>
+          <section className="territorio-analise__painel-exploracao" aria-label="Categorias e subcategorias">
             {categoria === 'Todas' ? (
-              subcategoriasGerais.length === 0 ? (
-                <p>Sem subcategorias registradas neste recorte.</p>
-              ) : (
-                <div className="territorio-analise__subcategorias-grid">
-                  {subcategoriasGerais.map(item => (
-                <button
-                  className="territorio-analise__barra"
-                  type="button"
-                  key={JSON.stringify([item.categoria, item.nome])}
-                  title={`Filtrar ${item.categoria}: ${item.nome}`}
-                  onClick={() => {
-                    setCategoria(item.categoria);
-                    setSubcategoria(item.nome);
-                    setSombra('Todas');
-                  }}
-                >
-                  <span className="territorio-analise__barra-descricao">
-                    <small>{item.categoria}</small>
-                    {item.nome}
-                  </span>
-                  <b>{item.quantidade}</b>
-                  <i style={{
-                    width: `${100 * item.quantidade / maxSubcategoriaGeral}%`,
-                    backgroundColor: CORES_OCORRENCIAS[item.categoria] ?? '#6E91B1'
-                  }} />
-                </button>
-                  ))}
-                </div>
-              )
-            ) : subcategorias.length === 0 ? (
-              <p>Nenhuma subcategoria registrada neste período.</p>
+              <div className="territorio-analise__categorias-cards" role="group"
+                aria-label="Selecionar categoria do mapa">
+                {CATEGORIAS_ALERTA.map(({ chave, rotulo, Icone }) => {
+                  const quantidade = categoriasPeriodo.find(d => d.nome === chave)?.quantidade ?? 0;
+                  return (
+                    <button key={chave} type="button"
+                      className="territorio-analise__categoria-card"
+                      title={`Filtrar ${rotulo} · ${quantidade} registro(s) neste recorte`}
+                      aria-label={`${rotulo}: ${quantidade} registro(s). Filtrar mapa`}
+                      onClick={() => {
+                        setCategoria(chave);
+                        setSubcategoria('Todas');
+                        setSombra('Todas');
+                      }}>
+                      <Icone size={27} color={CORES_OCORRENCIAS[chave]} aria-hidden="true" />
+                      <span>{rotulo}</span>
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
               <>
-                <div className="territorio-analise__subcategorias-grid">
-                  {subcategorias.map(d => (
-                  <button className="territorio-analise__barra" type="button" key={d.nome}
-                    onClick={() => setSubcategoria(atual => atual === d.nome ? 'Todas' : d.nome)}
-                    title={subcategoria === d.nome ? 'Mostrar todas as subcategorias' : `Filtrar ${d.nome}`}
-                    aria-pressed={subcategoria === d.nome}>
-                    <span>{d.nome}</span>
-                    <b>{d.quantidade}</b>
-                    <i style={{
-                      width: `${100 * d.quantidade / maxSubcategoria}%`,
-                      backgroundColor: categoria === 'Quentura' ? '#D65B39' : '#6E91B1'
-                    }} />
+                <div className="territorio-analise__exploracao-cabecalho">
+                  <button type="button" className="territorio-analise__voltar-categorias"
+                    onClick={() => {
+                      setCategoria('Todas');
+                      setSubcategoria('Todas');
+                      setSombra('Todas');
+                    }}>
+                    <FiArrowLeft size={15} aria-hidden="true" /> Todas as categorias
                   </button>
-                  ))}
+                  <h2>{CATEGORIAS_ALERTA.find(item => item.chave === categoria)?.rotulo ?? categoria}
+                    <span> · Condições registradas</span>
+                  </h2>
+                  {(subcategoria !== 'Todas' || sombra !== 'Todas') && (
+                    <button type="button" className="territorio-analise__limpar-selecao"
+                      onClick={() => {
+                        setSubcategoria('Todas');
+                        setSombra('Todas');
+                      }}>
+                      Limpar seleção
+                    </button>
+                  )}
                 </div>
-                {categoria === 'Quentura' && <p>
-                  Um relato pode indicar mais de uma condição. Por isso, a soma das condições
-                  pode superar o número de ocorrências.
-                </p>}
+                {subcategorias.length === 0 ? (
+                  <p className="territorio-analise__sem-subcategorias">
+                    Nenhuma subcategoria registrada neste recorte.
+                  </p>
+                ) : (
+                  <div className="territorio-analise__subcategorias-grid" role="group"
+                    aria-label={`Subcategorias de ${categoria}`}>
+                    {subcategorias.map(d => {
+                      const Icone = iconeSubcategoria(categoria, d.nome);
+                      const cor = CORES_OCORRENCIAS[categoria] ?? '#6E91B1';
+                      return (
+                        <button className="territorio-analise__subcategoria-card"
+                          key={d.nome} type="button"
+                          aria-pressed={subcategoria === d.nome}
+                          title={subcategoria === d.nome ? 'Mostrar todas as subcategorias' : `Filtrar ${d.nome}`}
+                          onClick={() => {
+                            setSubcategoria(atual => atual === d.nome ? 'Todas' : d.nome);
+                            setSombra('Todas');
+                          }}>
+                          <div className="territorio-analise__subcategoria-descricao">
+                            <Icone size={17} color={cor} aria-hidden="true" />
+                            <span>{d.nome}</span>
+                            <strong>{d.quantidade}</strong>
+                          </div>
+                          <div className="territorio-analise__barra-trilho" aria-hidden="true">
+                            <i style={{
+                              width: `${100 * d.quantidade / maxSubcategoria}%`,
+                              backgroundColor: cor
+                            }} />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {categoria === 'Quentura' && (
+                  <p className="territorio-analise__nota-condicoes">
+                    Um relato pode indicar várias condições; as contagens não devem ser somadas.
+                  </p>
+                )}
               </>
             )}
           </section>
         </div>
+      </div>
+
+      <div className="territorio-analise__metricas territorio-analise__metricas--resumo">
+        <div><strong>{filtrados.length.toLocaleString('pt-BR')}</strong>
+          <span>{modo === 'atuais' ? 'Ativos agora' : 'No período'}</span></div>
+        <div><strong>{new Set(filtrados.map(a => a.categoria)).size}</strong>
+          <span>Categorias</span></div>
+        <div><strong>{new Set(filtrados.flatMap(subcategoriasDoAlerta)).size}</strong>
+          <span>Tipos/condições</span></div>
+        {modo === 'historico' && (
+          <div><strong>{totalResolvidos + totalVencidos}</strong>
+            <span>Já encerrados</span></div>
+        )}
+        {(subcategoria !== 'Todas' || sombra !== 'Todas') && (
+          <span className="territorio-analise__recorte-atual">
+            Exibindo: {subcategoria !== 'Todas' ? subcategoria : categoria}
+            {sombra !== 'Todas' ? ` · Sombra: ${sombra}` : ''}
+          </span>
+        )}
+        <button type="button" onClick={() => exportarCSV(filtrados, agora)}
+          disabled={filtrados.length === 0} title="Exportar registros filtrados sem dados pessoais">
+          Exportar CSV
+        </button>
       </div>
 
       <div className="territorio-analise__mapa" role="region"

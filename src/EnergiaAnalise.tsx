@@ -209,7 +209,7 @@ export default function EnergiaAnalise({
                 </div>
                 <button type="button" aria-pressed={idConsulta === alerta.id}
                   onClick={() => setIdConsulta(id => id === alerta.id ? null : alerta.id)}>
-                  {idConsulta === alerta.id ? 'Ocultar clima' : 'Clima no relato'}
+                  {idConsulta === alerta.id ? 'Ocultar tempo' : 'Condições do tempo'}
                 </button>
               </div>
             );

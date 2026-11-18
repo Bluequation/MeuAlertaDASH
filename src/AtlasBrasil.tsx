@@ -2960,6 +2960,10 @@ export default function AtlasBrasil({
 
                                         <div className="atlas-toolbar__gradiente" />
 
+                                        <span className="atlas-toolbar__referencia-modelo">
+                                            Open-Meteo • referência {perfilMunicipio.horario.replace('T', ' às ')}
+                                        </span>
+
                                         <div className="atlas-toolbar__marcas">
                                             {escalaTermica === 'contraste' ? (
                                                 <>

@@ -739,14 +739,18 @@ export default function HistoricoEstacoes({
                     <p role="alert">{erro}</p>
                 </article>
             )}
-            {!carregando && !erro && leituras.length === 0 && (
+            {!carregando && !erro && !carregandoComparacao &&
+                leituras.length === 0 &&
+                (!comparar || leiturasComparacao.length === 0) && (
                 <article className="obs-bloco">
                     <h4>Sem medições no período</h4>
                     <p>Não foram encontradas leituras válidas no intervalo escolhido.</p>
                 </article>
             )}
 
-            {!carregando && !erro && leituras.length > 0 && (
+            {!carregando && !erro &&
+                (leituras.length > 0 || (comparar &&
+                    !carregandoComparacao && leiturasComparacao.length > 0)) && (
                 <>
                     {parcial && (
                         <p className="historico-periodo-alerta" role="alert">
@@ -755,71 +759,34 @@ export default function HistoricoEstacoes({
                             reduza o período para analisar todas as medições.
                         </p>
                     )}
-                    <div className="historico-resumo">
-                        <div className="historico-resumo-total">
-                            <span className="historico-resumo-icone">
-                                <FiDatabase />
-                            </span>
-                            <strong>{leituras.length.toLocaleString('pt-BR')} medições</strong>
-                            <span className="historico-periodo-resumo">
-                                {pontosDisponiveis.length} médias no gráfico
-                            </span>
+                    {erroComparacao && (
+                        <p className="historico-periodo-alerta" role="alert">
+                            Não foi possível consultar o período B.
+                            A série A continua disponível.
+                        </p>
+                    )}
+                    {carregandoComparacao && (
+                        <p className="historico-carregando-comparacao" role="status">
+                            Consultando período B...
+                        </p>
+                    )}
+                    {parcialComparacao && (
+                        <p className="historico-periodo-alerta" role="alert">
+                            A consulta do período B atingiu o limite de leituras;
+                            a comparação pode estar incompleta.
+                        </p>
+                    )}
+                    {comparar && !carregandoComparacao && !erroComparacao && (
+                        <div className="historico-legenda-comparacao">
+                            <span><i className="historico-legenda-comparacao__a" />
+                                A • {descricaoIntervalo(inicioPeriodo, instanteConsulta)}</span>
+                            <span><i className="historico-legenda-comparacao__b" />
+                                B • {descricaoIntervalo(inicioComparacao, fimComparacao)}</span>
                         </div>
-                        <div className="historico-resumo-periodo">
-                            <FiClock aria-hidden="true" />
-                            <span>
-                                {formatarData(leituras[0].recebidoEm, true)}
-                                {' até '}
-                                {formatarData(
-                                    leituras[leituras.length - 1].recebidoEm,
-                                    true
-                                )}
-                            </span>
-                        </div>
-                        <details className="historico-exportacao">
-                            <summary>
-                                <FiDownload aria-hidden="true" />
-                                Exportar
-                                <span aria-hidden="true">▾</span>
-                            </summary>
-                            <div className="historico-exportacao-opcoes">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (estacao) {
-                                            abrirRelatorioHistorico(
-                                                estacao,
-                                                pontosDisponiveis.map(ponto => ({
-                                                    recebidoEm: ponto.recebidoEm,
-                                                    temperatura: ponto.temperatura!,
-                                                    umidade: ponto.umidade!
-                                                })),
-                                                {
-                                                    periodo: opcaoPeriodo.titulo,
-                                                    agregacao: opcaoPeriodo.descricao,
-                                                    totalMedicoes: leituras.length,
-                                                    incompleto: parcial
-                                                }
-                                            );
-                                        }
-                                    }}
-                                >
-                                    <FiPrinter aria-hidden="true" />
-                                    Relatório para impressão / PDF
-                                </button>
-                                <button type="button" onClick={() => baixarCSV(true)}>
-                                    <FiDownload aria-hidden="true" />
-                                    Médias do gráfico (CSV)
-                                </button>
-                                <button type="button" onClick={() => baixarCSV(false)}>
-                                    <FiDownload aria-hidden="true" />
-                                    Medições originais (CSV)
-                                </button>
-                            </div>
-                        </details>
-                    </div>
+                    )}
 
-                    {pontosDisponiveis.length >= 2 ? (
+                    {(pontosDisponiveis.length >= 2 ||
+                        (comparar && pontosComparacaoDisponiveis.length >= 2)) ? (
                         ([
                             {
                                 campo: 'temperatura',
@@ -861,7 +828,7 @@ export default function HistoricoEstacoes({
                                         initialDimension={{ width: 300, height: 240 }}
                                     >
                                         <LineChart
-                                            data={pontos}
+                                            data={pontosGrafico}
                                             margin={{ top: 8, right: 12, left: -20, bottom: 8 }}
                                         >
                                             <CartesianGrid
@@ -886,7 +853,7 @@ export default function HistoricoEstacoes({
                                             <Line
                                                 type="monotone"
                                                 dataKey={grafico.campo}
-                                                name={grafico.titulo}
+                                                name={comparar ? 'Período A' : grafico.titulo}
                                                 stroke={grafico.cor}
                                                 strokeWidth={2.5}
                                                 dot={pontosDisponiveis.length <= 12}
@@ -895,6 +862,23 @@ export default function HistoricoEstacoes({
                                                 animationDuration={650}
                                                 activeDot={{ r: 5 }}
                                             />
+                                            {comparar && !carregandoComparacao &&
+                                                !erroComparacao && (
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey={`${grafico.campo}Comparacao`}
+                                                    name="Período B"
+                                                    stroke={grafico.campo === 'temperatura'
+                                                        ? '#9D6B55'
+                                                        : '#637C9B'}
+                                                    strokeWidth={2}
+                                                    strokeDasharray="5 4"
+                                                    dot={false}
+                                                    connectNulls={false}
+                                                    isAnimationActive={false}
+                                                    activeDot={{ r: 4 }}
+                                                />
+                                            )}
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -906,13 +890,89 @@ export default function HistoricoEstacoes({
                             pelo menos dois intervalos com medições para desenhar a evolução.</p>
                         </article>
                     )}
+
+                    <div className="historico-resumo historico-resumo--rodape">
+                        <div className="historico-resumo--rodape__informacoes">
+                            <div className="historico-resumo-total">
+                                <FiDatabase aria-hidden="true" />
+                                <strong>
+                                    A: {leituras.length.toLocaleString('pt-BR')} medições
+                                </strong>
+                                <span className="historico-periodo-resumo">
+                                    {pontosDisponiveis.length} intervalos
+                                </span>
+                            </div>
+                            {comparar && (
+                                <div className="historico-resumo-total">
+                                    <FiGitCompare aria-hidden="true" />
+                                    <strong>
+                                        B: {leiturasComparacao.length.toLocaleString('pt-BR')} medições
+                                    </strong>
+                                    <span className="historico-periodo-resumo">
+                                        {pontosComparacaoDisponiveis.length} intervalos
+                                    </span>
+                                </div>
+                            )}
+                            <div className="historico-resumo-periodo">
+                                <FiClock aria-hidden="true" />
+                                <span>
+                                    {descricaoIntervalo(inicioPeriodo, instanteConsulta)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <details className="historico-exportacao">
+                            <summary>
+                                <FiDownload aria-hidden="true" />
+                                Exportar
+                                <span aria-hidden="true">▾</span>
+                            </summary>
+                            <div className="historico-exportacao-opcoes">
+                                {leituras.length > 0 && (
+                                    <>
+                                        <button type="button" onClick={() => gerarRelatorio('a')}>
+                                            <FiPrinter aria-hidden="true" />
+                                            Relatório A (PDF)
+                                        </button>
+                                        <button type="button" onClick={() => baixarCSV(true, 'a')}>
+                                            <FiDownload aria-hidden="true" />
+                                            Médias A (CSV)
+                                        </button>
+                                        <button type="button" onClick={() => baixarCSV(false, 'a')}>
+                                            <FiDownload aria-hidden="true" />
+                                            Medições A (CSV)
+                                        </button>
+                                    </>
+                                )}
+                                {comparar && !carregandoComparacao &&
+                                    !erroComparacao && leiturasComparacao.length > 0 && (
+                                    <>
+                                        <button type="button" onClick={() => gerarRelatorio('b')}>
+                                            <FiPrinter aria-hidden="true" />
+                                            Relatório B (PDF)
+                                        </button>
+                                        <button type="button" onClick={() => baixarCSV(true, 'b')}>
+                                            <FiDownload aria-hidden="true" />
+                                            Médias B (CSV)
+                                        </button>
+                                        <button type="button" onClick={() => baixarCSV(false, 'b')}>
+                                            <FiDownload aria-hidden="true" />
+                                            Medições B (CSV)
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </details>
+                    </div>
+
                     <p className="historico-fonte">
                         Fonte: Estação CUIDAÍ • Dados medidos pelos sensores,
                         não estimativas da Open-Meteo.
                         Os gráficos apresentam médias das medições disponíveis
                         em cada intervalo; horários sem dados permanecem vazios.
-                        As exportações permitem consultar tanto as médias quanto
-                        as medições originais do período selecionado.
+                        As duas séries comparadas usam a mesma escala de tempo
+                        relativo, em datas diferentes. A exportação identifica
+                        cada período e diferencia médias de medições originais.
                     </p>
                 </>
             )}

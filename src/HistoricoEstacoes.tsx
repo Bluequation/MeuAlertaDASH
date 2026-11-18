@@ -96,7 +96,7 @@ const OPCOES_PERIODO: {
     },
     {
         id: 'mes',
-        titulo: '30 dias',
+        titulo: 'Mês',
         duracao: 30 * DIA,
         agrupamento: DIA,
         descricao: 'Médias por dia'
@@ -215,20 +215,43 @@ type PontoGrafico = PontoConsolidado & {
     momentoComparacao?: string;
 };
 
-const paraInputData = (instante: number, comHora: boolean): string => {
+const paraInputData = (instante: number, periodo: Periodo): string => {
     // Ceará: UTC-03, sem horário de verão.
     const data = new Date(instante - 3 * HORA).toISOString();
-    return comHora ? data.slice(0, 16) : data.slice(0, 10);
+    return periodo === 'hora' ? data.slice(0, 16)
+        : periodo === 'mes' ? data.slice(0, 7)
+            : data.slice(0, 10);
+};
+
+const inicioMes = (instante: number): number => {
+    const anoMes = paraInputData(instante, 'mes');
+    return Date.parse(`${anoMes}-01T00:00:00-03:00`);
 };
 
 const lerDataSelecionada = (valor: string, periodo: Periodo): number | null => {
-    const complemento = periodo === 'hora'
-        ? ':00-03:00'
-        : 'T23:59:59.999-03:00';
-    const instante = Date.parse(valor + complemento);
+    let instante: number;
+    if (periodo === 'mes') {
+        if (!/^\d{4}-\d{2}$/.test(valor)) return null;
+        const [ano, mes] = valor.split('-').map(Number);
+        if (mes < 1 || mes > 12) return null;
+        const diaFinal = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+        instante = Date.parse(`${valor}-${String(diaFinal).padStart(2, '0')}T23:59:59.999-03:00`);
+    } else {
+        const complemento = periodo === 'hora'
+            ? ':00-03:00'
+            : 'T23:59:59.999-03:00';
+        instante = Date.parse(valor + complemento);
+    }
     return Number.isFinite(instante)
         ? Math.min(instante, Date.now())
         : null;
+};
+
+const mudarMes = (instante: number, direcao: -1 | 1): number => {
+    const [ano, mes] = paraInputData(instante, 'mes').split('-').map(Number);
+    const primeiroDia = new Date(Date.UTC(ano, mes - 1 + direcao, 1))
+        .toISOString().slice(0, 7);
+    return lerDataSelecionada(primeiroDia, 'mes') ?? instante;
 };
 
 const descricaoIntervalo = (inicio: number, fim: number) =>
@@ -337,17 +360,29 @@ export default function HistoricoEstacoes({
     const opcaoPeriodo = OPCOES_PERIODO.find(
         opcao => opcao.id === periodo
     )!;
-    const inicioPeriodo = instanteConsulta - opcaoPeriodo.duracao;
+    const inicioPeriodo = periodo === 'mes'
+        ? inicioMes(instanteConsulta)
+        : instanteConsulta - opcaoPeriodo.duracao;
 
 
     const fimComparacao = instanteComparacao ??
-        instanteConsulta - opcaoPeriodo.duracao;
-    const inicioComparacao = fimComparacao - opcaoPeriodo.duracao;
+        (periodo === 'mes'
+            ? mudarMes(instanteConsulta, -1)
+            : instanteConsulta - opcaoPeriodo.duracao);
+    const inicioComparacao = periodo === 'mes'
+        ? inicioMes(fimComparacao)
+        : fimComparacao - opcaoPeriodo.duracao;
+
+    const periodoAnterior = () => periodo === 'mes'
+        ? mudarMes(instanteConsulta, -1)
+        : instanteConsulta - opcaoPeriodo.duracao;
 
     const navegarPeriodo = (direcao: -1 | 1) => {
-        setInstanteConsulta(Math.min(
-            Date.now(), instanteConsulta + direcao * opcaoPeriodo.duracao
-        ));
+        setInstanteConsulta(periodo === 'mes'
+            ? mudarMes(instanteConsulta, direcao)
+            : Math.min(
+                Date.now(), instanteConsulta + direcao * opcaoPeriodo.duracao
+            ));
     };
 
     useEffect(() => {
@@ -625,11 +660,11 @@ export default function HistoricoEstacoes({
                                     ? 'historico-periodo-botao historico-periodo-botao--ativo'
                                     : 'historico-periodo-botao'}
                                 onClick={() => {
-                                    const dataAtual = paraInputData(instanteConsulta, opcao.id === 'hora');
+                                    const dataAtual = paraInputData(instanteConsulta, opcao.id);
                                     const novoFim = lerDataSelecionada(dataAtual, opcao.id);
                                     if (novoFim !== null) setInstanteConsulta(novoFim);
                                     if (comparar) {
-                                        const dataB = paraInputData(fimComparacao, opcao.id === 'hora');
+                                        const dataB = paraInputData(fimComparacao, opcao.id);
                                         const novoB = lerDataSelecionada(dataB, opcao.id);
                                         if (novoB !== null) setInstanteComparacao(novoB);
                                     }
@@ -653,9 +688,9 @@ export default function HistoricoEstacoes({
                             aria-label={periodo === 'hora'
                                 ? 'Data e hora do período A'
                                 : 'Data final do período A'}
-                            type={periodo === 'hora' ? 'datetime-local' : 'date'}
-                            max={paraInputData(Date.now(), periodo === 'hora')}
-                            value={paraInputData(instanteConsulta, periodo === 'hora')}
+                            type={periodo === 'hora' ? 'datetime-local' : periodo === 'mes' ? 'month' : 'date'}
+                            max={paraInputData(Date.now(), periodo)}
+                            value={paraInputData(instanteConsulta, periodo)}
                             onChange={evento => {
                                 const instante = lerDataSelecionada(evento.target.value, periodo);
                                 if (instante !== null) setInstanteConsulta(instante);
@@ -686,7 +721,7 @@ export default function HistoricoEstacoes({
                         onClick={() => {
                             if (!comparar && instanteComparacao === null) {
                                 setInstanteComparacao(
-                                    instanteConsulta - opcaoPeriodo.duracao
+                                    periodoAnterior()
                                 );
                             }
                             setComparar(valor => !valor);
@@ -704,9 +739,9 @@ export default function HistoricoEstacoes({
                             <div className="historico-comparacao-seletor__linha">
                                 <input
                                     id="historico-data-comparacao"
-                                    type={periodo === 'hora' ? 'datetime-local' : 'date'}
-                                    max={paraInputData(Date.now(), periodo === 'hora')}
-                                    value={paraInputData(fimComparacao, periodo === 'hora')}
+                                    type={periodo === 'hora' ? 'datetime-local' : periodo === 'mes' ? 'month' : 'date'}
+                                    max={paraInputData(Date.now(), periodo)}
+                                    value={paraInputData(fimComparacao, periodo)}
                                     onChange={evento => {
                                         const instante = lerDataSelecionada(
                                             evento.target.value, periodo
@@ -716,7 +751,7 @@ export default function HistoricoEstacoes({
                                 />
                                 <button type="button"
                                     onClick={() => setInstanteComparacao(
-                                        instanteConsulta - opcaoPeriodo.duracao
+                                        periodoAnterior()
                                     )}>
                                     Anterior
                                 </button>

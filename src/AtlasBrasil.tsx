@@ -2429,11 +2429,104 @@ export default function AtlasBrasil({
                                     ? 'Estado selecionado'
                                     : 'Selecione um estado para explorar o território'}
                     </p>
+                    {geometriaBairroBuscado && bairroBuscado && (
+                        <span className="atlas-cabecalho__bairro">
+                            Bairro {bairroBuscado.nome}
+                        </span>
+                    )}
                 </div>
 
+                <div className="atlas-busca" ref={buscaRef}>
+                    <div className="atlas-busca__campo">
+                        <FiSearch size={15} aria-hidden="true" />
+                        <input
+                            type="search"
+                            role="combobox"
+                            aria-label="Pesquisar estado, município ou bairro"
+                            aria-autocomplete="list"
+                            aria-expanded={buscaAberta && textoBusca.trim().length > 0}
+                            aria-controls="atlas-busca-resultados"
+                            placeholder="Buscar estado, município ou bairro"
+                            value={textoBusca}
+                            onFocus={() => setBuscaAberta(true)}
+                            onChange={evento => {
+                                setTextoBusca(evento.target.value);
+                                setIndiceBusca(0);
+                                setBuscaAberta(true);
+                            }}
+                            onKeyDown={evento => {
+                                if (evento.key === 'Escape') {
+                                    setBuscaAberta(false);
+                                    evento.currentTarget.blur();
+                                } else if (evento.key === 'ArrowDown' && resultadosBusca.length) {
+                                    evento.preventDefault();
+                                    setBuscaAberta(true);
+                                    setIndiceBusca(indice =>
+                                        Math.min(indice + 1, resultadosBusca.length - 1));
+                                } else if (evento.key === 'ArrowUp' && resultadosBusca.length) {
+                                    evento.preventDefault();
+                                    setIndiceBusca(indice => Math.max(0, indice - 1));
+                                } else if (evento.key === 'Enter' && resultadosBusca.length) {
+                                    evento.preventDefault();
+                                    escolherResultadoBusca(
+                                        resultadosBusca[Math.min(indiceBusca, resultadosBusca.length - 1)]
+                                    );
+                                }
+                            }}
+                        />
+                        {textoBusca && (
+                            <button
+                                type="button"
+                                className="atlas-busca__limpar"
+                                aria-label="Limpar pesquisa"
+                                onClick={() => {
+                                    setTextoBusca('');
+                                    setIndiceBusca(0);
+                                }}
+                            >
+                                <FiX size={14} aria-hidden="true" />
+                            </button>
+                        )}
+                    </div>
+
+                    {buscaAberta && textoBusca.trim().length > 0 && (
+                        <div
+                            id="atlas-busca-resultados"
+                            className="atlas-busca__resultados"
+                            role="listbox"
+                            aria-label="Resultados da pesquisa territorial"
+                        >
+                            {resultadosBusca.length ? resultadosBusca.map((resultado, indice) => (
+                                <button
+                                    key={resultado.chave}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={indice === indiceBusca}
+                                    className={indice === indiceBusca
+                                        ? 'atlas-busca__resultado atlas-busca__resultado--ativo'
+                                        : 'atlas-busca__resultado'}
+                                    onMouseEnter={() => setIndiceBusca(indice)}
+                                    onClick={() => escolherResultadoBusca(resultado)}
+                                >
+                                    <span className="atlas-busca__resultado-nome">{resultado.nome}</span>
+                                    <span className="atlas-busca__resultado-nivel">{resultado.descricao}</span>
+                                </button>
+                            )) : (
+                                <p className="atlas-busca__vazio" role="status">
+                                    {carregandoBusca
+                                        ? 'Carregando municípios...'
+                                        : erroBusca ?? 'Nenhum local encontrado nas áreas disponíveis.'}
+                                </p>
+                            )}
+                            <div className="atlas-busca__escopo">
+                                Estados do Brasil · Municípios do Ceará · Bairros de Fortaleza e Ipaporanga
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {erro && <p style={{ color: '#B42318' }}>{erro}</p>}
+            {erro && <p style={{ color: '#B42318' }}>{erro}</p>
 
             {/* ATLAS COM PAINEL ESTATÍSTICO LATERAL */}
             <div
@@ -2491,6 +2584,7 @@ export default function AtlasBrasil({
                                     navegarComFade(() => {
                                         setPontoInspecionado(null);
                                         setMostrarAmostras(false);
+                                        setBairroBuscado(null);
 
                                         if (municipio) {
                                             setMunicipio(null);
@@ -2535,6 +2629,7 @@ export default function AtlasBrasil({
                                         municipio={municipio}
                                         distritos={divisoesAtivas}
                                         distritoSelecionado={distritoSelecionado}
+                                        bairroAlvo={geometriaBairroBuscado}
                                     />
 
                                     {/* Nível municipal: base geográfica real. */}
@@ -2646,6 +2741,7 @@ export default function AtlasBrasil({
 
                                                 navegarComFade(() => {
                                                     if (!estado) {
+                                                        setBairroBuscado(null);
                                                         setEstado({
                                                             codigo: String(
                                                                 feature.properties?.CD_UF ?? ''
@@ -2662,6 +2758,7 @@ export default function AtlasBrasil({
 
                                                         setMostrarAmostras(false);
                                                         setPerfilMapa(null);
+                                                        setBairroBuscado(null);
                                                         setMunicipio({ codigo, nome });
                                                     }
                                                 });
@@ -2951,6 +3048,7 @@ export default function AtlasBrasil({
                                             setPontoInspecionado(null);
 
                                             navegarComFade(() => {
+                                                setBairroBuscado(null);
                                                 setDistritoSelecionado(codigo);
                                             });
                                         }}

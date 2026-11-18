@@ -561,11 +561,40 @@ export default function HistoricoEstacoes({
         comparar, inicioComparacao, fimComparacao, revisao, aoVivo
     ]);
 
-    // Ao vivo: mostra as 72 últimas medições reais, mesmo se a estação
-    // estiver temporariamente offline. A Open-Meteo não controla essa janela.
-    const ultimaLeituraAoVivo = aoVivo ? leituras[leituras.length - 1] : null;
+    // Fonte secundária legítima: a última medição publicada no documento da
+    // estação. Usada se a subcoleção ainda não contiver a leitura mais recente.
+    const leiturasAoVivo = useMemo<Leitura[]>(() => {
+        if (!aoVivo) return leituras;
+        const ultima = estacao?.ultimaLeitura;
+        if (!ultima || !Number.isFinite(ultima.recebidoEm) ||
+            !Number.isFinite(ultima.temperatura) ||
+            !Number.isFinite(ultima.umidade)) return leituras;
+        const registros = [...leituras];
+        if (!registros.some(item =>
+            Math.abs(item.recebidoEm - ultima.recebidoEm) < 30_000
+        )) {
+            registros.push({
+                id: `ultima-publicada-${estacao?.id ?? ''}`,
+                temperatura: ultima.temperatura,
+                umidade: ultima.umidade,
+                recebidoEm: ultima.recebidoEm
+            });
+            registros.sort((a, b) => a.recebidoEm - b.recebidoEm);
+        }
+        return registros.slice(-72);
+    }, [
+        aoVivo, leituras, estacao?.id,
+        estacao?.ultimaLeitura?.recebidoEm,
+        estacao?.ultimaLeitura?.temperatura,
+        estacao?.ultimaLeitura?.umidade
+    ]);
+
+    // Ao vivo: mostra as últimas medições reais, mesmo se a estação
+    // estiver temporariamente offline. Open-Meteo não controla essa janela.
+    const ultimaLeituraAoVivo = aoVivo
+        ? leiturasAoVivo[leiturasAoVivo.length - 1] : null;
     const inicioVisualizacao = aoVivo
-        ? (leituras[0]?.recebidoEm ?? instanteAoVivo - 2 * HORA)
+        ? (leiturasAoVivo[0]?.recebidoEm ?? instanteAoVivo - 2 * HORA)
         : inicioPeriodo;
     const fimVisualizacao = aoVivo
         ? Math.max(
@@ -597,8 +626,8 @@ export default function HistoricoEstacoes({
             umidadeMaxima: leitura?.umidade ?? null,
             quantidade: leitura ? 1 : 0
         });
-        leituras.forEach((leitura, indice) => {
-            const anterior = leituras[indice - 1];
+        leiturasAoVivo.forEach((leitura, indice) => {
+            const anterior = leiturasAoVivo[indice - 1];
             if (anterior && leitura.recebidoEm - anterior.recebidoEm > 3 * 60_000) {
                 serie.push(ponto((anterior.recebidoEm + leitura.recebidoEm) / 2));
             }
@@ -606,7 +635,7 @@ export default function HistoricoEstacoes({
         });
         return serie;
     }, [
-        leituras, aoVivo, periodo,
+        leituras, leiturasAoVivo, aoVivo, periodo,
         inicioVisualizacao, fimVisualizacao
     ]);
 
@@ -776,7 +805,7 @@ export default function HistoricoEstacoes({
 
     const resumoCampo = (campo: 'temperatura' | 'umidade') => {
         const registros = aoVivo
-            ? leituras.filter(leitura =>
+            ? leiturasAoVivo.filter(leitura =>
                 leitura.recebidoEm >= inicioVisualizacao &&
                 leitura.recebidoEm <= fimVisualizacao
             )
@@ -826,7 +855,9 @@ export default function HistoricoEstacoes({
     const dadosDaSerie = (serie: 'a' | 'b') => {
         const eComparacao = serie === 'b';
         return {
-            leituras: eComparacao ? leiturasComparacao : leituras,
+            leituras: eComparacao
+                ? leiturasComparacao
+                : aoVivo ? leiturasAoVivo : leituras,
             pontos: eComparacao ? pontosComparacaoDisponiveis : pontosDisponiveis,
             inicio: eComparacao ? inicioComparacao : inicioPeriodo,
             fim: eComparacao ? fimComparacao : instanteConsulta,
@@ -1051,8 +1082,15 @@ export default function HistoricoEstacoes({
                 </div>
                 {aoVivo ? (
                     <p className="historico-modos__ao-vivo" role="status">
-                        <span className="historico-modos__indicador" aria-hidden="true" />
-                        Atualização automática • últimas 2 horas
+                        <span className={ultimaLeituraRecente
+                            ? 'historico-modos__indicador'
+                            : 'historico-modos__indicador historico-modos__indicador--sem-leitura'}
+                            aria-hidden="true" />
+                        {ultimaLeituraAoVivo
+                            ? ultimaLeituraRecente
+                                ? 'Atualizando • últimas medições da estação'
+                                : `Última medição ${formatarData(ultimaLeituraAoVivo.recebidoEm, true)} • sem transmissão recente`
+                            : 'Aguardando medições da estação'}
                     </p>
                 ) : (
                 <div className="historico-periodo-controles">
@@ -1232,7 +1270,7 @@ export default function HistoricoEstacoes({
                 </article>
             )}
             {!carregando && !erro && !carregandoComparacao &&
-                leituras.length === 0 &&
+                (aoVivo ? leiturasAoVivo.length === 0 : leituras.length === 0) &&
                 (!comparar || leiturasComparacao.length === 0) &&
                 (!mostrarOpenMeteo || (!carregandoOpenMeteo && amostrasOpenMeteo.length === 0)) && (
                 <article className="obs-bloco">
@@ -1242,11 +1280,17 @@ export default function HistoricoEstacoes({
             )}
 
             {!carregando && !erro &&
-                (leituras.length > 0 ||
+                ((aoVivo ? leiturasAoVivo.length > 0 : leituras.length > 0) ||
                     (mostrarOpenMeteo && amostrasOpenMeteo.length > 0) ||
                     (!aoVivo && comparar && !carregandoComparacao &&
                         leiturasComparacao.length > 0)) && (
                 <>
+                    {aoVivo && leiturasAoVivo.length === 0 && (
+                        <p className="historico-periodo-alerta" role="status">
+                            A estação ainda não possui medições para desenhar a linha.
+                            Se a Open-Meteo estiver ligada, somente suas estimativas aparecerão.
+                        </p>
+                    )}
                     {parcial && (
                         <p className="historico-periodo-alerta" role="alert">
                             O limite de {MAXIMO_LEITURAS.toLocaleString('pt-BR')} leituras
@@ -1280,7 +1324,7 @@ export default function HistoricoEstacoes({
                         </div>
                     )}
 
-                    {(pontosDisponiveis.length >= 2 ||
+                    {(pontosDisponiveis.length >= 1 ||
                         (mostrarOpenMeteo && pontosOpenMeteo.length > 0) ||
                         (!aoVivo && comparar && pontosComparacaoDisponiveis.length >= 2)) ? (
                         ([
@@ -1457,7 +1501,7 @@ export default function HistoricoEstacoes({
                                 <FiDatabase aria-hidden="true" />
                                 <strong>
                                     {aoVivo ? '' : 'A: '}
-                                    {(aoVivo ? pontosDisponiveis.length : leituras.length).toLocaleString('pt-BR')} medições
+                                    {(aoVivo ? leiturasAoVivo.length : leituras.length).toLocaleString('pt-BR')} medições
                                 </strong>
                                 <span className="historico-periodo-resumo">
                                     {aoVivo ? 'atualização automática'
@@ -1478,10 +1522,10 @@ export default function HistoricoEstacoes({
                             <div className="historico-resumo-periodo">
                                 <FiClock aria-hidden="true" />
                                 <span>
-                                    {aoVivo && leituras.length > 0
+                                    {aoVivo && leiturasAoVivo.length > 0
                                         ? descricaoIntervalo(
-                                            leituras[0].recebidoEm,
-                                            leituras[leituras.length - 1].recebidoEm
+                                            leiturasAoVivo[0].recebidoEm,
+                                            leiturasAoVivo[leiturasAoVivo.length - 1].recebidoEm
                                         )
                                         : descricaoIntervalo(inicioPeriodo, instanteConsulta)}
                                 </span>

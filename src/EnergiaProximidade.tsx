@@ -106,7 +106,11 @@ async function consultarClimaEntorno(
   grupo: Grupo, agora: number, signal: AbortSignal
 ): Promise<ClimaEntorno> {
   const inicio = Math.floor(grupo.primeiro / HORA) * HORA - HORA;
-  const fim = Math.floor(grupo.ultimo / HORA) * HORA + HORA;
+  // Nunca incluir horas futuras na análise de ocorrências já registradas.
+  const fim = Math.min(
+    Math.floor(grupo.ultimo / HORA) * HORA + HORA,
+    Math.floor(agora / HORA) * HORA
+  );
   if (inicio > agora || fim < inicio) throw new Error('Intervalo inválido para consulta meteorológica.');
 
   const diaLocal = (instante: number) =>

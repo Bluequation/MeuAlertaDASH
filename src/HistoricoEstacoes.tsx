@@ -711,11 +711,17 @@ export default function HistoricoEstacoes({
     ]);
 
     const resumoCampo = (campo: 'temperatura' | 'umidade') => {
-        if (leituras.length === 0) return null;
+        const registros = aoVivo
+            ? leituras.filter(leitura =>
+                leitura.recebidoEm >= inicioVisualizacao &&
+                leitura.recebidoEm <= fimVisualizacao
+            )
+            : leituras;
+        if (registros.length === 0) return null;
         let soma = 0;
         let minimo = Number.POSITIVE_INFINITY;
         let maximo = Number.NEGATIVE_INFINITY;
-        for (const leitura of leituras) {
+        for (const leitura of registros) {
             const valor = leitura[campo];
             soma += valor;
             minimo = Math.min(minimo, valor);
@@ -723,7 +729,7 @@ export default function HistoricoEstacoes({
         }
         return {
             minimo,
-            medio: soma / leituras.length,
+            medio: soma / registros.length,
             maximo
         };
     };

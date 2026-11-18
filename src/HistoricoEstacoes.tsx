@@ -29,7 +29,10 @@ import {
     FiClock,
     FiDownload,
     FiPrinter,
-    FiRefreshCw
+    FiRefreshCw,
+    FiChevronLeft,
+    FiChevronRight,
+    FiGitCompare
 } from 'react-icons/fi';
 import { db } from './firebase';
 import { abrirRelatorioHistorico } from './RelatorioHistorico';
@@ -204,6 +207,101 @@ function consolidarLeituras(
     return pontos;
 }
 
+
+type ResultadoConsulta = { leituras: Leitura[]; parcial: boolean };
+type PontoGrafico = PontoConsolidado & {
+    temperaturaComparacao: number | null;
+    umidadeComparacao: number | null;
+    momentoComparacao?: string;
+};
+
+const paraInputData = (instante: number, comHora: boolean): string => {
+    // Ceará: UTC-03, sem horário de verão.
+    const data = new Date(instante - 3 * HORA).toISOString();
+    return comHora ? data.slice(0, 16) : data.slice(0, 10);
+};
+
+const lerDataSelecionada = (valor: string, periodo: Periodo): number | null => {
+    const complemento = periodo === 'hora'
+        ? ':00-03:00'
+        : 'T23:59:59.999-03:00';
+    const instante = Date.parse(valor + complemento);
+    return Number.isFinite(instante)
+        ? Math.min(instante, Date.now())
+        : null;
+};
+
+const descricaoIntervalo = (inicio: number, fim: number) =>
+    `${formatarData(inicio, true)} – ${formatarData(fim, true)}`;
+
+async function consultarMedicoes(
+    id: string,
+    inicio: number,
+    fim: number,
+    continuar: () => boolean
+): Promise<ResultadoConsulta> {
+    const referencia = collection(db, 'estacoesMeteorologicas', id, 'leituras');
+    const encontrados = new Map<string, Leitura>();
+    let parcial = false;
+
+    const buscarTipo = async (limiteInicio: number | Timestamp, limiteFim: number | Timestamp) => {
+        let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+        while (continuar() && encontrados.size < MAXIMO_LEITURAS) {
+            const condicoes: QueryConstraint[] = [
+                where('recebidoEm', '>=', limiteInicio),
+                where('recebidoEm', '<=', limiteFim),
+                orderBy('recebidoEm', 'desc')
+            ];
+            if (cursor) condicoes.push(startAfter(cursor));
+            condicoes.push(limit(TAMANHO_PAGINA));
+
+            const pagina = await getDocs(query(referencia, ...condicoes));
+            if (!continuar()) return;
+
+            for (const documento of pagina.docs) {
+                const dados = documento.data();
+                const instante = typeof dados.recebidoEm?.toMillis === 'function'
+                    ? dados.recebidoEm.toMillis() : dados.recebidoEm;
+                if (
+                    typeof dados.temperatura !== 'number' ||
+                    !Number.isFinite(dados.temperatura) ||
+                    dados.temperatura < -50 || dados.temperatura > 70 ||
+                    typeof dados.umidade !== 'number' ||
+                    !Number.isFinite(dados.umidade) ||
+                    dados.umidade < 0 || dados.umidade > 100 ||
+                    typeof instante !== 'number' ||
+                    !Number.isFinite(instante) ||
+                    instante < inicio || instante > fim
+                ) continue;
+
+                if (encontrados.size < MAXIMO_LEITURAS) {
+                    encontrados.set(documento.id, {
+                        id: documento.id,
+                        temperatura: dados.temperatura,
+                        umidade: dados.umidade,
+                        recebidoEm: instante
+                    });
+                }
+            }
+            if (encontrados.size >= MAXIMO_LEITURAS) {
+                parcial = true;
+                break;
+            }
+            if (pagina.size < TAMANHO_PAGINA) break;
+            cursor = pagina.docs[pagina.docs.length - 1];
+        }
+    };
+
+    await buscarTipo(inicio, fim);
+    if (continuar() && !parcial) {
+        await buscarTipo(Timestamp.fromMillis(inicio), Timestamp.fromMillis(fim));
+    }
+    return {
+        leituras: [...encontrados.values()].sort((a, b) => a.recebidoEm - b.recebidoEm),
+        parcial
+    };
+}
+
 export default function HistoricoEstacoes({
     estacoes,
     idEstacaoSelecionada
@@ -212,14 +310,21 @@ export default function HistoricoEstacoes({
         useState<string | null>(null);
     const [periodo, setPeriodo] = useState<Periodo>('hora');
     const [instanteConsulta, setInstanteConsulta] = useState(Date.now);
+    const [comparar, setComparar] = useState(false);
+    const [instanteComparacao, setInstanteComparacao] =
+        useState<number | null>(null);
+    const [revisao, setRevisao] = useState(0);
+
     const [leituras, setLeituras] = useState<Leitura[]>([]);
     const [carregando, setCarregando] = useState(false);
     const [erro, setErro] = useState<string | null>(null);
     const [parcial, setParcial] = useState(false);
+    const [leiturasComparacao, setLeiturasComparacao] = useState<Leitura[]>([]);
+    const [carregandoComparacao, setCarregandoComparacao] = useState(false);
+    const [erroComparacao, setErroComparacao] = useState<string | null>(null);
+    const [parcialComparacao, setParcialComparacao] = useState(false);
 
-    const cache = useRef(new Map<string, {
-        leituras: Leitura[];
-        parcial: boolean;
+    const cache = useRef(new Map<string, ResultadoConsulta & {
         salvoEm: number;
     }>());
 
@@ -234,156 +339,144 @@ export default function HistoricoEstacoes({
     )!;
     const inicioPeriodo = instanteConsulta - opcaoPeriodo.duracao;
 
+
+    const fimComparacao = instanteComparacao ??
+        instanteConsulta - opcaoPeriodo.duracao;
+    const inicioComparacao = fimComparacao - opcaoPeriodo.duracao;
+
+    const navegarPeriodo = (direcao: -1 | 1) => {
+        setInstanteConsulta(Math.min(
+            Date.now(), instanteConsulta + direcao * opcaoPeriodo.duracao
+        ));
+    };
+
     useEffect(() => {
         let ativo = true;
-        setLeituras([]);
-        setErro(null);
-        setParcial(false);
+        const continuar = () => ativo;
+        const cacheLocal = cache.current;
 
-        if (!idConsulta) {
-            setCarregando(false);
-            return () => { ativo = false; };
-        }
+        const consultar = async (
+            inicio: number,
+            fim: number,
+            ajustarCarregamento: (valor: boolean) => void,
+            ajustarLeituras: (valor: Leitura[]) => void,
+            ajustarParcial: (valor: boolean) => void,
+            ajustarErro: (valor: string | null) => void
+        ) => {
+            if (!idConsulta) {
+                ajustarCarregamento(false);
+                ajustarLeituras([]);
+                ajustarParcial(false);
+                ajustarErro(null);
+                return;
+            }
 
-        const consultar = async () => {
-            setCarregando(true);
-            const chaveCache = `${idConsulta}:${periodo}`;
-            const anterior = cache.current.get(chaveCache);
-            const atual = Date.now();
+            ajustarCarregamento(true);
+            ajustarErro(null);
+            ajustarLeituras([]);
+            ajustarParcial(false);
 
-            // Evita reler dezenas de milhares de documentos ao trocar de aba.
-            if (
-                anterior &&
-                atual - anterior.salvoEm < 3 * 60 * 1000 &&
-                Math.abs(atual - instanteConsulta) < 3 * 60 * 1000
-            ) {
+            const chave = `${idConsulta}:${inicio}:${fim}`;
+            const anterior = cacheLocal.get(chave);
+            if (anterior && Date.now() - anterior.salvoEm < 3 * 60 * 1000) {
                 if (ativo) {
-                    setLeituras(anterior.leituras);
-                    setParcial(anterior.parcial);
-                    setCarregando(false);
+                    ajustarLeituras(anterior.leituras);
+                    ajustarParcial(anterior.parcial);
+                    ajustarCarregamento(false);
                 }
                 return;
             }
 
             try {
-                const referencia = collection(
-                    db,
-                    'estacoesMeteorologicas',
-                    idConsulta,
-                    'leituras'
+                const resultado = await consultarMedicoes(
+                    idConsulta, inicio, fim, continuar
                 );
-
-                const documentos = new Map<string, Leitura>();
-                let limiteAtingido = false;
-
-                // O leitor aceita tanto números em milissegundos quanto
-                // Timestamp; ambos já eram reconhecidos pelo painel anterior.
-                const consultarTipo = async (
-                    inicio: number | Timestamp,
-                    fim: number | Timestamp
-                ) => {
-                    let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
-
-                    while (ativo && documentos.size < MAXIMO_LEITURAS) {
-                        const condicoes: QueryConstraint[] = [
-                            where('recebidoEm', '>=', inicio),
-                            where('recebidoEm', '<=', fim),
-                            orderBy('recebidoEm', 'desc')
-                        ];
-                        if (cursor) {
-                            condicoes.push(startAfter(cursor));
-                        }
-                        condicoes.push(limit(TAMANHO_PAGINA));
-                        const pagina = await getDocs(query(
-                            referencia,
-                            ...condicoes
-                        ));
-
-                        pagina.docs.forEach(documento => {
-                            const dados = documento.data();
-                            const instante = typeof dados.recebidoEm?.toMillis === 'function'
-                                ? dados.recebidoEm.toMillis()
-                                : dados.recebidoEm;
-
-                            if (
-                                typeof dados.temperatura !== 'number' ||
-                                !Number.isFinite(dados.temperatura) ||
-                                dados.temperatura < -50 ||
-                                dados.temperatura > 70 ||
-                                typeof dados.umidade !== 'number' ||
-                                !Number.isFinite(dados.umidade) ||
-                                dados.umidade < 0 ||
-                                dados.umidade > 100 ||
-                                typeof instante !== 'number' ||
-                                !Number.isFinite(instante) ||
-                                instante < inicioPeriodo ||
-                                instante > instanteConsulta
-                            ) return;
-
-                            if (documentos.size < MAXIMO_LEITURAS) {
-                                documentos.set(documento.id, {
-                                    id: documento.id,
-                                    temperatura: dados.temperatura,
-                                    umidade: dados.umidade,
-                                    recebidoEm: instante
-                                });
-                            }
-                        });
-
-                        if (documentos.size >= MAXIMO_LEITURAS) {
-                            limiteAtingido = true;
-                            break;
-                        }
-                        if (pagina.size < TAMANHO_PAGINA) break;
-                        cursor = pagina.docs[pagina.docs.length - 1];
-                    }
-                };
-
-                await consultarTipo(inicioPeriodo, instanteConsulta);
-                if (ativo && !limiteAtingido) {
-                    await consultarTipo(
-                        Timestamp.fromMillis(inicioPeriodo),
-                        Timestamp.fromMillis(instanteConsulta)
-                    );
-                }
-
                 if (!ativo) return;
-
-                const ordenadas = Array.from(documentos.values()).sort(
-                    (a, b) => a.recebidoEm - b.recebidoEm
-                );
-
-                cache.current.set(chaveCache, {
-                    leituras: ordenadas,
-                    parcial: limiteAtingido,
-                    salvoEm: Date.now()
-                });
-                setLeituras(ordenadas);
-                setParcial(limiteAtingido);
-                setErro(null);
+                cacheLocal.set(chave, { ...resultado, salvoEm: Date.now() });
+                ajustarLeituras(resultado.leituras);
+                ajustarParcial(resultado.parcial);
             } catch (falha) {
                 if (!ativo) return;
-                console.error('Erro ao consultar histórico:', falha);
-                setErro('Não foi possível consultar o período selecionado.');
+                console.error('Erro ao consultar série histórica:', falha);
+                ajustarErro('Não foi possível consultar o período selecionado.');
             } finally {
-                if (ativo) setCarregando(false);
+                if (ativo) ajustarCarregamento(false);
             }
         };
 
-        void consultar();
-        return () => { ativo = false; };
-    }, [idConsulta, periodo, instanteConsulta, inicioPeriodo]);
+        void consultar(
+            inicioPeriodo, instanteConsulta,
+            setCarregando, setLeituras, setParcial, setErro
+        );
 
-    const pontos = useMemo(() => consolidarLeituras(
-        leituras,
-        periodo,
-        inicioPeriodo,
-        instanteConsulta
-    ), [leituras, periodo, inicioPeriodo, instanteConsulta]);
+        if (comparar) {
+            void consultar(
+                inicioComparacao, fimComparacao,
+                setCarregandoComparacao,
+                setLeiturasComparacao,
+                setParcialComparacao,
+                setErroComparacao
+            );
+        } else {
+            setCarregandoComparacao(false);
+            setLeiturasComparacao([]);
+            setErroComparacao(null);
+            setParcialComparacao(false);
+        }
+
+        return () => { ativo = false; };
+    }, [
+        idConsulta, inicioPeriodo, instanteConsulta,
+        comparar, inicioComparacao, fimComparacao, revisao
+    ]);
+
+    const pontos = useMemo(
+        () => consolidarLeituras(
+            leituras, periodo, inicioPeriodo, instanteConsulta
+        ),
+        [leituras, periodo, inicioPeriodo, instanteConsulta]
+    );
+
+    const pontosComparacao = useMemo(
+        () => comparar
+            ? consolidarLeituras(
+                leiturasComparacao, periodo, inicioComparacao, fimComparacao
+            )
+            : [],
+        [
+            comparar, leiturasComparacao, periodo,
+            inicioComparacao, fimComparacao
+        ]
+    );
 
     const pontosDisponiveis = useMemo(
         () => pontos.filter(ponto => ponto.quantidade > 0),
         [pontos]
+    );
+    const pontosComparacaoDisponiveis = useMemo(
+        () => pontosComparacao.filter(ponto => ponto.quantidade > 0),
+        [pontosComparacao]
+    );
+
+    // Sobreposição por posição no intervalo, sem misturar os instantes reais.
+    const pontosGrafico: PontoGrafico[] = useMemo(
+        () => Array.from({
+            length: Math.max(pontos.length, pontosComparacao.length)
+        }, (_, indice) => {
+            const principal = pontos[indice];
+            const segundo = pontosComparacao[indice];
+            return {
+                recebidoEm: principal?.recebidoEm ?? segundo?.recebidoEm ?? 0,
+                momento: principal?.momento ?? segundo?.momento ?? '',
+                temperatura: principal?.temperatura ?? null,
+                umidade: principal?.umidade ?? null,
+                quantidade: principal?.quantidade ?? 0,
+                temperaturaComparacao: segundo?.temperatura ?? null,
+                umidadeComparacao: segundo?.umidade ?? null,
+                momentoComparacao: segundo?.momento
+            };
+        }),
+        [pontos, pontosComparacao]
     );
 
     const baixarCSV = (consolidado: boolean) => {

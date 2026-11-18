@@ -3948,3 +3948,24 @@ body,
   font-size: 11px;
   line-height: 1.5;
 }
+
+
+/* Estatísticas observadas: discreto, sem mais um cartão no gráfico. */
+.historico-resumo-extremos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 10px 0 -7px 1px;
+  color: #7B8B98;
+  font-size: 10px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.historico-resumo-extremos > span {
+  white-space: nowrap;
+}
+.historico-resumo-extremos b {
+  color: #42576B;
+  font-weight: 700;
+}

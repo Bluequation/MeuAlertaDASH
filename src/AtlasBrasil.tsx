@@ -1042,6 +1042,121 @@ function criarIconeQuenturaAgrupada(quantidade: number): L.DivIcon {
     });
 }
 
+
+/**
+ * Estações físicas: mesmo ícone "access-point-network" do aplicativo
+ * CUIDAÍ, com contorno azul e dimensão proporcional ao zoom.
+ * A área interativa permanece maior que o símbolo visível.
+ */
+const CAMINHO_ICONE_ESTACAO = 'M4.93 3.93A9.97 9.97 0 0 0 2 11c0 2.76 1.12 5.26 2.93 7.07l1.41-1.41A7.94 7.94 0 0 1 4 11c0-2.21.89-4.22 2.34-5.66zm14.14 0l-1.41 1.41A7.96 7.96 0 0 1 20 11c0 2.22-.89 4.22-2.34 5.66l1.41 1.41A9.97 9.97 0 0 0 22 11c0-2.76-1.12-5.26-2.93-7.07M7.76 6.76A5.98 5.98 0 0 0 6 11c0 1.65.67 3.15 1.76 4.24l1.41-1.41A4 4 0 0 1 8 11c0-1.11.45-2.11 1.17-2.83zm8.48 0l-1.41 1.41A4 4 0 0 1 16 11c0 1.11-.45 2.11-1.17 2.83l1.41 1.41A5.98 5.98 0 0 0 18 11c0-1.65-.67-3.15-1.76-4.24M12 9a2 2 0 0 0-2 2a2 2 0 0 0 2 2a2 2 0 0 0 2-2m-1 6v4h-1a1 1 0 0 0-1 1H2v2h7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1h7v-2h-7a1 1 0 0 0-1-1h-1v-4z';
+
+function criarIconeEstacaoCuidai(
+    tamanho: number,
+    selecionada: boolean
+): L.DivIcon {
+    return L.divIcon({
+        className: [
+            'atlas-estacao-icone',
+            selecionada ? 'atlas-estacao-icone--selecionada' : ''
+        ].filter(Boolean).join(' '),
+        html: `
+            <span
+                class="atlas-estacao-icone__centro"
+                style="width:${tamanho}px;height:${tamanho}px;border-width:${tamanho >= 21 ? 1.5 : 1}px"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="${CAMINHO_ICONE_ESTACAO}" />
+                </svg>
+            </span>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -14]
+    });
+}
+
+function MarcadoresEstacoesCuidai({
+    estacoes,
+    instanteAtual,
+    idSelecionada,
+    onSelecionar
+}: {
+    estacoes: EstacaoPublica[];
+    instanteAtual: number;
+    idSelecionada: string | null;
+    onSelecionar: (id: string | null) => void;
+}) {
+    const mapa = useMap();
+    const [zoomAtual, setZoomAtual] = useState(() => mapa.getZoom());
+
+    useMapEvents({
+        zoomend: () => setZoomAtual(mapa.getZoom())
+    });
+
+    // Mesmo escalonamento visual do app: 11, 16, 21 ou 26 pixels.
+    const tamanho = zoomAtual >= 17 ? 26 :
+        zoomAtual >= 15 ? 21 :
+        zoomAtual >= 13 ? 16 : 11;
+
+    return (
+        <>
+            {estacoes.map(estacao => {
+                const leitura = estacao.ultimaLeitura;
+                const recente = leitura !== null &&
+                    instanteAtual >= leitura.recebidoEm &&
+                    instanteAtual - leitura.recebidoEm <= 30 * 60 * 1000;
+                const selecionada = idSelecionada === estacao.id;
+
+                return (
+                    <Marker
+                        key={`estacao-cuidai-${estacao.id}`}
+                        position={[estacao.latitude, estacao.longitude]}
+                        icon={criarIconeEstacaoCuidai(tamanho, selecionada)}
+                        zIndexOffset={100}
+                        title={`${estacao.nome} • Estação CUIDAÍ`}
+                        eventHandlers={{
+                            click: () => onSelecionar(
+                                selecionada ? null : estacao.id
+                            )
+                        }}
+                    >
+                        <Tooltip direction="top" offset={[0, -12]}>
+                            {estacao.nome} • Estação CUIDAÍ
+                        </Tooltip>
+                        <Popup>
+                            <div style={{ minWidth: '180px' }}>
+                                <strong>{estacao.nome}</strong>
+                                <p>
+                                    {recente
+                                        ? 'Leitura recente'
+                                        : 'Sem leitura recente'}
+                                </p>
+                                {leitura ? (
+                                    <>
+                                        <div>
+                                            Temperatura:{' '}
+                                            {leitura.temperatura.toFixed(1)} °C
+                                        </div>
+                                        <div>
+                                            Umidade:{' '}
+                                            {leitura.umidade.toFixed(0)}%
+                                        </div>
+                                        <small>
+                                            {new Date(leitura.recebidoEm).toLocaleString('pt-BR')}
+                                        </small>
+                                    </>
+                                ) : (
+                                    <p>Sem medição disponível.</p>
+                                )}
+                            </div>
+                        </Popup>
+                    </Marker>
+                );
+            })}
+        </>
+    );
+}
+
 type PropsAtlas = {
     estacoes: EstacaoPublica[];
     carregandoEstacoes: boolean;
@@ -2522,82 +2637,15 @@ export default function AtlasBrasil({
                                 />
                             )}
 
-                            {/* ESTAÇÕES CUIDAÍ DO MUNICÍPIO */}
-                            {municipio && estacoesDoTerritorio.map(estacao => {
-                                const leitura = estacao.ultimaLeitura;
-
-                                const recente =
-                                    leitura !== null &&
-                                    instanteAtual >= leitura.recebidoEm &&
-                                    instanteAtual - leitura.recebidoEm <=
-                                    30 * 60 * 1000;
-
-                                const selecionada =
-                                    idEstacaoAtiva === estacao.id;
-
-                                return (
-                                    <CircleMarker
-                                        key={`estacao-cuidai-${estacao.id}`}
-                                        center={[
-                                            estacao.latitude,
-                                            estacao.longitude
-                                        ]}
-                                        radius={selecionada ? 11 : 8}
-                                        pathOptions={{
-                                            color: selecionada
-                                                ? '#192942'
-                                                : '#FFFFFF',
-                                            weight: 3,
-                                            fillColor: recente
-                                                ? '#087CDB'
-                                                : '#718399',
-                                            fillOpacity: 1
-                                        }}
-                                        eventHandlers={{
-                                            click: () =>
-                                                setIdEstacaoSelecionada(atual =>
-                                                    atual === estacao.id ? null : estacao.id
-                                                )
-                                        }}
-                                    >
-                                        <Tooltip direction="top">
-                                            {estacao.nome} • Estação CUIDAÍ
-                                        </Tooltip>
-
-                                        <Popup>
-                                            <div style={{ minWidth: '180px' }}>
-                                                <strong>{estacao.nome}</strong>
-
-                                                <p>
-                                                    {recente
-                                                        ? 'Leitura recente'
-                                                        : 'Sem leitura recente'}
-                                                </p>
-
-                                                {leitura ? (
-                                                    <>
-                                                        <div>
-                                                            Temperatura:{' '}
-                                                            {leitura.temperatura.toFixed(1)} °C
-                                                        </div>
-                                                        <div>
-                                                            Umidade:{' '}
-                                                            {leitura.umidade.toFixed(0)}%
-                                                        </div>
-                                                        <small>
-                                                            {new Date(
-                                                                leitura.recebidoEm
-                                                            ).toLocaleString('pt-BR')}
-                                                        </small>
-                                                    </>
-                                                ) : (
-                                                    <p>Sem medição disponível.</p>
-                                                )}
-                                            </div>
-                                        </Popup>
-                                    </CircleMarker>
-                                );
-                            })}
+                            {/* ESTAÇÕES CUIDAÍ — MESMO ÍCONE DO APLICATIVO */}
+                            {municipio && (
+                                <MarcadoresEstacoesCuidai
+                                    estacoes={estacoesDoTerritorio}
+                                    instanteAtual={instanteAtual}
+                                    idSelecionada={idEstacaoAtiva}
+                                    onSelecionar={setIdEstacaoSelecionada}
+                                />
+                            )}
 
                             <BairrosAtlas
                                 bairros={bairrosDoMunicipio}

@@ -156,6 +156,9 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
   const sombras = useMemo(() => agruparContagem(
     porSubcategoria.filter(a => a.categoria === 'Quentura').map(sombraDoAlerta)
   ), [porSubcategoria]);
+  const totalRegistrosQuentura = porSubcategoria.filter(
+    a => a.categoria === 'Quentura'
+  ).length;
 
   const filtrados = useMemo(() => porSubcategoria.filter(a =>
     categoria !== 'Quentura' || sombra === 'Todas' || sombraDoAlerta(a) === sombra
@@ -400,7 +403,10 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
                   aria-pressed={sombra === resposta}
                   className={sombra === resposta ? 'ativo' : ''}
                   onClick={() => setSombra(atual => atual === resposta ? 'Todas' : resposta)}>
-                  <strong>{quantidade}</strong><span>{resposta}</span>
+                  <strong>{quantidade}</strong>
+                  <span>{resposta} • {totalRegistrosQuentura
+                    ? Math.round(quantidade / totalRegistrosQuentura * 100)
+                    : 0}%</span>
                 </button>;
               })}
             </div>

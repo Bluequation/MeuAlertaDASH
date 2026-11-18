@@ -248,182 +248,182 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
     <section className="territorio-analise">
       <div className="territorio-analise__topo">
         <div className="territorio-analise__topo-esquerda">
-      <header className="territorio-analise__cabecalho">
-        <div>
-          <h1>Mapa de Calor</h1>
-          <p>Concentração territorial das ocorrências registradas pela comunidade.</p>
-        </div>
-        <div className="territorio-analise__modos" role="group" aria-label="Tipo de consulta">
-          <button type="button" className={modo === 'atuais' ? 'ativo' : ''}
-            aria-pressed={modo === 'atuais'} onClick={() => setModo('atuais')}>
-            Ativos agora
-          </button>
-          <button type="button" className={modo === 'historico' ? 'ativo' : ''}
-            aria-pressed={modo === 'historico'} onClick={() => setModo('historico')}>
-            Histórico
-          </button>
-        </div>
-      </header>
-
-      {modo === 'historico' && (
-        <div className="territorio-analise__periodo">
-          <div className="territorio-analise__opcoes" role="group" aria-label="Período histórico">
-            {([
-              ['24h', '24 horas'], ['7d', '7 dias'],
-              ['30d', '30 dias'], ['datas', 'Datas']
-            ] as const).map(([valor, nome]) => (
-              <button type="button" key={valor} className={janela === valor ? 'ativo' : ''}
-                aria-pressed={janela === valor} onClick={() => setJanela(valor)}>
-                {nome}
+          <header className="territorio-analise__cabecalho">
+            <div>
+              <h1>Mapa de Calor</h1>
+              <p>Concentração territorial das ocorrências registradas pela comunidade.</p>
+            </div>
+            <div className="territorio-analise__modos" role="group" aria-label="Tipo de consulta">
+              <button type="button" className={modo === 'atuais' ? 'ativo' : ''}
+                aria-pressed={modo === 'atuais'} onClick={() => setModo('atuais')}>
+                Ativos agora
               </button>
-            ))}
-          </div>
-          {janela === 'datas' && (
-            <div className="territorio-analise__datas">
-              <label>De <input type="date" value={dataInicio} max={dataFim}
-                onChange={e => setDataInicio(e.target.value)} /></label>
-              <label>Até <input type="date" value={dataFim} min={dataInicio}
-                max={diaLocal(agora)} onChange={e => setDataFim(e.target.value)} /></label>
+              <button type="button" className={modo === 'historico' ? 'ativo' : ''}
+                aria-pressed={modo === 'historico'} onClick={() => setModo('historico')}>
+                Histórico
+              </button>
+            </div>
+          </header>
+
+          {modo === 'historico' && (
+            <div className="territorio-analise__periodo">
+              <div className="territorio-analise__opcoes" role="group" aria-label="Período histórico">
+                {([
+                  ['24h', '24 horas'], ['7d', '7 dias'],
+                  ['30d', '30 dias'], ['datas', 'Datas']
+                ] as const).map(([valor, nome]) => (
+                  <button type="button" key={valor} className={janela === valor ? 'ativo' : ''}
+                    aria-pressed={janela === valor} onClick={() => setJanela(valor)}>
+                    {nome}
+                  </button>
+                ))}
+              </div>
+              {janela === 'datas' && (
+                <div className="territorio-analise__datas">
+                  <label>De <input type="date" value={dataInicio} max={dataFim}
+                    onChange={e => setDataInicio(e.target.value)} /></label>
+                  <label>Até <input type="date" value={dataFim} min={dataInicio}
+                    max={diaLocal(agora)} onChange={e => setDataFim(e.target.value)} /></label>
+                </div>
+              )}
+              {!intervalo.valido && <p role="alert">Selecione uma data inicial anterior à data final.</p>}
             </div>
           )}
-          {!intervalo.valido && <p role="alert">Selecione uma data inicial anterior à data final.</p>}
-        </div>
-      )}
 
-      <div className="territorio-analise__filtros">
-        <div className="territorio-analise__filtro-categorias" role="group" aria-label="Categoria">
-          <button type="button" className={categoria === 'Todas' ? 'ativo' : ''}
-            aria-pressed={categoria === 'Todas'}
-            onClick={() => { setCategoria('Todas'); setSubcategoria('Todas'); setSombra('Todas'); }}>
-            Todas
-          </button>
-          {categorias.map(nome => (
-            <button type="button" key={nome} aria-pressed={categoria === nome}
-              className={categoria === nome ? 'ativo' : ''}
-              style={categoria === nome ? { borderColor: CORES_OCORRENCIAS[nome] ?? '#718399' } : undefined}
-              onClick={() => { setCategoria(nome); setSubcategoria('Todas'); setSombra('Todas'); }}>
-              <i style={{ backgroundColor: CORES_OCORRENCIAS[nome] ?? '#718399' }} />
-              {nome}
-            </button>
-          ))}
-        </div>
+          <div className="territorio-analise__filtros">
+            <div className="territorio-analise__filtro-categorias" role="group" aria-label="Categoria">
+              <button type="button" className={categoria === 'Todas' ? 'ativo' : ''}
+                aria-pressed={categoria === 'Todas'}
+                onClick={() => { setCategoria('Todas'); setSubcategoria('Todas'); setSombra('Todas'); }}>
+                Todas
+              </button>
+              {categorias.map(nome => (
+                <button type="button" key={nome} aria-pressed={categoria === nome}
+                  className={categoria === nome ? 'ativo' : ''}
+                  style={categoria === nome ? { borderColor: CORES_OCORRENCIAS[nome] ?? '#718399' } : undefined}
+                  onClick={() => { setCategoria(nome); setSubcategoria('Todas'); setSombra('Todas'); }}>
+                  <i style={{ backgroundColor: CORES_OCORRENCIAS[nome] ?? '#718399' }} />
+                  {nome}
+                </button>
+              ))}
+            </div>
 
-        {categoria !== 'Todas' && (
-          <div className="territorio-analise__selecao">
-            <label>Subcategoria
-              <select value={subcategoria} onChange={e => setSubcategoria(e.target.value)}>
-                <option value="Todas">Todas as subcategorias</option>
-                {subcategorias.map(s => <option key={s.nome} value={s.nome}>
-                  {s.nome} ({s.quantidade})
-                </option>)}
-              </select>
-            </label>
-            {categoria === 'Quentura' && (
-              <label>Sombra
-                <select value={sombra} onChange={e => setSombra(e.target.value as Sombra | 'Todas')}>
-                  <option value="Todas">Todas as respostas</option>
-                  {SOMBRAS.map(nome => <option key={nome} value={nome}>
-                    {nome}
-                  </option>)}
-                </select>
-              </label>
+            {categoria !== 'Todas' && (
+              <div className="territorio-analise__selecao">
+                <label>Subcategoria
+                  <select value={subcategoria} onChange={e => setSubcategoria(e.target.value)}>
+                    <option value="Todas">Todas as subcategorias</option>
+                    {subcategorias.map(s => <option key={s.nome} value={s.nome}>
+                      {s.nome} ({s.quantidade})
+                    </option>)}
+                  </select>
+                </label>
+                {categoria === 'Quentura' && (
+                  <label>Sombra
+                    <select value={sombra} onChange={e => setSombra(e.target.value as Sombra | 'Todas')}>
+                      <option value="Todas">Todas as respostas</option>
+                      {SOMBRAS.map(nome => <option key={nome} value={nome}>
+                        {nome}
+                      </option>)}
+                    </select>
+                  </label>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
 
-      <div className="territorio-analise__metricas">
-        <div><strong>{filtrados.length.toLocaleString('pt-BR')}</strong>
-          <span>{modo === 'atuais' ? 'Ativos no recorte' : 'Registros no período'}</span></div>
-        <div><strong>{new Set(filtrados.map(a => a.categoria)).size}</strong>
-          <span>Categorias representadas</span></div>
-        <div><strong>{new Set(filtrados.flatMap(subcategoriasDoAlerta)).size}</strong>
-          <span>Subcategorias/condições</span></div>
-        {modo === 'historico' && (
-          <div><strong>{totalResolvidos + totalVencidos}</strong>
-            <span>Encerrados atualmente no período</span></div>
-        )}
-        <button type="button" onClick={() => exportarCSV(filtrados, agora)}
-          disabled={filtrados.length === 0} title="Exportar registros filtrados sem dados pessoais">
-          Exportar CSV
-        </button>
-      </div>
+          <div className="territorio-analise__metricas">
+            <div><strong>{filtrados.length.toLocaleString('pt-BR')}</strong>
+              <span>{modo === 'atuais' ? 'Ativos no recorte' : 'Registros no período'}</span></div>
+            <div><strong>{new Set(filtrados.map(a => a.categoria)).size}</strong>
+              <span>Categorias representadas</span></div>
+            <div><strong>{new Set(filtrados.flatMap(subcategoriasDoAlerta)).size}</strong>
+              <span>Subcategorias/condições</span></div>
+            {modo === 'historico' && (
+              <div><strong>{totalResolvidos + totalVencidos}</strong>
+                <span>Encerrados atualmente no período</span></div>
+            )}
+            <button type="button" onClick={() => exportarCSV(filtrados, agora)}
+              disabled={filtrados.length === 0} title="Exportar registros filtrados sem dados pessoais">
+              Exportar CSV
+            </button>
+          </div>
         </div>
 
         <div className="territorio-analise__topo-direita">
-        <section className="territorio-analise__painel-lateral">
-          <h2>Distribuição por categoria</h2>
-          {categoriasPeriodo.length === 0 ? <p>Sem ocorrências no período.</p>
-            : categoriasPeriodo.map(d => (
-              <button className="territorio-analise__barra" type="button" key={d.nome}
-                aria-pressed={categoria === d.nome}
-                onClick={() => {
-                  setCategoria(d.nome);
-                  setSubcategoria('Todas');
-                  setSombra('Todas');
-                }}>
-                <span>{d.nome}</span>
-                <b>{d.quantidade}</b>
-                <i style={{
-                  width: `${100 * d.quantidade / maxCategoria}%`,
-                  backgroundColor: CORES_OCORRENCIAS[d.nome] ?? '#718399'
-                }} />
-              </button>
-            ))}
-        </section>
-
-        <section className="territorio-analise__painel-lateral">
-          <h2>{categoria === 'Quentura'
-            ? 'Condições de Quentura'
-            : 'Distribuição por subcategoria'}</h2>
-          {categoria === 'Todas' ? (
-            subcategoriasGerais.length === 0 ? (
-              <p>Sem subcategorias registradas neste recorte.</p>
-            ) : subcategoriasGerais.map(item => (
-              <button
-                className="territorio-analise__barra"
-                type="button"
-                key={JSON.stringify([item.categoria, item.nome])}
-                onClick={() => {
-                  setCategoria(item.categoria);
-                  setSubcategoria(item.nome);
-                  setSombra('Todas');
-                }}
-              >
-                <span className="territorio-analise__barra-descricao">
-                  <small>{item.categoria}</small>
-                  {item.nome}
-                </span>
-                <b>{item.quantidade}</b>
-                <i style={{
-                  width: `${100 * item.quantidade / maxSubcategoriaGeral}%`,
-                  backgroundColor: CORES_OCORRENCIAS[item.categoria] ?? '#6E91B1'
-                }} />
-              </button>
-            ))
-          ) : subcategorias.length === 0 ? (
-            <p>Nenhuma subcategoria registrada neste período.</p>
-          ) : (
-            <>
-              {subcategorias.map(d => (
+          <section className="territorio-analise__painel-lateral">
+            <h2>Distribuição por categoria</h2>
+            {categoriasPeriodo.length === 0 ? <p>Sem ocorrências no período.</p>
+              : categoriasPeriodo.map(d => (
                 <button className="territorio-analise__barra" type="button" key={d.nome}
-                  onClick={() => setSubcategoria(atual => atual === d.nome ? 'Todas' : d.nome)}
-                  aria-pressed={subcategoria === d.nome}>
+                  aria-pressed={categoria === d.nome}
+                  onClick={() => {
+                    setCategoria(d.nome);
+                    setSubcategoria('Todas');
+                    setSombra('Todas');
+                  }}>
                   <span>{d.nome}</span>
                   <b>{d.quantidade}</b>
                   <i style={{
-                    width: `${100 * d.quantidade / maxSubcategoria}%`,
-                    backgroundColor: categoria === 'Quentura' ? '#D65B39' : '#6E91B1'
+                    width: `${100 * d.quantidade / maxCategoria}%`,
+                    backgroundColor: CORES_OCORRENCIAS[d.nome] ?? '#718399'
                   }} />
                 </button>
               ))}
-              {categoria === 'Quentura' && <p>
-                Um relato pode indicar mais de uma condição. Por isso, a soma das condições
-                pode superar o número de ocorrências.
-              </p>}
-            </>
-          )}
-        </section>
+          </section>
+
+          <section className="territorio-analise__painel-lateral">
+            <h2>{categoria === 'Quentura'
+              ? 'Condições de Quentura'
+              : 'Distribuição por subcategoria'}</h2>
+            {categoria === 'Todas' ? (
+              subcategoriasGerais.length === 0 ? (
+                <p>Sem subcategorias registradas neste recorte.</p>
+              ) : subcategoriasGerais.map(item => (
+                <button
+                  className="territorio-analise__barra"
+                  type="button"
+                  key={JSON.stringify([item.categoria, item.nome])}
+                  onClick={() => {
+                    setCategoria(item.categoria);
+                    setSubcategoria(item.nome);
+                    setSombra('Todas');
+                  }}
+                >
+                  <span className="territorio-analise__barra-descricao">
+                    <small>{item.categoria}</small>
+                    {item.nome}
+                  </span>
+                  <b>{item.quantidade}</b>
+                  <i style={{
+                    width: `${100 * item.quantidade / maxSubcategoriaGeral}%`,
+                    backgroundColor: CORES_OCORRENCIAS[item.categoria] ?? '#6E91B1'
+                  }} />
+                </button>
+              ))
+            ) : subcategorias.length === 0 ? (
+              <p>Nenhuma subcategoria registrada neste período.</p>
+            ) : (
+              <>
+                {subcategorias.map(d => (
+                  <button className="territorio-analise__barra" type="button" key={d.nome}
+                    onClick={() => setSubcategoria(atual => atual === d.nome ? 'Todas' : d.nome)}
+                    aria-pressed={subcategoria === d.nome}>
+                    <span>{d.nome}</span>
+                    <b>{d.quantidade}</b>
+                    <i style={{
+                      width: `${100 * d.quantidade / maxSubcategoria}%`,
+                      backgroundColor: categoria === 'Quentura' ? '#D65B39' : '#6E91B1'
+                    }} />
+                  </button>
+                ))}
+                {categoria === 'Quentura' && <p>
+                  Um relato pode indicar mais de uma condição. Por isso, a soma das condições
+                  pode superar o número de ocorrências.
+                </p>}
+              </>
+            )}
+          </section>
         </div>
       </div>
 
@@ -451,44 +451,44 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
 
       {(categoria === 'Quentura' || modo === 'historico') && (
         <div className="territorio-analise__analiticos">
-          {categoria === 'Quentura' && (
-          <section>
-            <h2>Distribuição da sombra</h2>
-            <div className="territorio-analise__sombra">
-              {SOMBRAS.map(resposta => {
-                const quantidade = sombras.find(x => x.nome === resposta)?.quantidade ?? 0;
-                return <button key={resposta} type="button"
-                  aria-pressed={sombra === resposta}
-                  className={sombra === resposta ? 'ativo' : ''}
-                  onClick={() => setSombra(atual => atual === resposta ? 'Todas' : resposta)}>
-                  <strong>{quantidade}</strong>
-                  <span>{resposta} • {totalRegistrosQuentura
-                    ? Math.round(quantidade / totalRegistrosQuentura * 100)
-                    : 0}%</span>
-                </button>;
-              })}
-            </div>
-            <p>Respostas declaradas pela comunidade. “Não informado” não significa ausência de sombra.</p>
-          </section>
-        )}
+            {categoria === 'Quentura' && (
+            <section>
+              <h2>Distribuição da sombra</h2>
+              <div className="territorio-analise__sombra">
+                {SOMBRAS.map(resposta => {
+                  const quantidade = sombras.find(x => x.nome === resposta)?.quantidade ?? 0;
+                  return <button key={resposta} type="button"
+                    aria-pressed={sombra === resposta}
+                    className={sombra === resposta ? 'ativo' : ''}
+                    onClick={() => setSombra(atual => atual === resposta ? 'Todas' : resposta)}>
+                    <strong>{quantidade}</strong>
+                    <span>{resposta} • {totalRegistrosQuentura
+                      ? Math.round(quantidade / totalRegistrosQuentura * 100)
+                      : 0}%</span>
+                  </button>;
+                })}
+              </div>
+              <p>Respostas declaradas pela comunidade. “Não informado” não significa ausência de sombra.</p>
+            </section>
+          )}
 
-        {modo === 'historico' && (
-          <section className="territorio-analise__evolucao">
-            <h2>Evolução dos registros criados</h2>
-            {dadosEvolucao.length ? (
-              <ResponsiveContainer width="100%" height={188}>
-                <BarChart data={dadosEvolucao} margin={{ top: 10, right: 8, left: -22, bottom: 3 }}>
-                  <CartesianGrid vertical={false} stroke="#E9EFF5" />
-                  <XAxis dataKey="data" minTickGap={18} tick={{ fontSize: 10 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
-                  <Tooltip />
-                  <Bar dataKey="quantidade" name="Ocorrências criadas"
-                    fill="#4D8BB0" radius={[3, 3, 0, 0]} maxBarSize={28} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : <p>Sem registros com data válida neste intervalo.</p>}
-          </section>
-        )}
+          {modo === 'historico' && (
+            <section className="territorio-analise__evolucao">
+              <h2>Evolução dos registros criados</h2>
+              {dadosEvolucao.length ? (
+                <ResponsiveContainer width="100%" height={188}>
+                  <BarChart data={dadosEvolucao} margin={{ top: 10, right: 8, left: -22, bottom: 3 }}>
+                    <CartesianGrid vertical={false} stroke="#E9EFF5" />
+                    <XAxis dataKey="data" minTickGap={18} tick={{ fontSize: 10 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                    <Tooltip />
+                    <Bar dataKey="quantidade" name="Ocorrências criadas"
+                      fill="#4D8BB0" radius={[3, 3, 0, 0]} maxBarSize={28} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p>Sem registros com data válida neste intervalo.</p>}
+            </section>
+          )}
         </div>
       )}
 

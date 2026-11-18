@@ -1673,6 +1673,188 @@ export default function AtlasBrasil({
 
 
 
+    // O catálogo de municípios fica disponível mesmo na vista Brasil.
+    // Reaproveita a mesma malha usada pelo atlas (sem geocodificar por texto).
+    useEffect(() => {
+        if (!buscaAberta || municipios || municipiosBusca) return;
+        const controlador = new AbortController();
+        setCarregandoBusca(true);
+        setErroBusca(null);
+
+        void fetch('/municipios-ceara.geojson', {
+            signal: controlador.signal
+        }).then(resposta => {
+            if (!resposta.ok) throw new Error('Municípios indisponíveis.');
+            return resposta.json();
+        }).then((colecao: FeatureCollection) => {
+            if (!controlador.signal.aborted) {
+                if (
+                    colecao.type !== 'FeatureCollection' ||
+                    !Array.isArray(colecao.features)
+                ) throw new Error('Catálogo municipal inválido.');
+                setMunicipiosBusca(colecao);
+            }
+        }).catch(falha => {
+            if (!controlador.signal.aborted) {
+                console.error('Pesquisa de municípios:', falha);
+                setErroBusca('Não foi possível carregar municípios do Ceará.');
+            }
+        }).finally(() => {
+            if (!controlador.signal.aborted) setCarregandoBusca(false);
+        });
+        return () => controlador.abort();
+    }, [buscaAberta, municipios, municipiosBusca]);
+
+    useEffect(() => {
+        if (!buscaAberta) return;
+        const fechar = (evento: PointerEvent) => {
+            if (
+                evento.target instanceof Node &&
+                !buscaRef.current?.contains(evento.target)
+            ) setBuscaAberta(false);
+        };
+        document.addEventListener('pointerdown', fechar);
+        return () => document.removeEventListener('pointerdown', fechar);
+    }, [buscaAberta]);
+
+    const estadoCearaBusca = useMemo<EstadoAtlas | null>(() => {
+        const feature = dados?.features.find(
+            item => String(item.properties?.SIGLA_UF ?? '') === 'CE'
+        );
+        if (!feature) return null;
+        return {
+            codigo: String(feature.properties?.CD_UF ?? ''),
+            nome: String(feature.properties?.NM_UF ?? 'Ceará'),
+            sigla: 'CE'
+        };
+    }, [dados]);
+
+    const resultadosBusca = useMemo<ResultadoBuscaAtlas[]>(() => {
+        const consulta = chaveRegiao(textoBusca);
+        if (!consulta) return [];
+        const palavras = consulta.split(' ').filter(Boolean);
+        const candidatos: ResultadoBuscaAtlas[] = [];
+
+        dados?.features.forEach(feature => {
+            const props = feature.properties ?? {};
+            const estadoBusca: EstadoAtlas = {
+                codigo: String(props.CD_UF ?? ''),
+                nome: String(props.NM_UF ?? ''),
+                sigla: String(props.SIGLA_UF ?? '')
+            };
+            if (estadoBusca.nome && estadoBusca.codigo) {
+                candidatos.push({
+                    chave: `estado-${estadoBusca.codigo}`,
+                    tipo: 'estado',
+                    nome: estadoBusca.nome,
+                    descricao: `Estado · ${estadoBusca.sigla}`,
+                    estado: estadoBusca
+                });
+            }
+        });
+
+        if (estadoCearaBusca) {
+            (municipios ?? municipiosBusca)?.features.forEach(feature => {
+                const codigo = String(feature.properties?.id ?? '');
+                const nome = String(feature.properties?.name ?? '').trim();
+                if (!codigo || !nome) return;
+                candidatos.push({
+                    chave: `municipio-${codigo}`,
+                    tipo: 'municipio',
+                    nome,
+                    descricao: 'Município · Ceará',
+                    estado: estadoCearaBusca,
+                    municipio: { codigo, nome }
+                });
+            });
+
+            const bairrosPorCidade: Array<{
+                colecao: FeatureCollection | null;
+                codigo: string;
+                cidade: string;
+            }> = [
+                { colecao: bairrosFortaleza, codigo: '2304400', cidade: 'Fortaleza' },
+                { colecao: bairrosIpaporanga, codigo: '2305654', cidade: 'Ipaporanga' }
+            ];
+            bairrosPorCidade.forEach(({ colecao, codigo, cidade }) => {
+                colecao?.features.forEach(feature => {
+                    const nome = nomeBairroAtlas(feature);
+                    if (!nome) return;
+                    candidatos.push({
+                        chave: `bairro-${codigo}-${chaveRegiao(nome)}`,
+                        tipo: 'bairro',
+                        nome,
+                        descricao: `Bairro · ${cidade}, Ceará`,
+                        estado: estadoCearaBusca,
+                        municipio: { codigo, nome: cidade }
+                    });
+                });
+            });
+        }
+
+        const pontuacao = (resultado: ResultadoBuscaAtlas) => {
+            const nome = chaveRegiao(resultado.nome);
+            const sigla = chaveRegiao(resultado.estado.sigla);
+            const contexto = chaveRegiao(`${resultado.nome} ${resultado.descricao}`);
+            if (!palavras.every(palavra =>
+                contexto.includes(palavra) ||
+                (resultado.tipo === 'estado' && sigla === palavra)
+            )) return -1;
+            return nome === consulta || (resultado.tipo === 'estado' && sigla === consulta)
+                ? 0 : nome.startsWith(consulta) ? 1 : nome.includes(consulta) ? 2 : 3;
+        };
+
+        return candidatos
+            .map(resultado => ({ resultado, ordem: pontuacao(resultado) }))
+            .filter(item => item.ordem >= 0)
+            .sort((a, b) =>
+                a.ordem - b.ordem ||
+                a.resultado.nome.localeCompare(b.resultado.nome, 'pt-BR') ||
+                a.resultado.tipo.localeCompare(b.resultado.tipo)
+            ).slice(0, 10).map(item => item.resultado);
+    }, [
+        textoBusca, dados, estadoCearaBusca, municipios, municipiosBusca,
+        bairrosFortaleza, bairrosIpaporanga
+    ]);
+
+    const geometriaBairroBuscado = useMemo<Feature | null>(() => {
+        if (!bairroBuscado || municipio?.codigo !== bairroBuscado.municipioCodigo) {
+            return null;
+        }
+        const colecao = bairroBuscado.municipioCodigo === '2304400'
+            ? bairrosFortaleza : bairrosIpaporanga;
+        return colecao?.features.find(feature =>
+            chaveRegiao(nomeBairroAtlas(feature)) === chaveRegiao(bairroBuscado.nome)
+        ) ?? null;
+    }, [bairroBuscado, municipio?.codigo, bairrosFortaleza, bairrosIpaporanga]);
+
+    const escolherResultadoBusca = (resultado: ResultadoBuscaAtlas) => {
+        if (transicaoEmCurso.current) return;
+        setBuscaAberta(false);
+        setTextoBusca('');
+        setIndiceBusca(0);
+        navegarComFade(() => {
+            toqueTerritorioPendente.current = null;
+            setPontoInspecionado(null);
+            setPerfilMapa(null);
+            setMostrarAmostras(false);
+            setIdEstacaoSelecionada(null);
+            setMostrarRelatosQuentura(false);
+            setDistritoSelecionado(null);
+            setBairroBuscado(
+                resultado.tipo === 'bairro' && resultado.municipio
+                    ? {
+                        municipioCodigo: resultado.municipio.codigo,
+                        nome: resultado.nome
+                    }
+                    : null
+            );
+            setEstado(resultado.estado);
+            setMunicipio(resultado.tipo === 'estado'
+                ? null : resultado.municipio ?? null);
+        });
+    };
+
     const estaNoCeara = estado?.sigla === 'CE';
 
     const geometriaEstado = dados && estado

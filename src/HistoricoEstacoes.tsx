@@ -333,6 +333,7 @@ export default function HistoricoEstacoes({
         useState<string | null>(null);
     const [periodo, setPeriodo] = useState<Periodo>('hora');
     const [instanteConsulta, setInstanteConsulta] = useState(Date.now);
+    const [seguindoAgora, setSeguindoAgora] = useState(true);
     const [comparar, setComparar] = useState(false);
     const [instanteComparacao, setInstanteComparacao] =
         useState<number | null>(null);
@@ -378,11 +379,13 @@ export default function HistoricoEstacoes({
         : instanteConsulta - opcaoPeriodo.duracao;
 
     const navegarPeriodo = (direcao: -1 | 1) => {
-        setInstanteConsulta(periodo === 'mes'
+        const proximo = periodo === 'mes'
             ? mudarMes(instanteConsulta, direcao)
             : Math.min(
                 Date.now(), instanteConsulta + direcao * opcaoPeriodo.duracao
-            ));
+            );
+        setSeguindoAgora(proximo >= Date.now() - 60 * 1000);
+        setInstanteConsulta(proximo);
     };
 
     useEffect(() => {
@@ -502,7 +505,9 @@ export default function HistoricoEstacoes({
             const segundo = pontosComparacao[indice];
             return {
                 recebidoEm: principal?.recebidoEm ?? segundo?.recebidoEm ?? 0,
-                momento: principal?.momento ?? segundo?.momento ?? '',
+                momento: comparar && periodo === 'mes'
+                    ? `Dia ${indice + 1}`
+                    : principal?.momento ?? `Intervalo ${indice + 1}`,
                 temperatura: principal?.temperatura ?? null,
                 umidade: principal?.umidade ?? null,
                 quantidade: principal?.quantidade ?? 0,
@@ -638,6 +643,9 @@ export default function HistoricoEstacoes({
                             type="button"
                             onClick={() => {
                                 cache.current.clear();
+                                if (seguindoAgora) {
+                                    setInstanteConsulta(Date.now());
+                                }
                                 setRevisao(valor => valor + 1);
                             }}
                             disabled={carregando || carregandoComparacao}
@@ -660,9 +668,14 @@ export default function HistoricoEstacoes({
                                     ? 'historico-periodo-botao historico-periodo-botao--ativo'
                                     : 'historico-periodo-botao'}
                                 onClick={() => {
-                                    const dataAtual = paraInputData(instanteConsulta, opcao.id);
+                                    const dataAtual = paraInputData(
+                                        seguindoAgora ? Date.now() : instanteConsulta,
+                                        opcao.id
+                                    );
                                     const novoFim = lerDataSelecionada(dataAtual, opcao.id);
-                                    if (novoFim !== null) setInstanteConsulta(novoFim);
+                                    if (novoFim !== null) {
+                                        setInstanteConsulta(seguindoAgora ? Date.now() : novoFim);
+                                    }
                                     if (comparar) {
                                         const dataB = paraInputData(fimComparacao, opcao.id);
                                         const novoB = lerDataSelecionada(dataB, opcao.id);
@@ -693,18 +706,26 @@ export default function HistoricoEstacoes({
                             value={paraInputData(instanteConsulta, periodo)}
                             onChange={evento => {
                                 const instante = lerDataSelecionada(evento.target.value, periodo);
-                                if (instante !== null) setInstanteConsulta(instante);
+                                if (instante !== null) {
+                                    setSeguindoAgora(instante >= Date.now() - 60 * 1000);
+                                    setInstanteConsulta(instante);
+                                }
                             }}
                         />
                         <button type="button" className="historico-navegacao__seta"
-                            disabled={instanteConsulta >= Date.now() - 60 * 1000}
+                            disabled={periodo === 'mes'
+                                ? paraInputData(instanteConsulta, 'mes') === paraInputData(Date.now(), 'mes')
+                                : instanteConsulta >= Date.now() - 60 * 1000}
                             onClick={() => navegarPeriodo(1)}
                             aria-label="Avançar um intervalo"
                             title="Próximo período">
                             <FiChevronRight />
                         </button>
                         <button type="button" className="historico-navegacao__atual"
-                            onClick={() => setInstanteConsulta(Date.now())}>
+                            onClick={() => {
+                                setSeguindoAgora(true);
+                                setInstanteConsulta(Date.now());
+                            }}>
                             Agora
                         </button>
                     </div>

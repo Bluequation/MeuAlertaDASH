@@ -1026,9 +1026,11 @@ export default function HistoricoEstacoes({
                         não estimativas da Open-Meteo.
                         Os gráficos apresentam médias das medições disponíveis
                         em cada intervalo; horários sem dados permanecem vazios.
-                        As duas séries comparadas usam a mesma escala de tempo
-                        relativo, em datas diferentes. A exportação identifica
-                        cada período e diferencia médias de medições originais.
+                        {comparar
+                            ? 'As séries A e B usam a mesma escala de tempo relativo, em datas diferentes. '
+                            : ''}
+                        A exportação identifica cada período e diferencia
+                        médias de medições originais.
                     </p>
                 </>
             )}

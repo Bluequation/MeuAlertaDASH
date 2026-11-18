@@ -32,7 +32,7 @@ import {
     FiRefreshCw,
     FiChevronLeft,
     FiChevronRight,
-    FiGitCompare
+    FiGitMerge
 } from 'react-icons/fi';
 import { db } from './firebase';
 import { abrirRelatorioHistorico } from './RelatorioHistorico';
@@ -692,7 +692,7 @@ export default function HistoricoEstacoes({
                             setComparar(valor => !valor);
                         }}
                     >
-                        <FiGitCompare aria-hidden="true" />
+                        <FiGitMerge aria-hidden="true" />
                         {comparar ? 'Ocultar comparação' : 'Comparar com outro período'}
                     </button>
 
@@ -904,7 +904,7 @@ export default function HistoricoEstacoes({
                             </div>
                             {comparar && (
                                 <div className="historico-resumo-total">
-                                    <FiGitCompare aria-hidden="true" />
+                                    <FiGitMerge aria-hidden="true" />
                                     <strong>
                                         B: {leiturasComparacao.length.toLocaleString('pt-BR')} medições
                                     </strong>

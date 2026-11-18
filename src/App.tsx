@@ -2421,7 +2421,10 @@ function App() {
       'Categoria',
       'Detalhe',
       'Pluviometria (mm)',
-      'Status',
+      'Status atual',
+      'Válido até',
+      'Condições de Quentura',
+      'Sombra',
       'Confirmacoes',
       'Votos de resolucao',
       'Autor',
@@ -2436,9 +2439,7 @@ function App() {
         ? new Date(alerta.criadoEm).toLocaleDateString('pt-BR')
         : '';
 
-      const status = (alerta.votosResolvido || 0) >= 3
-        ? 'Resolvido'
-        : 'Ativo';
+      const status = statusDoAlerta(alerta, agoraMeteo);
 
       return [
         limpar(alerta.id),
@@ -2452,6 +2453,12 @@ function App() {
             : ''
         ),
         limpar(status),
+        limpar(alerta.expiraEm
+          ? new Date(alerta.expiraEm).toLocaleString('pt-BR', {
+              timeZone: 'America/Fortaleza'
+            }) : ''),
+        limpar((alerta.condicoesQuentura ?? []).join(' + ')),
+        limpar(alerta.sombraQuentura ?? ''),
         limpar(alerta.votosConfirma || 0),
         limpar(alerta.votosResolvido || 0),
         limpar(alerta.autor || ''),

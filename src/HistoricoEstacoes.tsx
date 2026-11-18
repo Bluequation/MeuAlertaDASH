@@ -703,6 +703,40 @@ export default function HistoricoEstacoes({
                 </select>
 
 
+                <div className="historico-modos" role="group"
+                    aria-label="Visualização das medições">
+                    <button type="button"
+                        className={aoVivo
+                            ? 'historico-modos__botao historico-modos__botao--ativo'
+                            : 'historico-modos__botao'}
+                        aria-pressed={aoVivo}
+                        onClick={() => {
+                            setModo('ao-vivo');
+                            setComparar(false);
+                        }}>
+                        <FiRadio aria-hidden="true" />
+                        Ao vivo
+                    </button>
+                    <button type="button"
+                        className={!aoVivo
+                            ? 'historico-modos__botao historico-modos__botao--ativo'
+                            : 'historico-modos__botao'}
+                        aria-pressed={!aoVivo}
+                        onClick={() => {
+                            setInstanteConsulta(Date.now());
+                            setSeguindoAgora(true);
+                            setModo('historico');
+                        }}>
+                        <FiClock aria-hidden="true" />
+                        Histórico
+                    </button>
+                </div>
+                {aoVivo ? (
+                    <p className="historico-modos__ao-vivo" role="status">
+                        <span className="historico-modos__indicador" aria-hidden="true" />
+                        Atualização automática • últimas 72 medições
+                    </p>
+                ) : (
                 <div className="historico-periodo-controles">
                     <div className="historico-periodo-topo">
                         <span>Intervalo do histórico</span>
@@ -850,11 +884,15 @@ export default function HistoricoEstacoes({
                         </div>
                     )}
                 </div>
+                )}
             </article>
 
             {carregando && (
                 <article className="obs-bloco">
-                    <p role="status">Consultando medições de {opcaoPeriodo.titulo.toLowerCase()}...</p>
+                    <p role="status">
+                        {aoVivo ? 'Carregando medições ao vivo...'
+                            : `Consultando medições de ${opcaoPeriodo.titulo.toLowerCase()}...`}
+                    </p>
                 </article>
             )}
             {erro && (
@@ -913,13 +951,13 @@ export default function HistoricoEstacoes({
                         ([
                             {
                                 campo: 'temperatura',
-                                titulo: 'Evolução da temperatura média',
+                                titulo: aoVivo ? 'Temperatura • ao vivo' : 'Evolução da temperatura média',
                                 unidade: '°C',
                                 cor: '#DC7A40'
                             },
                             {
                                 campo: 'umidade',
-                                titulo: 'Evolução da umidade média',
+                                titulo: aoVivo ? 'Umidade • ao vivo' : 'Evolução da umidade média',
                                 unidade: '%',
                                 cor: '#348CCB'
                             }

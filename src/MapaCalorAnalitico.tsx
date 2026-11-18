@@ -304,14 +304,14 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
 
           <div className="territorio-analise__metricas">
             <div><strong>{filtrados.length.toLocaleString('pt-BR')}</strong>
-              <span>{modo === 'atuais' ? 'Ativos no recorte' : 'Registros no período'}</span></div>
+              <span>{modo === 'atuais' ? 'Ativos' : 'No período'}</span></div>
             <div><strong>{new Set(filtrados.map(a => a.categoria)).size}</strong>
-              <span>Categorias representadas</span></div>
+              <span>Categorias</span></div>
             <div><strong>{new Set(filtrados.flatMap(subcategoriasDoAlerta)).size}</strong>
-              <span>Subcategorias/condições</span></div>
+              <span>Tipos/condições</span></div>
             {modo === 'historico' && (
               <div><strong>{totalResolvidos + totalVencidos}</strong>
-                <span>Encerrados atualmente no período</span></div>
+                <span>Já encerrados</span></div>
             )}
             <button type="button" onClick={() => exportarCSV(filtrados, agora)}
               disabled={filtrados.length === 0} title="Exportar registros filtrados sem dados pessoais">
@@ -321,7 +321,7 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
         </div>
 
         <div className="territorio-analise__topo-direita">
-          <section className="territorio-analise__painel-lateral">
+          <section className="territorio-analise__painel-lateral territorio-analise__painel-categorias">
             <h2>Distribuição por categoria</h2>
             {categoriasPeriodo.length === 0 ? <p>Sem ocorrências no período.</p>
               : categoriasPeriodo.map(d => (
@@ -343,14 +343,16 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
               ))}
           </section>
 
-          <section className="territorio-analise__painel-lateral">
+          <section className="territorio-analise__painel-lateral territorio-analise__painel-subcategorias">
             <h2>{categoria === 'Quentura'
               ? 'Condições de Quentura'
               : 'Distribuição por subcategoria'}</h2>
             {categoria === 'Todas' ? (
               subcategoriasGerais.length === 0 ? (
                 <p>Sem subcategorias registradas neste recorte.</p>
-              ) : subcategoriasGerais.map(item => (
+              ) : (
+                <div className="territorio-analise__subcategorias-grid">
+                  {subcategoriasGerais.map(item => (
                 <button
                   className="territorio-analise__barra"
                   type="button"
@@ -372,12 +374,15 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
                     backgroundColor: CORES_OCORRENCIAS[item.categoria] ?? '#6E91B1'
                   }} />
                 </button>
-              ))
+                  ))}
+                </div>
+              )
             ) : subcategorias.length === 0 ? (
               <p>Nenhuma subcategoria registrada neste período.</p>
             ) : (
               <>
-                {subcategorias.map(d => (
+                <div className="territorio-analise__subcategorias-grid">
+                  {subcategorias.map(d => (
                   <button className="territorio-analise__barra" type="button" key={d.nome}
                     onClick={() => setSubcategoria(atual => atual === d.nome ? 'Todas' : d.nome)}
                     title={subcategoria === d.nome ? 'Mostrar todas as subcategorias' : `Filtrar ${d.nome}`}
@@ -389,7 +394,8 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
                       backgroundColor: categoria === 'Quentura' ? '#D65B39' : '#6E91B1'
                     }} />
                   </button>
-                ))}
+                  ))}
+                </div>
                 {categoria === 'Quentura' && <p>
                   Um relato pode indicar mais de uma condição. Por isso, a soma das condições
                   pode superar o número de ocorrências.

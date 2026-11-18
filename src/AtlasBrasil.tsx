@@ -2850,6 +2850,7 @@ export default function AtlasBrasil({
                                                         if (inspecaoTermicaRef.current) return;
 
                                                         navegarComFade(() => {
+                                                            setBairroBuscado(null);
                                                             setDistritoSelecionado(atual =>
                                                                 atual === codigo ? null : codigo
                                                             );

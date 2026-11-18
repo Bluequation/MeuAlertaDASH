@@ -688,10 +688,34 @@ export default function HistoricoEstacoes({
         }));
     }, [amostrasOpenMeteo, periodo, inicioPeriodo, instanteConsulta]);
 
+    const resumoCampo = (campo: 'temperatura' | 'umidade') => {
+        if (leituras.length === 0) return null;
+        let soma = 0;
+        let minimo = Number.POSITIVE_INFINITY;
+        let maximo = Number.NEGATIVE_INFINITY;
+        for (const leitura of leituras) {
+            const valor = leitura[campo];
+            soma += valor;
+            minimo = Math.min(minimo, valor);
+            maximo = Math.max(maximo, valor);
+        }
+        return {
+            minimo,
+            medio: soma / leituras.length,
+            maximo
+        };
+    };
+
     const dominioCompartilhado = (campo: 'temperatura' | 'umidade'): [number, number] => {
         const valores = [
             ...pontosGrafico.map(p => p[campo]),
             ...pontosGrafico.map(p => p[`${campo}Comparacao` as keyof PontoGrafico]),
+            ...(!aoVivo && mostrarExtremos
+                ? pontosGrafico.flatMap(p => [
+                    p[`${campo}Minima` as keyof PontoGrafico],
+                    p[`${campo}Maxima` as keyof PontoGrafico]
+                ])
+                : []),
             ...(mostrarOpenMeteo && !aoVivo
                 ? pontosOpenMeteo.map(p => p[campo])
                 : [])
@@ -1059,7 +1083,7 @@ export default function HistoricoEstacoes({
             {!carregando && !erro && !carregandoComparacao &&
                 leituras.length === 0 &&
                 (!comparar || leiturasComparacao.length === 0) &&
-                (!mostrarOpenMeteo || amostrasOpenMeteo.length === 0) && (
+                (!mostrarOpenMeteo || (!carregandoOpenMeteo && amostrasOpenMeteo.length === 0)) && (
                 <article className="obs-bloco">
                     <h4>Sem medições no período</h4>
                     <p>Não foram encontradas leituras válidas no intervalo escolhido.</p>
@@ -1136,6 +1160,13 @@ export default function HistoricoEstacoes({
                                     </span>
                                     <h4>{grafico.titulo}</h4>
                                 </div>
+                                {resumoCampo(grafico.campo) && (
+                                    <div className="historico-resumo-extremos">
+                                        <span>Mín. <b>{resumoCampo(grafico.campo)!.minimo.toFixed(1).replace('.', ',')} {grafico.unidade}</b></span>
+                                        <span>Méd. <b>{resumoCampo(grafico.campo)!.medio.toFixed(1).replace('.', ',')} {grafico.unidade}</b></span>
+                                        <span>Máx. <b>{resumoCampo(grafico.campo)!.maximo.toFixed(1).replace('.', ',')} {grafico.unidade}</b></span>
+                                    </div>
+                                )}
 
                                 <div style={{
                                     width: '100%',
@@ -1244,7 +1275,7 @@ export default function HistoricoEstacoes({
                                         <div className="historico-open-comparacao__cabecalho">
                                             <FiCloud aria-hidden="true" />
                                             <strong>Open-Meteo</strong>
-                                            <span>Estimativa de modelo • horários</span>
+                                            <span>Estimativa de modelo • {periodo === 'mes' ? 'médias diárias' : 'valores horários'}{comparar ? ' • período A' : ''}</span>
                                         </div>
                                         {carregandoOpenMeteo ? (
                                             <p role="status">Consultando Open-Meteo...</p>
@@ -1309,8 +1340,7 @@ export default function HistoricoEstacoes({
                         ))
                     ) : (
                         <article className="obs-bloco">
-                            <p>Há dados em apenas um intervalo. São necessários
-                            pelo menos dois intervalos com medições para desenhar a evolução.</p>
+                            <p>Há dados insuficientes para traçar a evolução neste período.</p>
                         </article>
                     )}
 

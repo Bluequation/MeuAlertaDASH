@@ -10,7 +10,9 @@ import {
     FiGrid,
     FiCircle,
     FiThermometer,
-    FiArrowLeft
+    FiArrowLeft,
+    FiSearch,
+    FiX
 } from 'react-icons/fi';
 import ObservatorioMunicipal from './ObservatorioMunicipal';
 import type { PerfilTermicoMunicipal } from './perfilTermicoMunicipal';
@@ -39,6 +41,25 @@ type MunicipioAtlas = {
     codigo: string;
     nome: string;
 };
+
+type ResultadoBuscaAtlas = {
+    chave: string;
+    tipo: 'estado' | 'municipio' | 'bairro';
+    nome: string;
+    descricao: string;
+    estado: EstadoAtlas;
+    municipio?: MunicipioAtlas;
+};
+
+function nomeBairroAtlas(feature: Feature): string {
+    const props = feature.properties ?? {};
+    const nome = [
+        props.Nome, props.nome, props.NOME,
+        props.bairro, props.BAIRRO, props.nome_bairro,
+        props.NM_BAIRRO, props.name
+    ].find(valor => typeof valor === 'string' && valor.trim().length > 0);
+    return typeof nome === 'string' ? nome.trim() : '';
+}
 
 
 // CARTOGRAFIA EXPRESSIVA — ESTADOS DO BRASIL
@@ -702,7 +723,8 @@ function EnquadramentoAtlas({
     municipios,
     municipio,
     distritos,
-    distritoSelecionado
+    distritoSelecionado,
+    bairroAlvo
 }: {
     dados: FeatureCollection;
     estado: EstadoAtlas | null;
@@ -710,6 +732,7 @@ function EnquadramentoAtlas({
     municipio: MunicipioAtlas | null;
     distritos: FeatureCollection | null;
     distritoSelecionado: string | null;
+    bairroAlvo: Feature | null;
 }) {
     const map = useMap();
 
@@ -723,7 +746,7 @@ function EnquadramentoAtlas({
                 ) === distritoSelecionado
         );
 
-        const geometria = distritoAtual
+        const geometria = bairroAlvo ?? distritoAtual
             ?? (
                 municipio && distritos
                     ? distritos
@@ -763,7 +786,7 @@ function EnquadramentoAtlas({
                 // Enquadramento imediato, sem zoom animado.
                 map.fitBounds(limites, {
                     padding: !estado ? [8, 8] : [28, 28],
-                    maxZoom: distritoAtual ? 13 : undefined,
+                    maxZoom: bairroAlvo ? 15 : distritoAtual ? 13 : undefined,
                     animate: false
                 });
             });
@@ -786,7 +809,8 @@ function EnquadramentoAtlas({
         municipios,
         municipio,
         distritos,
-        distritoSelecionado
+        distritoSelecionado,
+        bairroAlvo
     ]);
 
     return null;
@@ -1240,9 +1264,23 @@ export default function AtlasBrasil({
     const [estado, setEstado] = useState<EstadoAtlas | null>(null);
     const [municipios, setMunicipios] = useState<FeatureCollection | null>(null);
     const [municipio, setMunicipio] = useState<MunicipioAtlas | null>(null);
+
+    // Pesquisa territorial discreta no cabeçalho do atlas.
+    // Estados: Brasil; municípios: Ceará; bairros: Fortaleza e Ipaporanga.
+    const [buscaAberta, setBuscaAberta] = useState(false);
+    const [textoBusca, setTextoBusca] = useState('');
+    const [indiceBusca, setIndiceBusca] = useState(0);
+    const [municipiosBusca, setMunicipiosBusca] =
+        useState<FeatureCollection | null>(null);
+    const [carregandoBusca, setCarregandoBusca] = useState(false);
+    const [erroBusca, setErroBusca] = useState<string | null>(null);
+    const [bairroBuscado, setBairroBuscado] =
+        useState<{ municipioCodigo: string; nome: string } | null>(null);
+    const buscaRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
         if (
-            municipio?.codigo !== '2304400' ||
+            (municipio?.codigo !== '2304400' && !buscaAberta) ||
             bairrosFortaleza
         ) return;
 
@@ -1272,12 +1310,12 @@ export default function AtlasBrasil({
             });
 
         return () => controlador.abort();
-    }, [municipio?.codigo, bairrosFortaleza]);
+    }, [municipio?.codigo, bairrosFortaleza, buscaAberta]);
 
     // CARREGAMENTO DOS BAIRROS DE IPAPORANGA — IBGE 2022
     useEffect(() => {
         if (
-            municipio?.codigo !== '2305654' ||
+            (municipio?.codigo !== '2305654' && !buscaAberta) ||
             bairrosIpaporanga
         ) return;
 
@@ -1309,7 +1347,7 @@ export default function AtlasBrasil({
             });
 
         return () => controlador.abort();
-    }, [municipio?.codigo, bairrosIpaporanga]);
+    }, [municipio?.codigo, bairrosIpaporanga, buscaAberta]);
 
     // DISSOLVÊNCIA SUAVE DO ATLAS
     const [mapaOculto, setMapaOculto] = useState(false);

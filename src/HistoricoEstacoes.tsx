@@ -651,6 +651,18 @@ export default function HistoricoEstacoes({
             (serie === 'b' && (carregandoComparacao || erroComparacao))) return;
         const dados = dadosDaSerie(serie);
         if (dados.pontos.length === 0) return;
+        if (aoVivo) {
+            abrirRelatorioHistorico(
+                estacao,
+                dados.leituras.map(leitura => ({
+                    recebidoEm: leitura.recebidoEm,
+                    temperatura: leitura.temperatura,
+                    umidade: leitura.umidade
+                }))
+            );
+            return;
+        }
+
         abrirRelatorioHistorico(
             estacao,
             dados.pontos.map(ponto => ({
@@ -937,7 +949,7 @@ export default function HistoricoEstacoes({
                             a comparação pode estar incompleta.
                         </p>
                     )}
-                    {comparar && !carregandoComparacao && !erroComparacao && (
+                    {!aoVivo && comparar && !carregandoComparacao && !erroComparacao && (
                         <div className="historico-legenda-comparacao">
                             <span><i className="historico-legenda-comparacao__a" />
                                 A • {descricaoIntervalo(inicioPeriodo, instanteConsulta)}</span>
@@ -947,7 +959,7 @@ export default function HistoricoEstacoes({
                     )}
 
                     {(pontosDisponiveis.length >= 2 ||
-                        (comparar && pontosComparacaoDisponiveis.length >= 2)) ? (
+                        (!aoVivo && comparar && pontosComparacaoDisponiveis.length >= 2)) ? (
                         ([
                             {
                                 campo: 'temperatura',
@@ -1014,7 +1026,7 @@ export default function HistoricoEstacoes({
                                             <Line
                                                 type="monotone"
                                                 dataKey={grafico.campo}
-                                                name={comparar ? 'Período A' : grafico.titulo}
+                                                name={!aoVivo && comparar ? 'Período A' : grafico.titulo}
                                                 stroke={grafico.cor}
                                                 strokeWidth={2.5}
                                                 dot={pontosDisponiveis.length <= 12}
@@ -1023,7 +1035,7 @@ export default function HistoricoEstacoes({
                                                 animationDuration={650}
                                                 activeDot={{ r: 5 }}
                                             />
-                                            {comparar && !carregandoComparacao &&
+                                            {!aoVivo && comparar && !carregandoComparacao &&
                                                 !erroComparacao && (
                                                 <Line
                                                     type="monotone"
@@ -1057,13 +1069,14 @@ export default function HistoricoEstacoes({
                             <div className="historico-resumo-total">
                                 <FiDatabase aria-hidden="true" />
                                 <strong>
-                                    A: {leituras.length.toLocaleString('pt-BR')} medições
+                                    {aoVivo ? '' : 'A: '}{leituras.length.toLocaleString('pt-BR')} medições
                                 </strong>
                                 <span className="historico-periodo-resumo">
-                                    {pontosDisponiveis.length} intervalos
+                                    {aoVivo ? 'atualização automática'
+                                        : `${pontosDisponiveis.length} intervalos`}
                                 </span>
                             </div>
-                            {comparar && (
+                            {!aoVivo && comparar && (
                                 <div className="historico-resumo-total">
                                     <FiGitMerge aria-hidden="true" />
                                     <strong>
@@ -1077,7 +1090,12 @@ export default function HistoricoEstacoes({
                             <div className="historico-resumo-periodo">
                                 <FiClock aria-hidden="true" />
                                 <span>
-                                    {descricaoIntervalo(inicioPeriodo, instanteConsulta)}
+                                    {aoVivo && leituras.length > 0
+                                        ? descricaoIntervalo(
+                                            leituras[0].recebidoEm,
+                                            leituras[leituras.length - 1].recebidoEm
+                                        )
+                                        : descricaoIntervalo(inicioPeriodo, instanteConsulta)}
                                 </span>
                             </div>
                         </div>
@@ -1093,19 +1111,21 @@ export default function HistoricoEstacoes({
                                     <>
                                         <button type="button" onClick={() => gerarRelatorio('a')}>
                                             <FiPrinter aria-hidden="true" />
-                                            Relatório A (PDF)
+                                            {aoVivo ? 'Relatório (PDF)' : 'Relatório A (PDF)'}
                                         </button>
-                                        <button type="button" onClick={() => baixarCSV(true, 'a')}>
-                                            <FiDownload aria-hidden="true" />
-                                            Médias A (CSV)
-                                        </button>
+                                        {!aoVivo && (
+                                            <button type="button" onClick={() => baixarCSV(true, 'a')}>
+                                                <FiDownload aria-hidden="true" />
+                                                Médias A (CSV)
+                                            </button>
+                                        )}
                                         <button type="button" onClick={() => baixarCSV(false, 'a')}>
                                             <FiDownload aria-hidden="true" />
-                                            Medições A (CSV)
+                                            {aoVivo ? 'Medições (CSV)' : 'Medições A (CSV)'}
                                         </button>
                                     </>
                                 )}
-                                {comparar && !carregandoComparacao &&
+                                {!aoVivo && comparar && !carregandoComparacao &&
                                     !erroComparacao && leiturasComparacao.length > 0 && (
                                     <>
                                         <button type="button" onClick={() => gerarRelatorio('b')}>
@@ -1129,13 +1149,15 @@ export default function HistoricoEstacoes({
                     <p className="historico-fonte">
                         Fonte: Estação CUIDAÍ • Dados medidos pelos sensores,
                         não estimativas da Open-Meteo.
-                        Os gráficos apresentam médias das medições disponíveis
-                        em cada intervalo; horários sem dados permanecem vazios.
-                        {comparar
-                            ? 'As séries A e B usam a mesma escala de tempo relativo, em datas diferentes. '
+                        {aoVivo
+                            ? 'O gráfico se atualiza automaticamente com as medições individuais recentes.'
+                            : 'No histórico, os gráficos apresentam médias por intervalo, sem preencher horários sem dados.'}
+                        {!aoVivo && comparar
+                            ? ' As séries A e B usam a mesma escala de tempo relativo, em datas diferentes.'
                             : ''}
-                        A exportação identifica cada período e diferencia
-                        médias de medições originais.
+                        {!aoVivo
+                            ? ' Os arquivos exportados diferenciam médias e medições originais.'
+                            : ''}
                     </p>
                 </>
             )}

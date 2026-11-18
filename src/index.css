@@ -1952,6 +1952,9 @@ body,
   border-radius: 50%;
   background: #278967;
 }
+.historico-modos__indicador--sem-leitura {
+  background: #C69B56;
+}
 
 .historico-modos + .historico-periodo-controles {
   margin-top: 12px;

@@ -236,42 +236,67 @@ export default function ObservatorioMunicipal({
         useState<string | null>(null);
 
     useEffect(() => {
-        const controlador = new AbortController();
+        let ativo = true;
+        let controladorAtual: AbortController | null = null;
+        let ultimaConsulta = 0;
+        const INTERVALO_PERFIL = 30 * 60 * 1000;
 
-        setCarregandoPerfil(true);
-        setErroPerfil(null);
-        setPerfilTermico(null);
+        const atualizar = async (primeira = false) => {
+            if (!ativo || document.hidden) return;
+            controladorAtual?.abort();
 
-        void consultarPerfilTermicoMunicipal(
-            geometria,
-            controlador.signal
-        )
-            .then(resultado => {
-                if (!controlador.signal.aborted) {
+            const controlador = new AbortController();
+            controladorAtual = controlador;
+            ultimaConsulta = Date.now();
+
+            if (primeira) {
+                setCarregandoPerfil(true);
+                setPerfilTermico(null);
+            }
+            setErroPerfil(null);
+
+            try {
+                const resultado = await consultarPerfilTermicoMunicipal(
+                    geometria, controlador.signal
+                );
+                if (ativo && !controlador.signal.aborted) {
                     setPerfilTermico(resultado);
                 }
-            })
-            .catch(erro => {
-                if (!controlador.signal.aborted) {
-                    console.error(
-                        'Erro no perfil térmico municipal:',
-                        erro
-                    );
-
+            } catch (erro) {
+                if (ativo && !controlador.signal.aborted) {
+                    console.error('Erro no perfil térmico municipal:', erro);
                     setErroPerfil(
                         erro instanceof Error
                             ? erro.message
                             : 'Não foi possível calcular o perfil térmico.'
                     );
+                    // Mantém o último perfil válido no mapa durante falhas.
                 }
-            })
-            .finally(() => {
-                if (!controlador.signal.aborted) {
+            } finally {
+                if (ativo && !controlador.signal.aborted) {
                     setCarregandoPerfil(false);
                 }
-            });
+            }
+        };
 
-        return () => controlador.abort();
+        void atualizar(true);
+        const intervalo = window.setInterval(() => {
+            if (!document.hidden) void atualizar();
+        }, INTERVALO_PERFIL);
+
+        const aoRetomar = () => {
+            if (!document.hidden && Date.now() - ultimaConsulta >= INTERVALO_PERFIL) {
+                void atualizar();
+            }
+        };
+        document.addEventListener('visibilitychange', aoRetomar);
+
+        return () => {
+            ativo = false;
+            window.clearInterval(intervalo);
+            document.removeEventListener('visibilitychange', aoRetomar);
+            controladorAtual?.abort();
+        };
     }, [geometria]);
 
     // Compartilha os dados já consultados com o mapa.
@@ -671,6 +696,7 @@ export default function ObservatorioMunicipal({
                                                 <strong>Referência: </strong>
                                                 {perfilTermico.horario.replace('T', ' às ')}
                                                 {' • Horário de Fortaleza'}
+                                                {' • Renovação automática a cada 30 min'}
                                             </p>
                                         </div>
                                     </details>

@@ -1413,6 +1413,15 @@ export default function AtlasBrasil({
     const [mostrarRelatosQuentura, setMostrarRelatosQuentura] =
         useState(false);
 
+    // Selecionar uma estação desativa os relatos sobre o mapa.
+    // A seleção pelo marcador e pelo Observatório usa esta mesma função.
+    const selecionarEstacao = (id: string | null) => {
+        setIdEstacaoSelecionada(id);
+        if (id !== null) {
+            setMostrarRelatosQuentura(false);
+        }
+    };
+
     const [erroAmostras, setErroAmostras] =
         useState<string | null>(null);
 
@@ -2638,12 +2647,12 @@ export default function AtlasBrasil({
                             )}
 
                             {/* ESTAÇÕES CUIDAÍ — MESMO ÍCONE DO APLICATIVO */}
-                            {municipio && (
+                            {municipio && !mostrarRelatosQuentura && (
                                 <MarcadoresEstacoesCuidai
                                     estacoes={estacoesDoTerritorio}
                                     instanteAtual={instanteAtual}
                                     idSelecionada={idEstacaoAtiva}
-                                    onSelecionar={setIdEstacaoSelecionada}
+                                    onSelecionar={selecionarEstacao}
                                 />
                             )}
 
@@ -2882,9 +2891,13 @@ export default function AtlasBrasil({
                                             : ''
                                             }`}
                                         aria-pressed={mostrarRelatosQuentura}
-                                        onClick={() =>
-                                            setMostrarRelatosQuentura(atual => !atual)
-                                        }
+                                        onClick={() => {
+                                            const ativar = !mostrarRelatosQuentura;
+                                            setMostrarRelatosQuentura(ativar);
+                                            if (ativar) {
+                                                setIdEstacaoSelecionada(null);
+                                            }
+                                        }}
                                     >
                                         <FiThermometer size={16} />
                                         <span>Quentura</span>
@@ -3091,7 +3104,7 @@ export default function AtlasBrasil({
                                 erroEstacoes={erroEstacoes}
                                 instanteAtual={instanteAtual}
                                 idEstacaoSelecionada={idEstacaoAtiva}
-                                onSelecionarEstacao={setIdEstacaoSelecionada}
+                                onSelecionarEstacao={selecionarEstacao}
                                 codigoMunicipio={municipio.codigo}
                                 municipiosCeara={municipios}
                             />

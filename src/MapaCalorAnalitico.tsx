@@ -421,9 +421,31 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
                   </div>
                 )}
                 {categoria === 'Quentura' && (
-                  <p className="territorio-analise__nota-condicoes">
-                    Um relato pode indicar várias condições; as contagens não devem ser somadas.
-                  </p>
+                  <div className="territorio-analise__filtro-sombra">
+                    <div className="territorio-analise__filtro-sombra-titulo">
+                      <strong>Sombra no local</strong>
+                      <span>Selecione uma resposta para filtrar o mapa</span>
+                    </div>
+                    <div className="territorio-analise__sombra-cards"
+                      role="group" aria-label="Filtrar relatos de Quentura pela presença de sombra">
+                      {SOMBRAS.map(resposta => {
+                        const quantidade = sombras.find(item => item.nome === resposta)?.quantidade ?? 0;
+                        const percentual = totalRegistrosQuentura
+                          ? Math.round(100 * quantidade / totalRegistrosQuentura) : 0;
+                        return (
+                          <button key={resposta} type="button"
+                            aria-pressed={sombra === resposta}
+                            onClick={() => setSombra(atual => atual === resposta ? 'Todas' : resposta)}>
+                            <span>{resposta}</span>
+                            <strong>{quantidade} <small>· {percentual}%</small></strong>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="territorio-analise__nota-condicoes">
+                      Um relato pode indicar várias condições. “Não informado” não significa ausência de sombra.
+                    </p>
+                  </div>
                 )}
               </>
             )}
@@ -488,30 +510,8 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
         />
       )}
 
-      {(categoria === 'Quentura' || modo === 'historico') && (
+      {modo === 'historico' && (
         <div className="territorio-analise__analiticos">
-            {categoria === 'Quentura' && (
-            <section>
-              <h2>Distribuição da sombra</h2>
-              <div className="territorio-analise__sombra">
-                {SOMBRAS.map(resposta => {
-                  const quantidade = sombras.find(x => x.nome === resposta)?.quantidade ?? 0;
-                  return <button key={resposta} type="button"
-                    aria-pressed={sombra === resposta}
-                    className={sombra === resposta ? 'ativo' : ''}
-                    onClick={() => setSombra(atual => atual === resposta ? 'Todas' : resposta)}>
-                    <strong>{quantidade}</strong>
-                    <span>{resposta} • {totalRegistrosQuentura
-                      ? Math.round(quantidade / totalRegistrosQuentura * 100)
-                      : 0}%</span>
-                  </button>;
-                })}
-              </div>
-              <p>Respostas declaradas pela comunidade. “Não informado” não significa ausência de sombra.</p>
-            </section>
-          )}
-
-          {modo === 'historico' && (
             <section className="territorio-analise__evolucao">
               <h2>Evolução dos registros criados</h2>
               {dadosEvolucao.length ? (
@@ -527,7 +527,6 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
                 </ResponsiveContainer>
               ) : <p>Sem registros com data válida neste intervalo.</p>}
             </section>
-          )}
         </div>
       )}
 

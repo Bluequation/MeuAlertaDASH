@@ -163,7 +163,6 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
 
   const totalVencidos = base.filter(a => statusDoAlerta(a, agora) === 'expirado').length;
   const totalResolvidos = base.filter(a => statusDoAlerta(a, agora) === 'resolvido').length;
-  const subcategoriasNoRecorte = agruparContagem(filtrados.flatMap(subcategoriasDoAlerta));
   const maxCategoria = Math.max(1, ...categoriasPeriodo.map(a => a.quantidade));
   const maxSubcategoria = Math.max(1, ...subcategorias.map(a => a.quantidade));
 
@@ -294,7 +293,7 @@ export default function MapaCalorAnalitico({ alertas, centro, agora }: Props) {
 
       <div className="territorio-analise__mapa" role="region"
         aria-label="Mapa de calor das ocorrências selecionadas">
-        <MapContainer center={centro ?? [-5.3, -39.3]} zoom={14}
+        <MapContainer center={centro ?? ([-5.3, -39.3] as [number, number])} zoom={14}
           style={{ width: '100%', height: '100%', background: '#FFFFFF' }}>
           <TileLayer className="mapa-cuidai"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />

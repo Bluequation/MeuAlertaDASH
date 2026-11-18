@@ -34,7 +34,9 @@ import {
     FiChevronLeft,
     FiChevronRight,
     FiGitMerge,
-    FiRadio
+    FiRadio,
+    FiCloud,
+    FiTrendingUp
 } from 'react-icons/fi';
 import { db } from './firebase';
 import { abrirRelatorioHistorico } from './RelatorioHistorico';
@@ -621,6 +623,10 @@ export default function HistoricoEstacoes({
                     : principal?.momento ?? `Intervalo ${indice + 1}`,
                 temperatura: principal?.temperatura ?? null,
                 umidade: principal?.umidade ?? null,
+                temperaturaMinima: principal?.temperaturaMinima ?? null,
+                temperaturaMaxima: principal?.temperaturaMaxima ?? null,
+                umidadeMinima: principal?.umidadeMinima ?? null,
+                umidadeMaxima: principal?.umidadeMaxima ?? null,
                 quantidade: principal?.quantidade ?? 0,
                 temperaturaComparacao: segundo?.temperatura ?? null,
                 umidadeComparacao: segundo?.umidade ?? null,
@@ -681,6 +687,25 @@ export default function HistoricoEstacoes({
             quantidade: 1
         }));
     }, [amostrasOpenMeteo, periodo, inicioPeriodo, instanteConsulta]);
+
+    const dominioCompartilhado = (campo: 'temperatura' | 'umidade'): [number, number] => {
+        const valores = [
+            ...pontosGrafico.map(p => p[campo]),
+            ...pontosGrafico.map(p => p[`${campo}Comparacao` as keyof PontoGrafico]),
+            ...(mostrarOpenMeteo && !aoVivo
+                ? pontosOpenMeteo.map(p => p[campo])
+                : [])
+        ].filter((valor): valor is number =>
+            typeof valor === 'number' && Number.isFinite(valor)
+        );
+        if (valores.length === 0) return campo === 'umidade' ? [0, 100] : [20, 40];
+        const minimo = Math.min(...valores);
+        const maximo = Math.max(...valores);
+        const margem = Math.max(campo === 'temperatura' ? 0.5 : 2, (maximo - minimo) * 0.1);
+        return campo === 'umidade'
+            ? [Math.max(0, minimo - margem), Math.min(100, maximo + margem)]
+            : [minimo - margem, maximo + margem];
+    };
 
     const dadosDaSerie = (serie: 'a' | 'b') => {
         const eComparacao = serie === 'b';
@@ -941,6 +966,30 @@ export default function HistoricoEstacoes({
                         {opcaoPeriodo.descricao} • {descricaoIntervalo(inicioPeriodo, instanteConsulta)}
                     </p>
 
+                    <div className="historico-opcoes-analise">
+                        <button
+                            type="button"
+                            className={mostrarOpenMeteo
+                                ? 'historico-analise-botao historico-analise-botao--ativo'
+                                : 'historico-analise-botao'}
+                            aria-pressed={mostrarOpenMeteo}
+                            onClick={() => setMostrarOpenMeteo(atual => !atual)}
+                        >
+                            <FiCloud aria-hidden="true" />
+                            {mostrarOpenMeteo ? 'Ocultar Open-Meteo' : 'Comparar com Open-Meteo'}
+                        </button>
+                        <button
+                            type="button"
+                            className={mostrarExtremos
+                                ? 'historico-analise-botao historico-analise-botao--ativo'
+                                : 'historico-analise-botao'}
+                            aria-pressed={mostrarExtremos}
+                            onClick={() => setMostrarExtremos(atual => !atual)}
+                        >
+                            <FiTrendingUp aria-hidden="true" />
+                            {mostrarExtremos ? 'Ocultar mín./máx.' : 'Mostrar mín./máx.'}
+                        </button>
+                    </div>
                     <button
                         type="button"
                         className={comparar
@@ -1009,7 +1058,8 @@ export default function HistoricoEstacoes({
             )}
             {!carregando && !erro && !carregandoComparacao &&
                 leituras.length === 0 &&
-                (!comparar || leiturasComparacao.length === 0) && (
+                (!comparar || leiturasComparacao.length === 0) &&
+                (!mostrarOpenMeteo || amostrasOpenMeteo.length === 0) && (
                 <article className="obs-bloco">
                     <h4>Sem medições no período</h4>
                     <p>Não foram encontradas leituras válidas no intervalo escolhido.</p>
@@ -1017,8 +1067,9 @@ export default function HistoricoEstacoes({
             )}
 
             {!carregando && !erro &&
-                (leituras.length > 0 || (comparar &&
-                    !carregandoComparacao && leiturasComparacao.length > 0)) && (
+                (leituras.length > 0 ||
+                    (!aoVivo && mostrarOpenMeteo && amostrasOpenMeteo.length > 0) ||
+                    (comparar && !carregandoComparacao && leiturasComparacao.length > 0)) && (
                 <>
                     {parcial && (
                         <p className="historico-periodo-alerta" role="alert">
@@ -1054,6 +1105,7 @@ export default function HistoricoEstacoes({
                     )}
 
                     {(pontosDisponiveis.length >= 2 ||
+                        (!aoVivo && mostrarOpenMeteo && pontosOpenMeteo.length > 0) ||
                         (!aoVivo && comparar && pontosComparacaoDisponiveis.length >= 2)) ? (
                         ([
                             {

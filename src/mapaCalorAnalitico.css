@@ -530,7 +530,7 @@
   align-self: start;
   height: auto;
   min-width: 0;
-  max-height: 240px;
+  max-height: 210px;
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: #C8DCEB transparent;
@@ -633,7 +633,7 @@
   }
 
   .territorio-analise__painel-lateral {
-    max-height: 230px;
+    max-height: 210px;
   }
 }
 

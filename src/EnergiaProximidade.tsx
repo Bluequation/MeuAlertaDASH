@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiCloudRain, FiMapPin, FiWind } from 'react-icons/fi';
+import { FiChevronDown, FiCloudRain, FiMapPin, FiWind } from 'react-icons/fi';
 import { consultarOpenMeteoComCache } from './openMeteoCache';
 import { subcategoriasDoAlerta, type AlertaTerritorial } from './territorioOcorrencias';
 
@@ -175,12 +175,14 @@ async function consultarClimaEntorno(
 
 export default function EnergiaProximidade({ registros, agora }: Props) {
   const grupos = useMemo(() => agruparRelatos(registros), [registros]);
-  const registrosEmGrupos = grupos.reduce((total, grupo) => total + grupo.relatos.length, 0);
-  const [idSelecionado, setIdSelecionado] = useState<string | null>(null);
+  const [grupoAberto, setGrupoAberto] = useState<string | null>(null);
+  const [climaAberto, setClimaAberto] = useState<string | null>(null);
   const [clima, setClima] = useState<ClimaEntorno | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
-  const selecionado = grupos.find(grupo => grupo.id === idSelecionado) ?? null;
+  const selecionado = grupos.find(grupo =>
+    grupo.id === grupoAberto && grupo.id === climaAberto
+  ) ?? null;
 
   useEffect(() => {
     if (!selecionado) return;
@@ -200,65 +202,107 @@ export default function EnergiaProximidade({ registros, agora }: Props) {
     selecionado?.latitude, selecionado?.longitude]);
 
   return (
-    <div className="energia-proximidade">
+    <section className="energia-proximidade" aria-label="Relatos de energia próximos">
       <div className="energia-proximidade__cabecalho">
-        <h3><FiMapPin size={15} aria-hidden="true" /> Relatos próximos no espaço e no tempo</h3>
-        <span>{grupos.length} grupo(s) · {registrosEmGrupos} relato(s) agrupado(s)</span>
+        <h3><FiMapPin size={15} aria-hidden="true" /> Onde houve vários relatos?</h3>
+        <span>{grupos.length} {grupos.length === 1 ? 'conjunto encontrado' : 'conjuntos encontrados'}</span>
       </div>
-      <p className="energia-proximidade__criterio">
-        Agrupamento exploratório: até 3 km e até 3 horas do primeiro relato de cada grupo.
-        Não representa uma interrupção confirmada da rede elétrica.
+      <p className="energia-proximidade__orientacao">
+        Toque em um conjunto para ver o que foi informado.
       </p>
       {grupos.length ? (
         <div className="energia-proximidade__grupos">
-          {grupos.slice(0, 6).map((grupo, indice) => (
-            <button key={grupo.id} type="button"
-              aria-pressed={idSelecionado === grupo.id}
-              onClick={() => setIdSelecionado(atual => atual === grupo.id ? null : grupo.id)}>
-              <strong>Grupo {indice + 1} <span>· {grupo.relatos.length} relatos</span></strong>
-              <small>{formatoData(grupo.primeiro)} – {formatoData(grupo.ultimo)}</small>
-              <span>Até {formatoNumero(grupo.distanciaMaxima)} km do primeiro relato</span>
-              <small>Tipos: {[...new Set(grupo.relatos.flatMap(subcategoriasDoAlerta))].join(' · ')}</small>
-              <em>{idSelecionado === grupo.id ? 'Ocultar análise' : 'Analisar chuva e vento'}</em>
-            </button>
-          ))}
+          {grupos.slice(0, 6).map((grupo, indice) => {
+            const aberto = grupoAberto === grupo.id;
+            const exibeClima = aberto && climaAberto === grupo.id;
+            const duracaoMinutos = Math.round((grupo.ultimo - grupo.primeiro) / 60_000);
+            const distanciaMetros = Math.round(grupo.distanciaMaxima * 1000);
+            const tipos = [...new Set(grupo.relatos.flatMap(subcategoriasDoAlerta))];
+            return (
+              <div className="energia-proximidade__grupo" key={grupo.id}>
+                <button type="button" className="energia-proximidade__linha"
+                  aria-expanded={aberto}
+                  onClick={() => {
+                    setGrupoAberto(atual => atual === grupo.id ? null : grupo.id);
+                    setClimaAberto(null);
+                    setClima(null);
+                    setErro(null);
+                  }}>
+                  <strong>{grupo.relatos.length} relatos próximos
+                    <small> · Conjunto {indice + 1}</small>
+                  </strong>
+                  <span>{formatoData(grupo.primeiro)}
+                    {grupo.ultimo !== grupo.primeiro &&
+                      ` a ${new Date(grupo.ultimo).toLocaleTimeString('pt-BR', {
+                        hour: '2-digit', minute: '2-digit', timeZone: 'America/Fortaleza'
+                      })}`}
+                  </span>
+                  <FiChevronDown className="energia-proximidade__seta" aria-hidden="true" />
+                </button>
+                {aberto && (
+                  <div className="energia-proximidade__detalhes">
+                    <p>Relatos a até {distanciaMetros >= 1000
+                      ? `${formatoNumero(distanciaMetros / 1000)} km`
+                      : `${distanciaMetros} m`} do primeiro registro,
+                      em {duracaoMinutos === 0 ? 'menos de 1 minuto' :
+                        `${duracaoMinutos} ${duracaoMinutos === 1 ? 'minuto' : 'minutos'}`}.
+                    </p>
+                    <div className="energia-proximidade__tipos"
+                      aria-label="Situações relatadas">
+                      {tipos.map(tipo => <span key={tipo}>{tipo}</span>)}
+                    </div>
+                    <button type="button" className="energia-proximidade__botao-clima"
+                      aria-expanded={exibeClima}
+                      onClick={() => setClimaAberto(atual => atual === grupo.id ? null : grupo.id)}>
+                      {exibeClima ? 'Ocultar chuva e vento' : 'Ver chuva e vento naquele horário'}
+                    </button>
+                    {exibeClima && (
+                      <div className="energia-proximidade__resultado" aria-live="polite">
+                        {carregando ? <p>Buscando estimativas da Open-Meteo…</p> :
+                          erro ? <p>{erro}</p> :
+                          clima ? (
+                            <>
+                              <div className="energia-proximidade__meteorologia">
+                                <span><FiCloudRain aria-hidden="true" />
+                                  Chuva: <b>{clima.chuvaAcumulada === null ? 'sem dados' :
+                                    `${formatoNumero(clima.chuvaAcumulada)} mm`}</b>
+                                </span>
+                                <span><FiWind aria-hidden="true" />
+                                  Maior rajada: <b>{clima.maiorRajada === null ? 'sem dados' :
+                                    `${formatoNumero(clima.maiorRajada)} km/h`}</b>
+                                </span>
+                              </div>
+                              <small>Estimativas de um ponto próximo, entre {
+                                formatoData(clima.inicio)} e {formatoData(clima.fim)}.</small>
+                            </>
+                          ) : null}
+                        <small>Fonte: Open-Meteo. Chuva e vento não comprovam
+                          a causa da falta de energia.</small>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <p className="energia-proximidade__sem-grupos">
-          Nenhum conjunto de dois ou mais relatos atende aos critérios neste período.
+          Não foram encontrados relatos próximos uns dos outros neste período.
         </p>
       )}
       {grupos.length > 6 && (
         <small className="energia-proximidade__limite">
-          Exibindo os 6 grupos mais recentes de {grupos.length}.
+          Mostrando os seis conjuntos mais recentes.
         </small>
       )}
-      {selecionado && (
-        <div className="energia-proximidade__resultado" aria-live="polite">
-          <strong>Contexto do grupo · ponto aproximado do primeiro relato</strong>
-          {carregando ? <p>Consultando a Open-Meteo…</p> :
-            erro ? <p>{erro}</p> :
-            clima ? (
-              <>
-                <div className="energia-proximidade__meteorologia">
-                  <span><FiCloudRain aria-hidden="true" />
-                    Chuva acumulada estimada: <b>{clima.chuvaAcumulada === null
-                      ? 'indisponível' : `${formatoNumero(clima.chuvaAcumulada)} mm`}</b>
-                  </span>
-                  <span><FiWind aria-hidden="true" />
-                    Maior rajada horária estimada: <b>{clima.maiorRajada === null
-                      ? 'indisponível' : `${formatoNumero(clima.maiorRajada)} km/h`}</b>
-                  </span>
-                </div>
-                <small>Janela consultada: {formatoData(clima.inicio)} a {formatoData(clima.fim)}
-                  {' · '}{clima.horariosValidos} hora(s) com dados horários.</small>
-              </>
-            ) : null}
-          <small>Fonte: Open-Meteo (modelo meteorológico). Valores de um ponto de referência,
-            não medições em cada alerta. Proximidade e coincidência temporal não demonstram
-            que a chuva ou o vento causaram a interrupção.</small>
-        </div>
-      )}
-    </div>
+      <details className="energia-proximidade__metodo">
+        <summary>Como esses conjuntos são identificados?</summary>
+        <p>O painel aproxima relatos feitos a até 3 km e até 3 horas do
+          primeiro registro de cada conjunto. Isso ajuda a investigar
+          ocorrências, mas não comprova uma única falha na rede elétrica
+          nem sua causa.</p>
+      </details>
+    </section>
   );
 }

@@ -29,7 +29,7 @@
 .energia-analise__topo small { font-size: 10px; color: #71869B; }
 .energia-analise__indicadores {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0,1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
 }
 .energia-analise__indicadores > div {
@@ -170,7 +170,6 @@
 }
 @media (max-width: 430px) {
   .energia-analise__indicadores { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .energia-analise__indicadores > div:last-child { grid-column: 1 / -1; }
   .energia-analise__registro { align-items: flex-start; flex-wrap: wrap; }
 }
 

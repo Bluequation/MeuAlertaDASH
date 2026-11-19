@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiCheckCircle, FiCloudRain, FiClock, FiWind, FiZap } from 'react-icons/fi';
+import { FiCheckCircle, FiCloudRain, FiWind, FiZap } from 'react-icons/fi';
 import { consultarOpenMeteoComCache } from './openMeteoCache';
 import EnergiaProximidade from './EnergiaProximidade';
 import {
@@ -139,6 +139,7 @@ export default function EnergiaAnalise({
     duracaoObservadaEnergiaMs(alerta) === null
   ).length;
   const ativos = registros.filter(alerta => statusDoAlerta(alerta, agora) === 'ativo').length;
+  const resolvidos = registros.filter(alerta => statusDoAlerta(alerta, agora) === 'resolvido').length;
 
   const selecionado = registrados.find(alerta => alerta.id === idConsulta) ?? null;
 
@@ -167,31 +168,29 @@ export default function EnergiaAnalise({
   return (
     <section className="energia-analise" aria-label="Análise dos relatos de energia">
       <div className="energia-analise__topo">
-        <h2><FiZap aria-hidden="true" /> Energia | Acompanhamento comunitário</h2>
+        <h2><FiZap aria-hidden="true" /> Energia no território</h2>
         <small>{modo === 'historico'
-          ? 'Relatos criados no período selecionado'
-          : 'Relatos criados nos últimos 30 dias'}</small>
+          ? 'Relatos feitos no período escolhido'
+          : 'Relatos dos últimos 30 dias'}</small>
       </div>
 
       <div className="energia-analise__indicadores">
-        <div><strong>{ativos}</strong><span>Relatos ativos</span></div>
-        <div><strong>{restabelecidos.length}</strong><span>Retornos confirmados com horário</span></div>
-        <div><strong>{media === null ? '—' : duracaoLegivel(media)}</strong>
-          <span>Tempo médio entre relato e retorno</span></div>
+        <div><strong>{ativos}</strong><span>Avisos ainda ativos</span></div>
+        <div><strong>{resolvidos}</strong><span>Marcados como resolvidos</span></div>
+        {media !== null && (
+          <div><strong>{duracaoLegivel(media)}</strong>
+            <span>Média entre o primeiro relato e a confirmação do retorno</span></div>
+        )}
       </div>
-
-      <p className="energia-analise__ressalva">
-        <FiClock size={13} aria-hidden="true" />
-        Tempo observado desde o registro comunitário até a confirmação de retorno;
-        não é a duração oficial da interrupção. {encerradosSemHorario > 0 &&
-          `${encerradosSemHorario} relato(s) resolvido(s) sem horário de retorno não entraram na média.`}
-      </p>
 
       <EnergiaProximidade registros={registrados} agora={agora} />
 
-      {registrados.length ? (
+      <details className="energia-analise__individuais">
+        <summary>Ver os relatos um a um <span>{registrados.length}</span></summary>
+        <p>Veja o que foi informado em cada ponto. Um relato não confirma sozinho uma interrupção.</p>
+        {registrados.length ? (
         <div className="energia-analise__registros">
-          {registrados.slice(0, 8).map(alerta => {
+          {registrados.map(alerta => {
             const duracao = duracaoObservadaEnergiaMs(alerta);
             const estado = statusDoAlerta(alerta, agora);
             return (
@@ -215,9 +214,9 @@ export default function EnergiaAnalise({
             );
           })}
         </div>
-      ) : (
-        <p className="energia-analise__vazio">Nenhum registro de energia neste recorte.</p>
-      )}
+        ) : (
+          <p className="energia-analise__vazio">Nenhum registro de energia neste recorte.</p>
+        )}
 
       {selecionado && (
         <div className="energia-analise__contexto" role="status" aria-live="polite">
@@ -240,6 +239,23 @@ export default function EnergiaAnalise({
             sem confirmação de causa da falha elétrica. Não são dados da Enel.</small>
         </div>
       )}
+      </details>
+
+      <details className="energia-analise__metodologia">
+        <summary>Como interpretar?</summary>
+        <p>Os números vêm de relatos da comunidade, não da distribuidora de energia.
+          Ativo significa que o relato ainda está dentro da validade;
+          resolvido significa que a comunidade informou o retorno ou a resolução.
+          Relatos próximos não são necessariamente a mesma falta de energia.</p>
+        {encerradosSemHorario > 0 && (
+          <p>{encerradosSemHorario} relato(s) foi/foram resolvido(s) sem horário registrado.
+            Por isso, não entra(m) no cálculo do tempo de retorno.</p>
+        )}
+        {media !== null && (
+          <p>A média considera somente o intervalo entre a criação do relato e
+            a confirmação comunitária do retorno. Não é a duração oficial da interrupção.</p>
+        )}
+      </details>
     </section>
   );
 }

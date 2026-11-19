@@ -175,18 +175,60 @@
 }
 
 
-/* Grupos de relatos relacionados por distância e horário, sem atribuir causalidade. */
-.energia-proximidade {
+/* Informações detalhadas só aparecem quando solicitadas. */
+.energia-analise__individuais,
+.energia-analise__metodologia,
+.energia-proximidade__metodo {
   min-width: 0;
+  border-top: 1px solid #E4EAF1;
+  padding-top: 9px;
+}
+.energia-analise__individuais > summary,
+.energia-analise__metodologia > summary,
+.energia-proximidade__metodo > summary {
+  cursor: pointer;
+  list-style-position: inside;
+  color: #655196;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 0;
+}
+.energia-analise__individuais > summary > span {
+  display: inline-block;
+  min-width: 19px;
+  padding: 2px 6px;
+  margin-left: 5px;
+  border-radius: 8px;
+  color: #6B549B;
+  background: #F1EBF8;
+  font-size: 10px;
+  text-align: center;
+}
+.energia-analise__individuais > p,
+.energia-analise__metodologia > p,
+.energia-proximidade__metodo > p {
+  margin: 6px 0 9px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: #6D8094;
+}
+.energia-analise__individuais .energia-analise__registros {
+  margin-top: 8px;
+}
+.energia-analise__individuais .energia-analise__contexto { margin-top: 9px; }
+
+/* Leitura rápida: uma linha por conjunto, sem blocos altos. */
+.energia-proximidade {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 11px;
-  border-top: 1px solid #E6ECF2;
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid #E4EAF1;
 }
 .energia-proximidade__cabecalho {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 5px 12px;
@@ -200,114 +242,161 @@
   font-weight: 750;
   color: #233C57;
 }
-.energia-proximidade__cabecalho h3 svg { color: #8868B8; flex: 0 0 auto; }
+.energia-proximidade__cabecalho svg { color: #8868B8; flex: 0 0 auto; }
 .energia-proximidade__cabecalho > span {
   font-size: 10px;
-  color: #6D8198;
+  color: #718398;
 }
-.energia-proximidade__criterio,
+.energia-proximidade__orientacao,
 .energia-proximidade__sem-grupos,
 .energia-proximidade__limite {
   margin: 0;
+  font-size: 10.5px;
   color: #76889B;
-  font-size: 10px;
   line-height: 1.4;
 }
 .energia-proximidade__grupos {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-}
-.energia-proximidade__grupos > button {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
-  min-height: 100px;
-  box-sizing: border-box;
-  padding: 10px 11px;
-  border: 1px solid #E2E8EF;
+}
+.energia-proximidade__grupo {
+  min-width: 0;
+  border: 1px solid #E1E8F0;
   border-radius: 10px;
-  background: #FCFDFE;
-  color: #253D58;
-  font: inherit;
+  background: #FFFFFF;
+  overflow: hidden;
+}
+.energia-proximidade__linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  width: 100%;
+  min-width: 0;
+  padding: 11px 13px;
+  border: 0;
+  background: transparent;
+  color: #253C57;
   text-align: left;
   cursor: pointer;
-  transition: background-color 140ms ease, border-color 140ms ease;
+  font: inherit;
 }
-.energia-proximidade__grupos > button:hover,
-.energia-proximidade__grupos > button[aria-pressed="true"] {
-  background: #F4F0FB;
-  border-color: #B5A3D3;
+.energia-proximidade__linha:hover,
+.energia-proximidade__linha[aria-expanded="true"] {
+  background: #F8F5FC;
 }
-.energia-proximidade__grupos > button strong {
-  font-size: 11px;
-  line-height: 1.3;
+.energia-proximidade__linha > strong {
+  font-size: 11.5px;
   font-weight: 750;
 }
-.energia-proximidade__grupos > button strong span {
-  color: #7865A5;
+.energia-proximidade__linha > strong small {
+  font-size: 10px;
+  font-weight: 550;
+  color: #8A7AA5;
+}
+.energia-proximidade__linha > span {
+  margin-left: auto;
+  color: #70849A;
+  font-size: 10.5px;
+}
+.energia-proximidade__seta {
+  flex: 0 0 auto;
+  transition: transform 150ms ease;
+}
+.energia-proximidade__linha[aria-expanded="true"] .energia-proximidade__seta {
+  transform: rotate(180deg);
+}
+.energia-proximidade__detalhes {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 11px 13px 13px;
+  background: #FCFBFE;
+  border-top: 1px solid #E5EAF1;
+}
+.energia-proximidade__detalhes > p {
+  margin: 0;
+  color: #556B80;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.energia-proximidade__tipos {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.energia-proximidade__tipos > span {
+  display: inline-block;
+  border-radius: 7px;
+  padding: 5px 8px;
+  background: #F0EDF7;
+  color: #624D89;
+  font-size: 10.5px;
   font-weight: 650;
 }
-.energia-proximidade__grupos > button > span,
-.energia-proximidade__grupos > button small {
-  color: #708498;
-  font-size: 10px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-.energia-proximidade__grupos > button em {
-  color: #655096;
-  font-size: 10px;
-  font-style: normal;
+.energia-proximidade__botao-clima {
+  align-self: flex-start;
+  border: 1px solid #D6CEE6;
+  background: #F7F3FB;
+  color: #5B4689;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 10.5px;
   font-weight: 750;
-  margin-top: auto;
+}
+.energia-proximidade__botao-clima:hover {
+  background: #EEE5F8;
 }
 .energia-proximidade__resultado {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   padding: 10px 12px;
-  background: #F7F9FD;
-  border: 1px solid #DEE6EF;
-  border-radius: 10px;
+  border: 1px solid #E1E7ED;
+  background: #F8FAFD;
+  border-radius: 9px;
 }
-.energia-proximidade__resultado > strong {
-  color: #29405B;
-  font-size: 11px;
-}
-.energia-proximidade__resultado > small,
-.energia-proximidade__resultado > p {
+.energia-proximidade__resultado p,
+.energia-proximidade__resultado small {
   margin: 0;
-  color: #73869B;
-  font-size: 10px;
-  line-height: 1.4;
+  color: #72869A;
+  font-size: 10.5px;
+  line-height: 1.45;
 }
 .energia-proximidade__meteorologia {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 22px;
-  min-width: 0;
+  gap: 8px 16px;
 }
 .energia-proximidade__meteorologia > span {
   display: inline-flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 5px;
-  align-items: center;
-  color: #3F566C;
   font-size: 11px;
-  line-height: 1.4;
+  color: #36516A;
 }
-.energia-proximidade__meteorologia svg { color: #5F83A9; flex: 0 0 auto; }
-.energia-proximidade__meteorologia b { color: #213F5C; }
-@media (max-width: 950px) {
-  .energia-proximidade__grupos { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.energia-proximidade__meteorologia svg { color: #6486AA; flex: 0 0 auto; }
+.energia-analise summary:focus-visible,
+.energia-proximidade button:focus-visible,
+.energia-proximidade summary:focus-visible {
+  outline: 2px solid #8868B8;
+  outline-offset: 2px;
 }
-@media (max-width: 580px) {
-  .energia-proximidade__grupos { grid-template-columns: minmax(0,1fr); }
-  .energia-proximidade__grupos > button { min-height: 0; }
+@media (max-width: 620px) {
+  .energia-proximidade__linha {
+    align-items: flex-start;
+  }
+  .energia-proximidade__linha > span {
+    margin-left: 0;
+    width: calc(100% - 25px);
+  }
+  .energia-proximidade__seta { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .energia-proximidade__grupos > button { transition: none; }
+  .energia-proximidade__seta { transition: none; }
 }

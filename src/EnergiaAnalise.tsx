@@ -248,8 +248,12 @@ export default function EnergiaAnalise({
           resolvido significa que a comunidade informou o retorno ou a resolução.
           Relatos próximos não são necessariamente a mesma falta de energia.</p>
         {encerradosSemHorario > 0 && (
-          <p>{encerradosSemHorario} relato(s) foi/foram resolvido(s) sem horário registrado.
-            Por isso, não entra(m) no cálculo do tempo de retorno.</p>
+          <p>{encerradosSemHorario} {encerradosSemHorario === 1
+            ? 'relato foi marcado como resolvido'
+            : 'relatos foram marcados como resolvidos'} sem horário registrado.
+            {encerradosSemHorario === 1
+              ? ' Esse registro não entra'
+              : ' Esses registros não entram'} no cálculo do tempo de retorno.</p>
         )}
         {media !== null && (
           <p>A média considera somente o intervalo entre a criação do relato e

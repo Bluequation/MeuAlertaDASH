@@ -20,6 +20,9 @@ export type CenaSuperficie = {
   areaHa: number;
   satelite: 'Sentinel-2' | 'Landsat';
   nuvensPct: number | null;
+  coberturaValidaPct: number | null;
+  limiarNdwi: number | null;
+  resolucaoM: number | null;
   cenaId: string | null;
   previewUrl: string | null;
 };
@@ -173,6 +176,16 @@ export function importarSerieSuperficie(conteudo: string): CenaSuperficie[] {
       'cloud_pct', 'nuvens_pct', 'cloud_cover', 'nuvens'
     ]));
 
+    const coberturaBruta = numeroCSV(obterCampo(colunas, indices, [
+      'valid_coverage_pct', 'cobertura_valida_pct', 'coverage_pct'
+    ]));
+    const limiarNdwi = numeroCSV(obterCampo(colunas, indices, [
+      'ndwi_threshold', 'limiar_ndwi'
+    ]));
+    const resolucaoM = numeroCSV(obterCampo(colunas, indices, [
+      'scale_m', 'escala_m', 'resolucao_m'
+    ]));
+
     const cenaId = obterCampo(colunas, indices, [
       'scene_id', 'id_cena', 'system_index'
     ]) || null;
@@ -201,6 +214,11 @@ export function importarSerieSuperficie(conteudo: string): CenaSuperficie[] {
       nuvensPct: nuvensPct !== null && nuvensPct >= 0 && nuvensPct <= 100
         ? nuvensPct
         : null,
+      coberturaValidaPct: coberturaBruta !== null && coberturaBruta >= 0 && coberturaBruta <= 100
+        ? coberturaBruta
+        : null,
+      limiarNdwi,
+      resolucaoM: resolucaoM !== null && resolucaoM > 0 ? resolucaoM : null,
       cenaId,
       previewUrl
     });

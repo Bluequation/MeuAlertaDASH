@@ -57,6 +57,7 @@ type AbaAgua =
   | 'relatorios';
 
 type AgrupamentoSerie = 'diario' | 'mensal' | 'anual';
+type FiltroSatelite = 'Sentinel-2' | 'Landsat';
 
 const ABAS: { id: AbaAgua; nome: string; icone: ReactNode }[] = [
   { id: 'visao', nome: 'Visão geral', icone: <FiActivity /> },
@@ -87,6 +88,9 @@ function exportarCSV(cenas: CenaSuperficie[]): void {
     'area_ha',
     'satellite',
     'cloud_pct',
+    'valid_coverage_pct',
+    'ndwi_threshold',
+    'scale_m',
     'scene_id',
     'preview_url'
   ];
@@ -95,6 +99,9 @@ function exportarCSV(cenas: CenaSuperficie[]): void {
     String(cena.areaHa).replace('.', ','),
     cena.satelite,
     cena.nuvensPct === null ? '' : String(cena.nuvensPct).replace('.', ','),
+    cena.coberturaValidaPct === null ? '' : String(cena.coberturaValidaPct).replace('.', ','),
+    cena.limiarNdwi === null ? '' : String(cena.limiarNdwi).replace('.', ','),
+    cena.resolucaoM === null ? '' : String(cena.resolucaoM),
     cena.cenaId || '',
     cena.previewUrl || ''
   ]);
@@ -177,6 +184,7 @@ export default function AguaObservatorio() {
   const [cenaAId, setCenaAId] = useState('');
   const [cenaBId, setCenaBId] = useState('');
   const [agrupamento, setAgrupamento] = useState<AgrupamentoSerie>('mensal');
+  const [filtroSatelite, setFiltroSatelite] = useState<FiltroSatelite>('Sentinel-2');
 
   const [areaHa, setAreaHa] = useState('');
   const [evaporacaoMm, setEvaporacaoMm] = useState('');
@@ -236,10 +244,15 @@ export default function AguaObservatorio() {
       }));
   }, [meteorologia]);
 
+  const cenasFiltradas = useMemo(
+    () => cenas.filter(cena => cena.satelite === filtroSatelite),
+    [cenas, filtroSatelite]
+  );
+
   const serieSuperficial = useMemo(() => {
     const grupos = new Map<string, number[]>();
 
-    cenas.forEach(cena => {
+    cenasFiltradas.forEach(cena => {
       const chave = agrupamento === 'diario'
         ? cena.data
         : agrupamento === 'mensal'
@@ -266,7 +279,7 @@ export default function AguaObservatorio() {
           cenas: valores.length
         };
       });
-  }, [cenas, agrupamento]);
+  }, [cenasFiltradas, agrupamento]);
 
   const cenaA = cenas.find(cena => cena.id === cenaAId) || null;
   const cenaB = cenas.find(cena => cena.id === cenaBId) || null;
@@ -517,6 +530,7 @@ export default function AguaObservatorio() {
               <div><FiSatellite /><span><strong>Sentinel-2</strong><small>Fonte principal · resolução de 10 m nas bandas usadas no NDWI</small></span></div>
               <div><FiLayers /><span><strong>Landsat 8/9</strong><small>Complemento histórico · resolução de 30 m nas bandas usadas no NDWI</small></span></div>
             </div>
+            <p className="agua-nota-serie">As séries são filtradas por sensor. Não misturamos automaticamente as áreas Sentinel-2 e Landsat porque as resoluções e respostas espectrais são diferentes.</p>
 
             {mensagemImportacao && (
               <div className="agua-mensagem-importacao"><FiInfo /> {mensagemImportacao}</div>
@@ -528,16 +542,27 @@ export default function AguaObservatorio() {
                   <h3>Evolução da área inundada</h3>
                   <p>Quando houver mais de uma cena no período, o gráfico utiliza a mediana das áreas observadas.</p>
                 </div>
-                <select
-                  className="agua-seletor"
-                  value={agrupamento}
+                <div className="agua-controles-serie agua-no-print">
+                  <select
+                    className="agua-seletor"
+                    value={filtroSatelite}
+                    onChange={event => setFiltroSatelite(event.target.value as FiltroSatelite)}
+                    aria-label="Fonte da série"
+                  >
+                    <option value="Sentinel-2">Sentinel-2 · principal</option>
+                    <option value="Landsat">Landsat · histórico</option>
+                  </select>
+                  <select
+                    className="agua-seletor"
+                    value={agrupamento}
                   onChange={event => setAgrupamento(event.target.value as AgrupamentoSerie)}
                   aria-label="Agrupamento da série"
                 >
                   <option value="diario">Diário · por aquisição</option>
                   <option value="mensal">Mensal · mediana</option>
-                  <option value="anual">Anual · mediana</option>
-                </select>
+                    <option value="anual">Anual · mediana</option>
+                  </select>
+                </div>
               </div>
 
               {serieSuperficial.length > 0 ? (
@@ -569,7 +594,7 @@ export default function AguaObservatorio() {
                 </div>
               )}
               <div className="agua-rodape-grafico">
-                <span>{cenas.length} cenas válidas carregadas nesta sessão</span>
+                <span>{cenasFiltradas.length} cenas {filtroSatelite} · {cenas.length} no total nesta sessão</span>
                 <span>Unidade: hectares (ha)</span>
               </div>
             </section>
@@ -598,6 +623,14 @@ export default function AguaObservatorio() {
                     <div><span>Variação observada</span><strong className={diferencaArea !== null && diferencaArea < 0 ? 'agua-valor-negativo' : 'agua-valor-positivo'}>{diferencaArea === null ? '—' : (diferencaArea > 0 ? '+' : '') + formatarNumero(diferencaArea, 2) + ' ha'}</strong></div>
                     <div><span>Variação percentual</span><strong>{variacaoPercentual === null ? '—' : (variacaoPercentual > 0 ? '+' : '') + formatarNumero(variacaoPercentual, 1) + '%'}</strong></div>
                   </div>
+                  {cenaA && cenaB && cenaA.satelite !== cenaB.satelite && (
+                    <div className="agua-mensagem-importacao">
+                      <FiAlertCircle /> A comparação usa sensores diferentes. Sentinel-2 e Landsat têm resoluções espaciais distintas; interprete a diferença com cautela e prefira comparar cenas do mesmo sensor.
+                    </div>
+                  )}
+                  {(cenaA?.coberturaValidaPct !== null && cenaA?.coberturaValidaPct !== undefined && cenaA.coberturaValidaPct < 80) || (cenaB?.coberturaValidaPct !== null && cenaB?.coberturaValidaPct !== undefined && cenaB.coberturaValidaPct < 80) ? (
+                    <div className="agua-mensagem-erro"><FiAlertCircle /> Uma das cenas tem menos de 80% de cobertura válida sobre a área de estudo. Revise a máscara de nuvens e a qualidade antes de usar o resultado.</div>
+                  ) : null}
                   <div className="agua-comparador-imagens">
                     {[{ cena: cenaA, titulo: 'Data A' }, { cena: cenaB, titulo: 'Data B' }].map(item => (
                       <div className="agua-previa-cena" key={item.titulo}>
@@ -605,7 +638,7 @@ export default function AguaObservatorio() {
                         {item.cena?.previewUrl
                           ? <img src={item.cena.previewUrl} alt={'Prévia da cena ' + item.titulo} />
                           : <div className="agua-previa-sem-imagem"><FiSatellite /><span>Prévia não vinculada a esta cena</span></div>}
-                        <small>{item.cena ? item.cena.satelite + ' · ' + formatarNumero(item.cena.areaHa, 2) + ' ha' : 'Selecione uma cena'}</small>
+                        <small>{item.cena ? item.cena.satelite + ' · ' + formatarNumero(item.cena.areaHa, 2) + ' ha · ' + (item.cena.resolucaoM ? item.cena.resolucaoM + ' m' : 'resolução n/i') + ' · cobertura válida ' + (item.cena.coberturaValidaPct === null ? 'n/i' : formatarNumero(item.cena.coberturaValidaPct, 0) + '%') : 'Selecione uma cena'}</small>
                       </div>
                     ))}
                   </div>

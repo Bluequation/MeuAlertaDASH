@@ -33,7 +33,7 @@ import {
   FiMapPin,
   FiRadio,
   FiRefreshCw,
-  FiSatellite,
+  FiGlobe,
   FiSun,
   FiUpload
 } from 'react-icons/fi';
@@ -46,6 +46,7 @@ import {
   consultarMeteorologiaReservatorio,
   type RespostaOpenMeteo
 } from './aguaMeteorologia';
+import 'leaflet/dist/leaflet.css';
 import './agua.css';
 
 type AbaAgua =
@@ -62,7 +63,7 @@ type FiltroSatelite = 'Sentinel-2' | 'Landsat';
 const ABAS: { id: AbaAgua; nome: string; icone: ReactNode }[] = [
   { id: 'visao', nome: 'Visão geral', icone: <FiActivity /> },
   { id: 'reservatorio', nome: 'Reservatório', icone: <FiDroplet /> },
-  { id: 'satelite', nome: 'Satélite', icone: <FiSatellite /> },
+  { id: 'satelite', nome: 'Satélite', icone: <FiGlobe /> },
   { id: 'evaporacao', nome: 'Evaporação', icone: <FiSun /> },
   { id: 'meteorologia', nome: 'Meteorologia', icone: <FiCloud /> },
   { id: 'relatorios', nome: 'Relatórios', icone: <FiFileText /> }
@@ -445,7 +446,7 @@ export default function AguaObservatorio() {
                     </span>
                   </div>
                   <div className="agua-fonte-linha">
-                    <span className="agua-fonte-icone"><FiSatellite /></span>
+                    <span className="agua-fonte-icone"><FiGlobe /></span>
                     <div><strong>Sentinel-2 / Landsat</strong><small>Área superficial por cena válida</small></div>
                     <span className="agua-status agua-status--pendente">
                       {cenas.length ? cenas.length + ' cenas' : 'Aguardando'}
@@ -527,7 +528,7 @@ export default function AguaObservatorio() {
             />
 
             <div className="agua-satelite-fontes">
-              <div><FiSatellite /><span><strong>Sentinel-2</strong><small>Fonte principal · resolução de 10 m nas bandas usadas no NDWI</small></span></div>
+              <div><FiGlobe /><span><strong>Sentinel-2</strong><small>Fonte principal · resolução de 10 m nas bandas usadas no NDWI</small></span></div>
               <div><FiLayers /><span><strong>Landsat 8/9</strong><small>Complemento histórico · resolução de 30 m nas bandas usadas no NDWI</small></span></div>
             </div>
             <p className="agua-nota-serie">As séries são filtradas por sensor. Não misturamos automaticamente as áreas Sentinel-2 e Landsat porque as resoluções e respostas espectrais são diferentes.</p>
@@ -588,7 +589,7 @@ export default function AguaObservatorio() {
                 </div>
               ) : (
                 <div className="agua-vazio">
-                  <FiSatellite />
+                  <FiGlobe />
                   <strong>Nenhuma cena processada cadastrada</strong>
                   <p>Exporte a tabela de aquisições pelo fluxo de processamento do Google Earth Engine e importe o CSV aqui. Nenhuma área será inventada para preencher o gráfico.</p>
                 </div>
@@ -637,7 +638,7 @@ export default function AguaObservatorio() {
                         <div className="agua-previa-cena__topo"><strong>{item.titulo}</strong><span>{item.cena ? formatarData(item.cena.data) : '—'}</span></div>
                         {item.cena?.previewUrl
                           ? <img src={item.cena.previewUrl} alt={'Prévia da cena ' + item.titulo} />
-                          : <div className="agua-previa-sem-imagem"><FiSatellite /><span>Prévia não vinculada a esta cena</span></div>}
+                          : <div className="agua-previa-sem-imagem"><FiGlobe /><span>Prévia não vinculada a esta cena</span></div>}
                         <small>{item.cena ? item.cena.satelite + ' · ' + formatarNumero(item.cena.areaHa, 2) + ' ha · ' + (item.cena.resolucaoM ? item.cena.resolucaoM + ' m' : 'resolução n/i') + ' · cobertura válida ' + (item.cena.coberturaValidaPct === null ? 'n/i' : formatarNumero(item.cena.coberturaValidaPct, 0) + '%') + ' · nuvens ' + (item.cena.nuvensPct === null ? 'n/i' : formatarNumero(item.cena.nuvensPct, 0) + '%') + ' · NDWI ' + (item.cena.limiarNdwi === null ? 'n/i' : formatarNumero(item.cena.limiarNdwi, 2)) : 'Selecione uma cena'}</small>
                       </div>
                     ))}
@@ -811,7 +812,7 @@ export default function AguaObservatorio() {
               <div className="agua-relatorio-lista">
                 <div><FiCheckCircle /><span><strong>Cadastro técnico</strong><small>Capacidade e características da ficha COGERH.</small></span></div>
                 <div><FiCloud /><span><strong>Meteorologia</strong><small>Estimativas Open-Meteo, com horário e coordenadas da consulta.</small></span></div>
-                <div><FiSatellite /><span><strong>Área superficial</strong><small>Cenas importadas, sensor, data, nuvens e método de classificação.</small></span></div>
+                <div><FiGlobe /><span><strong>Área superficial</strong><small>Cenas importadas, sensor, data, nuvens e método de classificação.</small></span></div>
                 <div><FiActivity /><span><strong>Evaporação</strong><small>Fórmula, parâmetros utilizados e distinção entre medição e estimativa.</small></span></div>
               </div>
             </section>

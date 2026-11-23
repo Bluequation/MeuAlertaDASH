@@ -22,6 +22,7 @@ import {
   query,
   where
 } from 'firebase/firestore';
+import AguaObservatorio from './AguaObservatorio';
 import AtlasBrasil from './AtlasBrasil';
 import MapaCalorAnalitico from './MapaCalorAnalitico';
 import {
@@ -43,6 +44,7 @@ import {
   MdClose,
   MdMemory,
   MdCloud,
+  MdWaterDrop,
   MdArrowForward,
   MdArrowBack
 } from 'react-icons/md';
@@ -1617,7 +1619,7 @@ function App() {
     null;
   const [minhaLocalizacao, setMinhaLocalizacao] = useState<[number, number] | null>(null);
   const [carregamentoInicial, setCarregamentoInicial] = useState(true);
-  const [abaAtiva, setAbaAtiva] = useState<'visao_geral' | 'mapa_calor' | 'meteorologia' | 'sobre'>('visao_geral');
+  const [abaAtiva, setAbaAtiva] = useState<'visao_geral' | 'mapa_calor' | 'meteorologia' | 'agua' | 'sobre'>('visao_geral');
   // Zoom atual da aba Mapa de Calor
   const [filtroCategoria, setFiltroCategoria] = useState<string>('Todas');
   const [online, setOnline] = useState(navigator.onLine);  // 👇 ESTADOS PARA CONTROLAR A RESPONSIVIDADE E O MENU MOBILE
@@ -2777,7 +2779,7 @@ function App() {
         height: '100dvh',
         minHeight: 0,
         backgroundColor:
-          abaAtiva === 'meteorologia'
+          abaAtiva === 'meteorologia' || abaAtiva === 'agua'
             ? '#F8FAFC'
             : '#F2F2F7', overflow: 'hidden'
       }}
@@ -3018,6 +3020,33 @@ function App() {
           >
             <MdCloud size={20} />
             Meteorologia
+          </li>
+
+          {/* OBSERVATÓRIO HÍDRICO */}
+          <li
+            onClick={() => {
+              setAbaAtiva('agua');
+              setMenuAberto(false);
+            }}
+            style={{
+              padding: '12px 16px',
+              backgroundColor: abaAtiva === 'agua' ? '#007AFF' : 'transparent',
+              color: abaAtiva === 'agua' ? '#FFFFFF' : 'rgba(255,255,255,0.78)',
+              borderRadius: '12px',
+              marginBottom: '8px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              transition: '0.2s',
+              boxShadow: abaAtiva === 'agua'
+                ? '0 4px 12px rgba(0,122,255,0.30)'
+                : 'none'
+            }}
+          >
+            <MdWaterDrop size={20} />
+            Observatório Hídrico
           </li>
 
           {/* SOBRE O PROJETO */}
@@ -5278,6 +5307,8 @@ function App() {
             agora={agoraMeteo}
           />
         )}
+
+        {abaAtiva === 'agua' && <AguaObservatorio />}
 
         {abaAtiva === 'sobre' && (
           <div

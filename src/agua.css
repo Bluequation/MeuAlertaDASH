@@ -1,0 +1,201 @@
+.agua-page {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: #192942;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.agua-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.agua-header__identidade { min-width: 0; }
+.agua-kicker { display: flex; align-items: center; gap: 7px; color: #168FC4; font-size: 10px; font-weight: 800; letter-spacing: 1.15px; }
+.agua-kicker svg { font-size: 14px; }
+.agua-header h1 { margin: 7px 0 3px; color: #192942; font-size: clamp(25px, 3vw, 32px); line-height: 1.15; font-weight: 850; letter-spacing: -1.1px; }
+.agua-header h1 span { color: #168FC4; }
+.agua-header p { margin: 0; color: #718397; font-size: 13px; line-height: 1.55; }
+.agua-header__acoes { display: flex; align-items: center; justify-content: flex-end; gap: 9px; flex-wrap: wrap; }
+.agua-tag { display: inline-flex; align-items: center; border-radius: 999px; padding: 7px 10px; font-size: 10px; font-weight: 800; letter-spacing: .35px; }
+.agua-tag--piloto { background: #E8F4FB; color: #1678A8; }
+.agua-abas { display: flex; align-items: center; gap: 5px; padding: 5px; background: #EAF0F5; border-radius: 13px; overflow-x: auto; scrollbar-width: thin; }
+.agua-aba { flex: 1 0 auto; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 13px; border: 0; border-radius: 9px; color: #687E91; background: transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .18s ease, color .18s ease, box-shadow .18s ease; }
+.agua-aba svg { font-size: 15px; }
+.agua-aba:hover { color: #087CDB; background: rgba(255,255,255,.55); }
+.agua-aba--ativa { color: #087CDB; background: #FFFFFF; box-shadow: 0 2px 8px rgba(25,55,85,.08); }
+.agua-conteudo { display: flex; flex-direction: column; gap: 17px; min-width: 0; }
+.agua-secao-titulo { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.agua-secao-titulo h2 { margin: 0; color: #192942; font-size: 19px; font-weight: 800; letter-spacing: -.35px; }
+.agua-secao-titulo p { margin: 5px 0 0; color: #8292A3; font-size: 12px; line-height: 1.5; }
+.agua-fonte, .agua-mini-status { display: inline-flex; align-items: center; gap: 6px; color: #55738B; background: #EEF5FA; border-radius: 8px; padding: 7px 10px; font-size: 10px; font-weight: 750; }
+.agua-fonte svg, .agua-mini-status svg { font-size: 13px; }
+.agua-indicadores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; }
+.agua-indicador { min-width: 0; background: #FFFFFF; border: 1px solid #E4EDF5; border-radius: 14px; padding: 15px 16px 14px; }
+.agua-indicador__titulo { display: block; color: #7B8C9D; font-size: 11px; font-weight: 700; }
+.agua-indicador__valor { margin-top: 10px; color: #192942; font-size: clamp(23px, 2.3vw, 29px); line-height: 1; font-weight: 850; letter-spacing: -.7px; white-space: nowrap; }
+.agua-indicador__valor small { margin-left: 5px; color: #8A9AA9; font-size: 11px; font-weight: 700; letter-spacing: 0; }
+.agua-indicador__valor--azul { color: #168FC4; }
+.agua-indicador__valor--laranja { color: #C77B32; }
+.agua-indicador__valor--neutro { color: #8292A3; }
+.agua-indicador__nota { display: block; margin-top: 9px; color: #9AA7B4; font-size: 10px; line-height: 1.4; }
+.agua-grade-visao { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(270px, .85fr); gap: 15px; align-items: stretch; }
+.agua-painel { min-width: 0; background: #FFFFFF; border: 1px solid #E4EDF5; border-radius: 15px; padding: 17px; }
+.agua-painel__cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.agua-painel__cabecalho--quebra { flex-wrap: wrap; }
+.agua-painel__cabecalho h3, .agua-painel h3 { margin: 0; color: #192942; font-size: 14px; font-weight: 800; }
+.agua-painel__cabecalho p { margin: 4px 0 0; color: #8A99A8; font-size: 11px; line-height: 1.5; }
+.agua-mapa { height: 315px; width: 100%; overflow: hidden; border-radius: 11px; background: #EAF1F6; }
+.agua-mapa .leaflet-container { height: 100%; width: 100%; font-family: inherit; }
+.agua-mapa-rodape { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 11px; color: #8A99A8; font-size: 10px; }
+.agua-mapa-rodape strong { color: #46647D; font-variant-numeric: tabular-nums; }
+.agua-lista-fontes { display: flex; flex-direction: column; }
+.agua-fonte-linha { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 12px 0; border-bottom: 1px solid #EDF2F6; }
+.agua-fonte-linha:last-child { border-bottom: 0; }
+.agua-fonte-icone { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; background: #EEF4F8; color: #68849A; font-size: 14px; }
+.agua-fonte-icone--ok { color: #168FC4; background: #E8F5FB; }
+.agua-fonte-linha strong, .agua-fonte-linha small { display: block; }
+.agua-fonte-linha strong { color: #29445D; font-size: 11px; }
+.agua-fonte-linha small { margin-top: 3px; color: #91A0AE; font-size: 9px; line-height: 1.4; }
+.agua-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 7px; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.agua-status--ok { color: #247A65; background: #EAF6F1; }
+.agua-status--pendente { color: #8B7045; background: #F8F2E7; }
+.agua-aviso, .agua-nota-fonte { display: flex; align-items: flex-start; gap: 9px; margin-top: 13px; padding: 11px 12px; border-radius: 10px; background: #F4F8FB; color: #668097; }
+.agua-aviso svg, .agua-nota-fonte svg { flex: 0 0 auto; margin-top: 1px; color: #168FC4; font-size: 15px; }
+.agua-aviso p, .agua-nota-fonte p { margin: 0; font-size: 10px; line-height: 1.6; }
+.agua-ficha-grade { display: grid; grid-template-columns: minmax(230px, .72fr) minmax(0, 1.5fr); gap: 15px; }
+.agua-ficha-destaque { display: flex; flex-direction: column; align-items: flex-start; padding: 21px; border-radius: 15px; color: #FFFFFF; background: linear-gradient(145deg, #214563, #192942); }
+.agua-ficha-destaque > span { color: #BBD0E1; font-size: 11px; line-height: 1.5; }
+.agua-ficha-destaque > strong { margin-top: 17px; font-size: 34px; letter-spacing: -1px; }
+.agua-ficha-destaque > strong small { color: #BBD0E1; font-size: 13px; }
+.agua-ficha-destaque p { margin: 10px 0 18px; color: #C4D6E5; font-size: 11px; line-height: 1.6; }
+.agua-ficha-destaque a { display: inline-flex; align-items: center; gap: 6px; margin-top: auto; color: #FFFFFF; text-decoration: none; font-size: 11px; font-weight: 750; }
+.agua-ficha-destaque a:hover { text-decoration: underline; }
+.agua-ficha-dados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+.agua-ficha-dados > div { display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 12px 0; border-bottom: 1px solid #EDF2F6; }
+.agua-ficha-dados span { color: #8A99A8; font-size: 10px; }
+.agua-ficha-dados strong { color: #29445D; font-size: 12px; }
+.agua-nota-fonte { flex-wrap: wrap; align-items: center; }
+.agua-nota-fonte p { flex: 1 1 320px; }
+.agua-nota-fonte a { display: inline-flex; align-items: center; gap: 5px; color: #168FC4; font-size: 10px; font-weight: 750; text-decoration: none; }
+.agua-satelite-fontes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.agua-satelite-fontes > div { display: flex; align-items: center; gap: 11px; padding: 12px 14px; background: #F3F8FB; border: 1px solid #E6EFF5; border-radius: 12px; color: #168FC4; }
+.agua-satelite-fontes svg { font-size: 19px; flex: 0 0 auto; }
+.agua-satelite-fontes strong, .agua-satelite-fontes small { display: block; }
+.agua-satelite-fontes strong { color: #29445D; font-size: 11px; }
+.agua-satelite-fontes small { margin-top: 3px; color: #8394A4; font-size: 9px; line-height: 1.4; }
+.agua-mensagem-importacao, .agua-mensagem-erro { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 9px; background: #EDF6FB; color: #3E6D8A; font-size: 11px; line-height: 1.5; }
+.agua-mensagem-erro { color: #9B3F35; background: #FFF1EF; }
+.agua-mensagem-importacao svg, .agua-mensagem-erro svg { flex: 0 0 auto; margin-top: 1px; }
+.agua-seletor, .agua-formulario input { min-width: 0; border: 1px solid #DCE7F0; border-radius: 9px; background: #FFFFFF; color: #29445D; padding: 9px 11px; font: inherit; font-size: 11px; outline: none; }
+.agua-seletor:focus, .agua-formulario input:focus { border-color: #168FC4; box-shadow: 0 0 0 3px rgba(22,143,196,.1); }
+.agua-grafico { width: 100%; height: 260px; min-width: 0; }
+.agua-rodape-grafico { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 8px; color: #91A0AE; font-size: 10px; }
+.agua-vazio { min-height: 185px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 22px; color: #8A9AA9; text-align: center; }
+.agua-vazio > svg { color: #8EC6E2; font-size: 25px; }
+.agua-vazio strong { color: #49677F; font-size: 12px; }
+.agua-vazio p { max-width: 480px; margin: 0; font-size: 10px; line-height: 1.6; }
+.agua-vazio--compacto { min-height: 130px; }
+.agua-comparador-controles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.agua-comparador-controles label, .agua-formulario label { display: flex; flex-direction: column; gap: 7px; color: #718397; font-size: 10px; font-weight: 750; }
+.agua-comparador-controles select { width: 100%; margin-top: 2px; }
+.agua-comparador-resultados { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-bottom: 14px; }
+.agua-comparador-resultados > div { padding: 12px; border-radius: 10px; background: #F5F8FB; }
+.agua-comparador-resultados span, .agua-comparador-resultados strong { display: block; }
+.agua-comparador-resultados span { color: #8494A4; font-size: 9px; }
+.agua-comparador-resultados strong { margin-top: 7px; color: #29445D; font-size: 15px; }
+.agua-comparador-resultados .agua-valor-negativo { color: #B95D46; }
+.agua-comparador-resultados .agua-valor-positivo { color: #24866E; }
+.agua-comparador-imagens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.agua-previa-cena { min-width: 0; border: 1px solid #E7EEF4; border-radius: 11px; overflow: hidden; }
+.agua-previa-cena__topo { display: flex; justify-content: space-between; gap: 8px; padding: 9px 11px; color: #49677F; font-size: 10px; }
+.agua-previa-cena__topo span { color: #8A99A8; }
+.agua-previa-cena img { display: block; width: 100%; height: 180px; object-fit: cover; background: #EAF1F6; }
+.agua-previa-sem-imagem { height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #8DA2B3; background: #F4F8FB; font-size: 10px; }
+.agua-previa-sem-imagem svg { font-size: 22px; }
+.agua-previa-cena > small { display: block; padding: 8px 11px; color: #8292A3; font-size: 9px; }
+.agua-evaporacao-grade { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .8fr); gap: 15px; }
+.agua-formulario { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+.agua-formulario input { width: 100%; font-size: 12px; }
+.agua-formula { display: flex; flex-direction: column; gap: 5px; margin-top: 15px; padding: 12px; border-radius: 10px; background: #F1F7FA; }
+.agua-formula strong { color: #28516C; font-size: 11px; }
+.agua-formula span { color: #8496A6; font-size: 10px; }
+.agua-resultado-evaporacao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 14px; }
+.agua-resultado-evaporacao > div { padding: 12px; border-radius: 10px; background: #F5F8FB; }
+.agua-resultado-evaporacao span, .agua-resultado-evaporacao strong { display: block; }
+.agua-resultado-evaporacao span { color: #8292A3; font-size: 9px; }
+.agua-resultado-evaporacao strong { margin-top: 7px; color: #168FC4; font-size: 15px; }
+.agua-metodo { background: #F9FBFC; }
+.agua-metodo__icone { display: grid; place-items: center; width: 35px; height: 35px; margin-bottom: 12px; border-radius: 10px; color: #168FC4; background: #E7F4FA; font-size: 18px; }
+.agua-metodo h3 { margin-bottom: 8px; }
+.agua-metodo p, .agua-metodo li { color: #7F91A1; font-size: 10px; line-height: 1.65; }
+.agua-metodo ul { margin: 12px 0; padding-left: 17px; }
+.agua-metodo li { margin: 5px 0; }
+.agua-estacao-status { display: flex; flex-direction: column; }
+.agua-estacao-icone { display: grid; place-items: center; width: 42px; height: 42px; margin: 10px 0; border-radius: 12px; color: #168FC4; background: #E8F5FB; font-size: 21px; }
+.agua-estacao-status > strong { color: #29445D; font-size: 12px; }
+.agua-estacao-status > p { color: #8292A3; font-size: 10px; line-height: 1.65; }
+.agua-estacao-rodape { display: flex; flex-direction: column; gap: 4px; margin-top: auto; padding-top: 12px; border-top: 1px solid #EDF2F6; }
+.agua-estacao-rodape span { color: #91A0AE; font-size: 9px; }
+.agua-estacao-rodape strong { color: #55738B; font-size: 10px; }
+.agua-relatorios-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.agua-relatorio-card { display: flex; flex-direction: column; align-items: flex-start; min-height: 205px; }
+.agua-relatorio-icone { display: grid; place-items: center; width: 38px; height: 38px; margin-bottom: 13px; border-radius: 11px; color: #168FC4; background: #EAF5FB; font-size: 18px; }
+.agua-relatorio-card h3 { margin-bottom: 7px; }
+.agua-relatorio-card p { max-width: 420px; margin: 0 0 16px; color: #8292A3; font-size: 10px; line-height: 1.6; }
+.agua-relatorio-card small { margin-top: 9px; color: #91A0AE; font-size: 9px; }
+.agua-relatorio-lista { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.agua-relatorio-lista > div { display: flex; align-items: flex-start; gap: 9px; }
+.agua-relatorio-lista svg { flex: 0 0 auto; margin-top: 2px; color: #168FC4; font-size: 15px; }
+.agua-relatorio-lista strong, .agua-relatorio-lista small { display: block; }
+.agua-relatorio-lista strong { color: #38566F; font-size: 10px; }
+.agua-relatorio-lista small { margin-top: 3px; color: #8A99A8; font-size: 9px; line-height: 1.5; }
+.agua-botao { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 8px 12px; border: 1px solid transparent; border-radius: 9px; font: inherit; font-size: 10px; font-weight: 800; text-decoration: none; cursor: pointer; transition: transform .15s ease, background .15s ease; }
+.agua-botao:disabled { opacity: .6; cursor: wait; }
+.agua-botao svg { font-size: 14px; }
+.agua-botao--primario { color: #FFFFFF; background: #168FC4; }
+.agua-botao--primario:hover { background: #0879AD; }
+.agua-botao--secundario { color: #41627B; background: #FFFFFF; border-color: #DCE7F0; }
+.agua-botao--secundario:hover { background: #F1F7FA; }
+.agua-botao input[type="file"] { display: none; }
+.agua-girando { animation: aguaGirar 1s linear infinite; }
+@keyframes aguaGirar { to { transform: rotate(360deg); } }
+.agua-atualizacao { margin: -5px 0 0; color: #91A0AE; font-size: 9px; line-height: 1.5; }
+.agua-rodape { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 13px; border-top: 1px solid #E5EDF3; color: #9AA8B5; font-size: 9px; }
+
+@media (max-width: 1050px) {
+  .agua-indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agua-grade-visao { grid-template-columns: 1fr; }
+  .agua-ficha-grade, .agua-evaporacao-grade { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  .agua-page { gap: 15px; }
+  .agua-header { gap: 12px; }
+  .agua-header__acoes { width: 100%; justify-content: flex-start; }
+  .agua-abas { margin: 0 -2px; }
+  .agua-aba { padding: 9px 11px; font-size: 11px; }
+  .agua-indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .agua-indicador { padding: 12px; }
+  .agua-indicador__valor { font-size: 23px; }
+  .agua-satelite-fontes, .agua-comparador-controles, .agua-comparador-imagens, .agua-relatorios-grade { grid-template-columns: 1fr; }
+  .agua-comparador-resultados { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agua-formulario, .agua-resultado-evaporacao { grid-template-columns: 1fr; }
+  .agua-ficha-dados { grid-template-columns: 1fr; }
+  .agua-grafico { height: 220px; }
+  .agua-mapa { height: 255px; }
+  .agua-previa-cena img, .agua-previa-sem-imagem { height: 155px; }
+  .agua-painel { padding: 14px; }
+  .agua-fonte-linha { grid-template-columns: 28px minmax(0, 1fr); }
+  .agua-fonte-linha .agua-status { grid-column: 2; justify-self: start; }
+  .agua-relatorio-lista { grid-template-columns: 1fr; }
+}
+@media print {
+  @page { size: A4; margin: 14mm; }
+  html, body, #root { height: auto !important; overflow: visible !important; background: #FFFFFF !important; }
+  body * { visibility: hidden !important; }
+  .agua-page, .agua-page * { visibility: visible !important; }
+  .agua-page { position: absolute; inset: 0; width: 100%; gap: 12px; color: #192942 !important; }
+  .agua-no-print { display: none !important; }
+  .agua-painel, .agua-indicador { break-inside: avoid; box-shadow: none !important; }
+  .agua-mapa { height: 210px; }
+  .agua-abas { display: none !important; }
+  .agua-rodape { margin-top: 12px; }
+}

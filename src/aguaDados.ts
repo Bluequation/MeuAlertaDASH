@@ -163,7 +163,7 @@ export function importarSerieSuperficie(conteudo: string): CenaSuperficie[] {
       'area_ha', 'area_ha_inundada', 'area_superficial_ha'
     ]));
 
-    if (!data || areaHa === null || areaHa <= 0) return;
+    if (!data || areaHa === null || areaHa < 0) return;
 
     const sateliteBruto = (obterCampo(colunas, indices, [
       'satelite', 'satellite', 'sensor'

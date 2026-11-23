@@ -484,6 +484,12 @@ export default function AguaObservatorio() {
               <p>As coordenadas são de referência do posto do reservatório no documento de planejamento hídrico. A delimitação precisa do espelho d’água será validada com cartografia e imagens de satélite.</p>
               <a href={RESERVATORIO_PILOTO.fonteCoordenadas} target="_blank" rel="noreferrer">Fonte das coordenadas <FiExternalLink /></a>
             </div>
+
+            <div className="agua-nota-fonte agua-nota-fonte--atencao">
+              <FiAlertCircle />
+              <p>A ficha técnica consultada da COGERH informa 9,12 hm³. Uma publicação acadêmica anterior registra 7,96 hm³. Antes de calcular volume armazenado ou balanço hídrico, a capacidade e a curva cota-área-volume vigentes precisam ser confirmadas com a COGERH.</p>
+              <a href="https://repositorio.ufc.br/bitstream/riufc/65666/1/2022_tcc_wasousa.pdf" target="_blank" rel="noreferrer">Consultar referência acadêmica anterior <FiExternalLink /></a>
+            </div>
           </>
         )}
 

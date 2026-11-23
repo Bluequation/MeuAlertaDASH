@@ -638,7 +638,7 @@ export default function AguaObservatorio() {
                         {item.cena?.previewUrl
                           ? <img src={item.cena.previewUrl} alt={'Prévia da cena ' + item.titulo} />
                           : <div className="agua-previa-sem-imagem"><FiSatellite /><span>Prévia não vinculada a esta cena</span></div>}
-                        <small>{item.cena ? item.cena.satelite + ' · ' + formatarNumero(item.cena.areaHa, 2) + ' ha · ' + (item.cena.resolucaoM ? item.cena.resolucaoM + ' m' : 'resolução n/i') + ' · cobertura válida ' + (item.cena.coberturaValidaPct === null ? 'n/i' : formatarNumero(item.cena.coberturaValidaPct, 0) + '%') : 'Selecione uma cena'}</small>
+                        <small>{item.cena ? item.cena.satelite + ' · ' + formatarNumero(item.cena.areaHa, 2) + ' ha · ' + (item.cena.resolucaoM ? item.cena.resolucaoM + ' m' : 'resolução n/i') + ' · cobertura válida ' + (item.cena.coberturaValidaPct === null ? 'n/i' : formatarNumero(item.cena.coberturaValidaPct, 0) + '%') + ' · nuvens ' + (item.cena.nuvensPct === null ? 'n/i' : formatarNumero(item.cena.nuvensPct, 0) + '%') + ' · NDWI ' + (item.cena.limiarNdwi === null ? 'n/i' : formatarNumero(item.cena.limiarNdwi, 2)) : 'Selecione uma cena'}</small>
                       </div>
                     ))}
                   </div>

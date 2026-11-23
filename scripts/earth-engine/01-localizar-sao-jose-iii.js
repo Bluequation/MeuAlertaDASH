@@ -27,18 +27,6 @@ var inicio = fim.advance(-12, 'month');
 Map.setOptions('SATELLITE');
 Map.centerObject(pontoReferencia, 12);
 
-Map.addLayer(
-  ee.FeatureCollection([ee.Feature(pontoReferencia)]).style({
-    color: 'FF453A',
-    pointSize: 8,
-    pointShape: 'circle',
-    width: 2,
-    fillColor: 'FF453A'
-  }),
-  {},
-  'Ponto de referência (não é o contorno)'
-);
-
 var imagens = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
   .filterBounds(areaBusca)
   .filterDate(inicio, fim)
@@ -64,6 +52,22 @@ Map.addLayer(
   'Água potencial (NDWI > 0; NÃO VALIDADA)',
   false
 );
+
+// O marcador vem por ÚLTIMO para ficar visível por cima das imagens.
+Map.addLayer(
+  ee.FeatureCollection([ee.Feature(pontoReferencia)]).style({
+    color: 'FF453A',
+    pointSize: 11,
+    pointShape: 'circle',
+    width: 3,
+    fillColor: 'FF453A'
+  }),
+  {},
+  'Ponto vermelho — referência, confirmar local'
+);
+
+print('Ponto de referência (longitude, latitude): -40.7703, -4.8986');
+print('Verifique visualmente o açude antes de desenhar o contorno.');
 
 // Próxima etapa:
 // scripts/earth-engine/sao-jose-iii-area-series.js

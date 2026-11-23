@@ -187,9 +187,6 @@ export default function AguaObservatorio() {
     let ativo = true;
 
     async function carregar() {
-      setCarregandoMeteo(true);
-      setErroMeteo(null);
-
       try {
         const dados = await consultarMeteorologiaReservatorio(controlador.signal);
         if (!ativo) return;
@@ -331,7 +328,11 @@ export default function AguaObservatorio() {
           <span className="agua-tag agua-tag--piloto">PILOTO · SÃO JOSÉ III</span>
           <button
             className="agua-botao agua-botao--secundario"
-            onClick={() => setSolicitarAtualizacao(valor => valor + 1)}
+            onClick={() => {
+              setCarregandoMeteo(true);
+              setErroMeteo(null);
+              setSolicitarAtualizacao(valor => valor + 1);
+            }}
             disabled={carregandoMeteo}
           >
             <FiRefreshCw className={carregandoMeteo ? 'agua-girando' : ''} />

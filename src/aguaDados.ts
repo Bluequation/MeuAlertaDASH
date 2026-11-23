@@ -147,7 +147,7 @@ export function importarSerieSuperficie(conteudo: string): CenaSuperficie[] {
 
   const cabecalhos = separarLinhaCSV(primeira, delimitador)
     .map(normalizarCabecalho);
-  const indices = new Map(cabecalhos.map((nome, indice) => [nome, indice]));
+  const indices = new Map<string, number>(cabecalhos.map((nome, indice) => [nome, indice] as const));
 
   const cenas: CenaSuperficie[] = [];
 

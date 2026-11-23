@@ -28,7 +28,15 @@ Map.centerObject(aoi, 14);
 Map.addLayer(aoi, {color: '00A6D6'}, 'Área de estudo — São José III');
 
 function areaEmHectares(imagem, bandaVerde, bandaNIR, escala, sensor, nuvens) {
-  var ndwi = imagem.normalizedDifference([bandaVerde, bandaNIR]).rename('NDWI');
+  var verde = imagem.select(bandaVerde);
+  var nir = imagem.select(bandaNIR);
+  var denominador = verde.add(nir);
+  // expression evita a máscara automática de pixels negativos do normalizedDifference,
+  // importante para reflectâncias Landsat já corrigidas pelo fator e offset do USGS.
+  var ndwi = imagem.expression(
+    '(green - nir) / (green + nir)',
+    { green: verde, nir: nir }
+  ).rename('NDWI').updateMask(denominador.neq(0));
   var mascaraAgua = ndwi.gt(NDWI_THRESHOLD);
 
   var soma = ee.Image.pixelArea()

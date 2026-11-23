@@ -39,6 +39,9 @@ A implementação inicial mantém o cadastro do reservatório em configuração 
 - Sentinel-2 L2A Harmonized é a fonte principal, com resolução de 10 m nas bandas usadas no NDWI e revisita nominal de cinco dias.
 - Landsat 8/9 Collection 2 Level-2 complementa a série histórica, com resolução de 30 m nas bandas usadas no NDWI.
 - A disponibilidade efetiva depende de cobertura de nuvens, sombras e cenas válidas.
+- O processamento registra cobertura válida sobre o AOI, porcentagem de nuvens, limiar NDWI e resolução de cada cena.
+- Os limiares NDWI são configuráveis separadamente para Sentinel-2 e Landsat.
+- O gráfico do painel filtra um sensor por vez; comparações entre sensores exibem aviso devido às diferenças de resolução e resposta espectral.
 - O script scripts/earth-engine/sao-jose-iii-area-series.js exporta uma tabela CSV de área superficial por aquisição.
 - O polígono AOI precisa ser delimitado e validado manualmente no Earth Engine antes do primeiro processamento.
 - O limiar NDWI inicial é provisório e precisa ser calibrado com imagens e referência de campo.
@@ -62,6 +65,7 @@ A estação não será considerada operacional até instalação, calibração e
 - Meteorologia estimada via Open-Meteo.
 - Ficha técnica e localização do reservatório.
 - Importação de série CSV produzida no Earth Engine.
+- A importação CSV inicial fica na sessão do navegador; persistência no Firestore e prévias de imagem serão conectadas em etapa posterior.
 - Gráfico com agregação diária, mensal ou anual por mediana.
 - Comparação de duas cenas.
 - Calculadora transparente de conversão de lâmina evaporada em volume.

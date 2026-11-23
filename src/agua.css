@@ -90,6 +90,9 @@
 .agua-mensagem-importacao svg, .agua-mensagem-erro svg { flex: 0 0 auto; margin-top: 1px; }
 .agua-seletor, .agua-formulario input { min-width: 0; border: 1px solid #DCE7F0; border-radius: 9px; background: #FFFFFF; color: #29445D; padding: 9px 11px; font: inherit; font-size: 11px; outline: none; }
 .agua-seletor:focus, .agua-formulario input:focus { border-color: #168FC4; box-shadow: 0 0 0 3px rgba(22,143,196,.1); }
+.agua-controles-serie { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.agua-controles-serie .agua-seletor { min-width: 155px; }
+.agua-nota-serie { margin: -4px 0 0; color: #8292A3; font-size: 10px; line-height: 1.55; }
 .agua-grafico { width: 100%; height: 260px; min-width: 0; }
 .agua-rodape-grafico { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 8px; color: #91A0AE; font-size: 10px; }
 .agua-vazio { min-height: 185px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 22px; color: #8A9AA9; text-align: center; }
@@ -179,6 +182,8 @@
   .agua-indicador { padding: 12px; }
   .agua-indicador__valor { font-size: 23px; }
   .agua-satelite-fontes, .agua-comparador-controles, .agua-comparador-imagens, .agua-relatorios-grade { grid-template-columns: 1fr; }
+  .agua-controles-serie { width: 100%; }
+  .agua-controles-serie .agua-seletor { flex: 1 1 140px; min-width: 0; }
   .agua-comparador-resultados { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .agua-formulario, .agua-resultado-evaporacao { grid-template-columns: 1fr; }
   .agua-ficha-dados { grid-template-columns: 1fr; }

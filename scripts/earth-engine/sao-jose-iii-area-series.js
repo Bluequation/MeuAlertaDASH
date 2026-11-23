@@ -7,13 +7,14 @@
  * 2. Desenhe/importa manualmente um polígono AOI que cubra a extensão máxima
  *    conhecida do reservatório, sem incluir açudes vizinhos.
  * 3. O desenho precisa estar disponível com o nome "geometry".
- * 4. Revise NDWI_THRESHOLD após comparar cenas e referências de campo.
+ * 4. Revise os limiares NDWI de cada sensor após comparar cenas e referências de campo.
  * 5. Execute e exporte a tabela CSV para o Google Drive.
  *
  * IMPORTANTE
  * - O resultado é ÁREA SUPERFICIAL (ha), não volume armazenado.
- * - NDWI_THRESHOLD é inicial e precisa ser calibrado para turbidez, solo exposto
- *   e vegetação aquática do reservatório.
+ * - Os limiares NDWI são iniciais e precisam ser calibrados separadamente por sensor
+ *   para turbidez, solo exposto e vegetação aquática do reservatório.
+ * - A cobertura válida é calculada dentro do AOI e ajuda a identificar cenas incompletas.
  * - Cenas com nuvens/sombras e cobertura insuficiente devem ser revisadas.
  * - Não converta área em volume sem curva cota-área-volume validada.
  */
@@ -22,12 +23,13 @@ var aoi = geometry;
 var DATA_INICIAL = '2013-03-18';
 var DATA_FINAL = '2026-12-16'; // fim exclusivo
 var LIMITE_NUVENS = 70;
-var NDWI_THRESHOLD = 0.0; // valor inicial para calibração local
+var LIMIAR_NDWI_SENTINEL = 0.0; // inicial; calibrar com cenas e campo
+var LIMIAR_NDWI_LANDSAT = 0.0;  // inicial; calibrar separadamente
 
 Map.centerObject(aoi, 14);
 Map.addLayer(aoi, {color: '00A6D6'}, 'Área de estudo — São José III');
 
-function areaEmHectares(imagem, bandaVerde, bandaNIR, escala, sensor, nuvens) {
+function areaEmHectares(imagem, bandaVerde, bandaNIR, escala, sensor, nuvens, limiarNDWI) {
   var verde = imagem.select(bandaVerde);
   var nir = imagem.select(bandaNIR);
   var denominador = verde.add(nir);
@@ -37,7 +39,7 @@ function areaEmHectares(imagem, bandaVerde, bandaNIR, escala, sensor, nuvens) {
     '(green - nir) / (green + nir)',
     { green: verde, nir: nir }
   ).rename('NDWI').updateMask(denominador.neq(0));
-  var mascaraAgua = ndwi.gt(NDWI_THRESHOLD);
+  var mascaraAgua = ndwi.gt(limiarNDWI);
 
   var soma = ee.Image.pixelArea()
     .rename('area')
@@ -50,23 +52,42 @@ function areaEmHectares(imagem, bandaVerde, bandaNIR, escala, sensor, nuvens) {
       tileScale: 4
     });
 
-  var areaM2 = ee.Algorithms.If(
-    soma.get('area'),
-    soma.get('area'),
+  var somaValida = ee.Image.pixelArea()
+    .rename('area')
+    .updateMask(ndwi.mask())
+    .reduceRegion({
+      reducer: ee.Reducer.sum(),
+      geometry: aoi,
+      scale: escala,
+      maxPixels: 1e10,
+      tileScale: 4
+    });
+  var somaAoi = ee.Image.pixelArea()
+    .rename('area')
+    .reduceRegion({
+      reducer: ee.Reducer.sum(),
+      geometry: aoi,
+      scale: escala,
+      maxPixels: 1e10,
+      tileScale: 4
+    });
+  var areaValidaM2 = ee.Number(ee.Algorithms.If(somaValida.get('area'), somaValida.get('area'), 0));
+  var areaTotalM2 = ee.Number(somaAoi.get('area'));
+  var coberturaValidaPct = areaValidaM2.divide(areaTotalM2).multiply(100);
+  var areaHa = ee.Algorithms.If(
+    coberturaValidaPct.gt(0),
+    ee.Number(ee.Algorithms.If(soma.get('area'), soma.get('area'), 0)).divide(10000),
     null
   );
 
   return ee.Feature(null, {
     data: ee.Date(imagem.get('system:time_start')).format('YYYY-MM-dd'),
-    area_ha: ee.Algorithms.If(
-      areaM2,
-      ee.Number(areaM2).divide(10000),
-      null
-    ),
+    area_ha: areaHa,
     satellite: sensor,
     cloud_pct: nuvens,
+    valid_coverage_pct: coberturaValidaPct,
     scene_id: imagem.get('system:index'),
-    ndwi_threshold: NDWI_THRESHOLD,
+    ndwi_threshold: limiarNDWI,
     escala_m: escala
   });
 }
@@ -80,7 +101,8 @@ var sentinelLista = sentinelOriginal.toList(sentinelOriginal.size());
 var sentinelFeatures = ee.FeatureCollection(sentinelLista.map(function(item) {
   var imagem = ee.Image(item);
   var scl = imagem.select('SCL');
-  var mascara = scl.neq(3)
+  var mascara = scl.neq(1)
+    .and(scl.neq(3))
     .and(scl.neq(8))
     .and(scl.neq(9))
     .and(scl.neq(10))
@@ -93,13 +115,15 @@ var sentinelFeatures = ee.FeatureCollection(sentinelLista.map(function(item) {
     'B8',
     10,
     'Sentinel-2',
-    imagem.get('CLOUDY_PIXEL_PERCENTAGE')
+    imagem.get('CLOUDY_PIXEL_PERCENTAGE'),
+    LIMIAR_NDWI_SENTINEL
   );
 }));
 
-function prepararLandsat(imagem, sensor) {
+function prepararLandsat(imagem, sensor, limiarNDWI) {
   var qa = imagem.select('QA_PIXEL');
-  var mascaraNuvem = qa.bitwiseAnd(1 << 1).eq(0)
+  var mascaraNuvem = qa.bitwiseAnd(1 << 0).eq(0)
+    .and(qa.bitwiseAnd(1 << 1).eq(0))
     .and(qa.bitwiseAnd(1 << 2).eq(0))
     .and(qa.bitwiseAnd(1 << 3).eq(0))
     .and(qa.bitwiseAnd(1 << 4).eq(0))
@@ -118,14 +142,15 @@ function prepararLandsat(imagem, sensor) {
     'NIR',
     30,
     sensor,
-    imagem.get('CLOUD_COVER')
+    imagem.get('CLOUD_COVER'),
+    limiarNDWI
   );
 }
 
-function landsatParaFeatures(colecao, sensor) {
+function landsatParaFeatures(colecao, sensor, limiarNDWI) {
   var lista = colecao.toList(colecao.size());
   return ee.FeatureCollection(lista.map(function(item) {
-    return prepararLandsat(ee.Image(item), sensor);
+    return prepararLandsat(ee.Image(item), sensor, limiarNDWI);
   }));
 }
 
@@ -139,8 +164,8 @@ var colecaoLandsat9 = ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')
   .filterDate('2021-10-31', DATA_FINAL)
   .filter(ee.Filter.lte('CLOUD_COVER', LIMITE_NUVENS));
 
-var landsat8Features = landsatParaFeatures(colecaoLandsat8, 'Landsat 8');
-var landsat9Features = landsatParaFeatures(colecaoLandsat9, 'Landsat 9');
+var landsat8Features = landsatParaFeatures(colecaoLandsat8, 'Landsat 8', LIMIAR_NDWI_LANDSAT);
+var landsat9Features = landsatParaFeatures(colecaoLandsat9, 'Landsat 9', LIMIAR_NDWI_LANDSAT);
 
 var serie = sentinelFeatures
   .merge(landsat8Features)
@@ -161,6 +186,7 @@ Export.table.toDrive({
     'area_ha',
     'satellite',
     'cloud_pct',
+    'valid_coverage_pct',
     'scene_id',
     'ndwi_threshold',
     'escala_m'

@@ -42,7 +42,9 @@ print('Cobertura de nuvens da cena completa (%):', melhorCena.get('CLOUDY_PIXEL_
 Map.addLayer(
   melhorCena.clip(areaBusca),
   { bands: ['B4', 'B3', 'B2'], min: 0, max: 3500 },
-  'Sentinel-2: composição colorida'
+  'Sentinel-2: composição colorida (opcional)',
+  false, // inicia desligada para não cobrir o marcador de referência
+  0.75
 );
 
 var ndwi = melhorCena.normalizedDifference(['B3', 'B8']).rename('NDWI');

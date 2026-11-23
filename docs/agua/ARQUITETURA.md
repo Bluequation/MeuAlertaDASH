@@ -4,6 +4,7 @@
 - Nome: Açude São José III.
 - Município: Ipaporanga/CE.
 - Capacidade nominal: 9,12 hm³, conforme ficha técnica da COGERH.
+- Divergência a confirmar: uma publicação acadêmica anterior registra 7,96 hm³. A capacidade e a curva cota-área-volume vigentes devem ser confirmadas com a COGERH antes de cálculos de volume ou balanço hídrico.
 - Área da bacia hidrográfica: 99,35 km².
 - Riacho barrado: Riacho São José.
 - Coordenadas de referência: -4.8986, -40.7703, obtidas no documento de planejamento hídrico da COGERH.

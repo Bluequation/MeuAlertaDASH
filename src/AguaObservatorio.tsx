@@ -149,8 +149,6 @@ function exportarCSV(cenas: CenaSuperficie[]): void {
   URL.revokeObjectURL(url);
 }
 
-const ROTA_PREVIAS = 'data/agua/previas/';
-
 function linkConsultaCena(cena: CenaSuperficie): string {
   if (cena.satelite === 'MapBiomas Água') {
     return 'https://plataforma.brasil.mapbiomas.org/agua';

@@ -99,6 +99,13 @@
 .agua-metodologia > summary span { color: #7D9BAA; font-weight: 400; }
 .agua-metodologia[open] { padding-bottom: 8px; }
 .agua-metodologia > p { margin: 8px 0 0; max-width: 1050px; line-height: 1.65; }
+/* Discrepâncias entre sensores: aviso neutro, sem descartar observações. */
+.agua-verificacao-cenas { border: 1px solid #E7DAC8; background: #FCF9F3; color: #6E604A; border-radius: 10px; margin: 2px 0 13px; padding: 10px 13px; font-size: 10px; line-height: 1.6; }
+.agua-verificacao-cenas > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; color: #795E37; font-weight: 650; }
+.agua-verificacao-cenas > summary svg { flex: 0 0 auto; font-size: 14px; }
+.agua-verificacao-cenas > p { margin: 9px 0; max-width: 850px; }
+.agua-verificacao-cenas__lista { display: grid; gap: 6px; }
+.agua-verificacao-cenas__lista > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px 16px; padding: 6px 0; border-top: 1px solid #EEE4D6; font-variant-numeric: tabular-nums; }
 .agua-serie-destaques { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-top: 12px; padding: 14px 0 5px; border-top: 1px solid #E7EEF5; }
 .agua-serie-destaques > div { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
 .agua-serie-destaques span { color: #72879B; font-size: 10px; }

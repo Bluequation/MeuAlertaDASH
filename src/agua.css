@@ -92,6 +92,24 @@
 .agua-seletor:focus, .agua-formulario input:focus { border-color: #168FC4; box-shadow: 0 0 0 3px rgba(22,143,196,.1); }
 .agua-controles-serie { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .agua-controles-serie .agua-seletor { min-width: 155px; }
+/* Histórico satelital: leitura clara, sem cartões empilhados em excesso. */
+.agua-metodologia { margin: -3px 0 0; color: #6E8498; font-size: 10px; }
+.agua-metodologia > summary { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; cursor: pointer; color: #53738B; font-weight: 650; }
+.agua-metodologia > summary svg { font-size: 13px; color: #168FC4; }
+.agua-metodologia > summary span { color: #7D9BAA; font-weight: 400; }
+.agua-metodologia[open] { padding-bottom: 8px; }
+.agua-metodologia > p { margin: 8px 0 0; max-width: 1050px; line-height: 1.65; }
+.agua-serie-destaques { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-top: 12px; padding: 14px 0 5px; border-top: 1px solid #E7EEF5; }
+.agua-serie-destaques > div { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
+.agua-serie-destaques span { color: #72879B; font-size: 10px; }
+.agua-serie-destaques strong { color: #1A789E; font-size: 19px; font-variant-numeric: tabular-nums; font-weight: 750; }
+.agua-serie-destaques small { color: #8C9EAB; font-size: 10px; }
+.agua-vazio a { color: #168FC4; font-size: 10px; font-weight: 650; }
+@media (max-width: 680px) {
+  .agua-serie-destaques { gap: 8px; }
+  .agua-serie-destaques strong { font-size: 15px; }
+  .agua-serie-destaques span, .agua-serie-destaques small { font-size: 9px; }
+}
 .agua-nota-serie { margin: -4px 0 0; color: #8292A3; font-size: 10px; line-height: 1.55; }
 .agua-grafico { width: 100%; height: 260px; min-width: 0; }
 .agua-rodape-grafico { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 8px; color: #91A0AE; font-size: 10px; }

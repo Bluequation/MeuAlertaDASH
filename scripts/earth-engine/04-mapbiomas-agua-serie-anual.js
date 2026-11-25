@@ -29,7 +29,7 @@ print('Área de estudo é o polígono geometry já salvo no Earth Engine.');
 
 var serie = ee.FeatureCollection(anos.map(function(ano) {
   ano = ee.Number(ano);
-  var banda = ee.String('classification_').cat(ano.format('%d'));
+  var banda = ee.String('classification_').cat(ano.format('%.0f'));
 
   // Classe 1 = superfície de água, conforme documentação MapBiomas.
   var aguaMapeada = imagemAnual.select(banda).eq(1);
@@ -45,14 +45,34 @@ var serie = ee.FeatureCollection(anos.map(function(ano) {
     tileScale: 4
   });
 
-  var area = ee.Number(ee.Algorithms.If(
-    estatisticas.get('area_ha'), estatisticas.get('area_ha'), 0
+  // Distingue zero de água de ausência de dados válidos.
+  var cobertos = ee.Image.pixelArea().divide(10000).rename('area_ha')
+    .updateMask(imagemAnual.select(banda).mask())
+    .reduceRegion({
+      reducer: ee.Reducer.sum(),
+      geometry: aoi,
+      scale: 30,
+      maxPixels: 1e8,
+      tileScale: 4
+    });
+  var areaObservavel = ee.Number(ee.Algorithms.If(
+    cobertos.get('area_ha'), cobertos.get('area_ha'), 0
   ));
+  var areaTotal = ee.Number(aoi.area(1)).divide(10000);
+  var coberturaValidaPct = areaObservavel.divide(areaTotal).multiply(100);
+
+  var area = ee.Algorithms.If(
+    areaObservavel.gt(0),
+    ee.Number(ee.Algorithms.If(estatisticas.get('area_ha'),
+      estatisticas.get('area_ha'), 0)),
+    null
+  );
 
   return ee.Feature(null, {
     data: ee.Date.fromYMD(ano, 12, 31).format('YYYY-MM-dd'),
     ano: ano,
     area_ha: area,
+    valid_coverage_pct: coberturaValidaPct,
     satellite: 'MapBiomas Água',
     source: 'MapBiomas Água - Coleção 5 (anual, 30 m)',
     scale_m: 30,
@@ -76,13 +96,29 @@ var borda = ee.Image().byte().paint(
 Map.addLayer(borda, {palette: ['FF9A39']},
   'Contorno da área de estudo', true);
 
+// Preferir download direto: 41 registros cabem numa única tabela pequena.
+// Assim não é necessário iniciar uma tarefa em Tasks/Google Drive.
+serie.getDownloadURL({
+  format: 'CSV',
+  selectors: ['data', 'ano', 'area_ha', 'valid_coverage_pct',
+              'satellite', 'source', 'scale_m', 'scene_id', 'geometry_status'],
+  filename: 'cuidai-agua-sao-jose-iii-mapbiomas'
+}, function(url, erro) {
+  if (erro) {
+    print('Download direto indisponível; use Tasks > Run para exportar.', erro);
+  } else {
+    print('BAIXAR CSV — CUIDAÍ ÁGUA / MAPBIOMAS:', url);
+  }
+});
+
+// Exportação alternativa para o Google Drive, caso o download direto falhe.
 Export.table.toDrive({
   collection: serie,
   description: 'CUIDAI_AGUA_SAO_JOSE_III_MAPBIOMAS_1985_2025',
   folder: 'CUIDAI_AGUA',
   fileNamePrefix: 'cuidai-agua-sao-jose-iii-mapbiomas-1985-2025',
   fileFormat: 'CSV',
-  selectors: ['data', 'ano', 'area_ha', 'satellite', 'source',
+  selectors: ['data', 'ano', 'area_ha', 'valid_coverage_pct', 'satellite', 'source',
               'scale_m', 'scene_id', 'geometry_status']
 });
 

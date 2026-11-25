@@ -12,7 +12,6 @@
  */
 
 var pontoReferencia = ee.Geometry.Point([-40.7703, -4.8986]);
-var areaVisualizacao = pontoReferencia.buffer(6500);
 
 Map.setOptions('SATELLITE');
 Map.centerObject(pontoReferencia, 13);
@@ -56,7 +55,7 @@ var visual = {
 
 // O primeiro período aparece automaticamente no mapa.
 Map.addLayer(
-  cenas2026.median().clip(areaVisualizacao),
+  cenas2026.median(),
   visual,
   'CHEIA 2026 — março/abril (composição)',
   true,
@@ -65,7 +64,7 @@ Map.addLayer(
 
 // Ligue esta camada em Layers para comparar com 2026.
 Map.addLayer(
-  cenas2023.median().clip(areaVisualizacao),
+  cenas2023.median(),
   visual,
   'CHEIA 2023 — abril/maio (composição)',
   false,

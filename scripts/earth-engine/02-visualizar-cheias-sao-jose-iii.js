@@ -65,26 +65,56 @@ function selecionarCena(inicio, fim, rotulo) {
 var cena2026 = selecionarCena('2026-03-20', '2026-05-15', '2026');
 var cena2023 = selecionarCena('2023-04-27', '2023-06-20', '2023');
 
-// Visualização em cores naturais: uma única cena em cada camada.
-// SEM median() e SEM máscaras que introduzam aparência de colcha de retalhos.
-var visual = {
+// O fundo permanece sendo o Google Satélite, com alta nitidez.
+// A classificação Sentinel-2 aparece apenas como MANCHA COLORIDA sobre o mapa.
+// Assim não substituímos o fundo por pixels RGB de 10 m.
+var limiteVisual = pontoReferencia.buffer(4500);
+
+function aguaProvavel(imagem) {
+  var scl = imagem.select('SCL');
+  var pixelsValidos = scl.neq(0)
+    .and(scl.neq(1))
+    .and(scl.neq(3))
+    .and(scl.neq(8))
+    .and(scl.neq(9))
+    .and(scl.neq(10))
+    .and(scl.neq(11));
+
+  var ndwi = imagem.normalizedDifference(['B3', 'B8']);
+  return ndwi.gt(0)
+    .updateMask(pixelsValidos)
+    .selfMask()
+    .clip(limiteVisual);
+}
+
+var agua2026 = aguaProvavel(cena2026);
+var agua2023 = aguaProvavel(cena2023);
+
+// Somente para investigação, RGB desligado por padrão.
+// Se ativado, o RGB terá resolução menor que o fundo Google Satélite.
+var visualRGB = {
   bands: ['B4', 'B3', 'B2'],
   min: 0,
   max: 3500,
   gamma: 1.15
 };
+Map.addLayer(cena2026, visualRGB,
+  'RGB Sentinel-2 2026 (opcional, 10 m)', false);
+Map.addLayer(cena2023, visualRGB,
+  'RGB Sentinel-2 2023 (opcional, 10 m)', false);
 
-Map.addLayer(cena2026, visual,
-  '2026 — imagem única após cheia', true, 0.9);
+// As duas camadas azuis/laranjas podem ser ligadas ou desligadas
+// independentemente em Layers; inicialmente só 2026 está visível.
+Map.addLayer(agua2023, {palette: ['FF912D']},
+  'ÁGUA PROVÁVEL 2023 — LARANJA', false, 0.68);
+Map.addLayer(agua2026, {palette: ['008ED0']},
+  'ÁGUA PROVÁVEL 2026 — AZUL', true, 0.68);
 
-Map.addLayer(cena2023, visual,
-  '2023 — imagem única após cheia', false, 0.9);
-
-// Camada de referência desligada para não esconder a água.
 Map.addLayer(pontoReferencia, {color: 'FF453A'},
   'Ponto de referência (opcional)', false);
 
-print('Em Layers: ligue 2023 e desligue 2026 para comparar.');
-print('A data real de cada cena está em Console.');
-print('Use zoom moderado: cada pixel Sentinel-2 equivale a 10 metros.');
-print('Só desenhe o polígono depois de inspecionar as duas datas.');
+print('Compare em Layers: 2026 azul e 2023 laranja.');
+print('O fundo é uma imagem Google Satélite; pode ser de outra data.');
+print('A mancha colorida é uma ESTIMATIVA com pixels Sentinel-2 de 10 m.');
+print('Não use o limite colorido como margem oficial sem validação.');
+print('Desenhe a área de estudo após comparar ambas as datas.');

@@ -1,0 +1,31 @@
+name: CUIDAI Agua - verificar painel
+on:
+  push:
+    branches:
+      - feat/cuidai-agua-sao-jose-iii
+  pull_request:
+    paths:
+      - 'src/AguaObservatorio.tsx'
+      - 'src/aguaDados.ts'
+      - 'src/aguaOficial.ts'
+      - 'scripts/earth-engine/**'
+      - 'package*.json'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Obter codigo
+        uses: actions/checkout@v4
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Instalar dependencias fixas
+        run: npm ci
+      - name: Checagem TypeScript e build Vite
+        run: npm run build

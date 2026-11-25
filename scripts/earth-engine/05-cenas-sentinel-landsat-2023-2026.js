@@ -8,6 +8,7 @@
  *
  * NDWI > 0 é um limiar EXPERIMENTAL, não uma área validada:
  * -> máscaras de nuvem/sombra e pixels fora da cena são aplicadas;
+ * -> SCL: sem dados, defeito, sombra de nuvem, não classificado, nuvem/cirrus e neve/gelo são descartados;
  * -> registros com cobertura válida inferior a 85% são DESCARTADOS;
  * -> dados Sentinel-2 (10 m) e Landsat (30 m) são identificados separadamente;
  * -> não calcular volume com estes valores sem curva cota-área-volume.
@@ -28,6 +29,8 @@ Map.setOptions('SATELLITE');
 Map.centerObject(aoi, 13);
 
 function gerarRegistro(imagem, verde, nir, escala, sensor, nuvens, limiar) {
+  // O retorno de copyProperties pode perder a inferência de tipo no EE.
+  imagem = ee.Image(imagem);
   var green = imagem.select(verde);
   var nearInfrared = imagem.select(nir);
   var denom = green.add(nearInfrared);
@@ -119,16 +122,28 @@ function landsatRegistros(asset) {
 var landsat8 = landsatRegistros('LANDSAT/LC08/C02/T1_L2');
 var landsat9 = landsatRegistros('LANDSAT/LC09/C02/T1_L2');
 
-var registros = s2Features.merge(landsat8).merge(landsat9)
-  .filter(ee.Filter.notNull(['area_ha']))
+var candidatos = s2Features.merge(landsat8).merge(landsat9)
+  .filter(ee.Filter.notNull(['area_ha']));
+var registros = candidatos
   .filter(ee.Filter.gte('valid_coverage_pct', COBERTURA_MINIMA_PCT))
   .sort('data');
 
-print('CUIDAÍ | Água — cenas filtradas por qualidade:', registros.size());
-print('Sentinel-2:', registros.filter(ee.Filter.eq('satellite', 'Sentinel-2')).size());
-print('Landsat:', registros.filter(ee.Filter.eq('satellite', 'Landsat')).size());
+var sentinelValido = registros.filter(ee.Filter.eq('satellite', 'Sentinel-2'));
+var landsatValido = registros.filter(ee.Filter.eq('satellite', 'Landsat'));
+
+print('CUIDAÍ | Água — cenas candidatas com algum pixel válido:', candidatos.size());
+print('Cenas rejeitadas por cobertura abaixo de 85%:', candidatos.filter(ee.Filter.lt('valid_coverage_pct', COBERTURA_MINIMA_PCT)).size());
+print('Cenas exportadas após filtro de cobertura:', registros.size());
+print('Sentinel-2 exportadas:', sentinelValido.size());
+print('Landsat 8/9 exportadas:', landsatValido.size());
+print('Intervalo de datas exportado:', registros.aggregate_min('data'), registros.aggregate_max('data'));
+print('Sentinel-2 — cobertura válida min/max (%):', sentinelValido.aggregate_min('valid_coverage_pct'), sentinelValido.aggregate_max('valid_coverage_pct'));
+print('Landsat 8/9 — cobertura válida min/max (%):', landsatValido.aggregate_min('valid_coverage_pct'), landsatValido.aggregate_max('valid_coverage_pct'));
+print('Sentinel-2 — área NDWI min/max (ha):', sentinelValido.aggregate_min('area_ha'), sentinelValido.aggregate_max('area_ha'));
+print('Landsat 8/9 — área NDWI min/max (ha):', landsatValido.aggregate_min('area_ha'), landsatValido.aggregate_max('area_ha'));
+print('Área da AOI original (ha):', ee.Number(aoi.area(1)).divide(10000));
 print('Amostra das primeiras cenas:', registros.limit(5));
-print('IMPORTANTE: NDWI > 0 preliminar. Não é volume nem série validada.');
+print('IMPORTANTE: NDWI > 0 preliminar, sujeito a falsos positivos/negativos e efeitos de mistura de pixels. Não é volume nem série validada.');
 
 var colunas = [
   'data', 'area_ha', 'satellite', 'scene_id', 'cloud_pct',
@@ -144,12 +159,4 @@ Export.table.toDrive({
   selectors: colunas
 });
 
-// Tentar download direto; se exceder limites, usar a tarefa no Drive.
-registros.getDownloadURL({
-  format: 'CSV',
-  selectors: colunas,
-  filename: 'cuidai-agua-sao-jose-iii-cenas-2023-2026'
-}, function(url, erro) {
-  if (erro) print('Link direto indisponível. Exportar em Tasks > Run.', erro);
-  else print('DOWNLOAD CSV DAS CENAS:', url);
-});
+print('CSV preparado no Tasks para exportação ao Drive; validar visualmente as cenas antes de interpretar as áreas como superfície real.');

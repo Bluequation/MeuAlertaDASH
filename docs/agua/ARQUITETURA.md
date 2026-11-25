@@ -80,22 +80,39 @@ A estação não será considerada operacional até instalação, calibração e
 - **MapBiomas Água:** a Coleção 5 fornece classificação **anual de água
   1985–2025**, com resolução de 30 m. A fonte oficial está documentada em
   https://brasil.mapbiomas.org/iniciativas-e-produtos/agua/mapeamento-anual/tempo-desde-a-ultima-ocorrencia-de-superficie-de-agua/ .
-- **Exportação com uma única análise no Earth Engine:** o script
+- **Processamento Earth Engine concluído:** o script
   `scripts/earth-engine/04-mapbiomas-agua-serie-anual.js` usa a AOI `geometry`
-  que a usuária já salvou para calcular 41 anos em um único processamento.
-  Isso **não substitui** a validação da AOI em imagens de cheias históricas.
-- **Ingestão automática no painel:** quando um CSV gerado e revisado for
-  publicado em `public/data/cuidai-agua-sao-jose-iii-mapbiomas.csv`,
-  o painel lerá o arquivo na inicialização, sem exigir upload dos visitantes.
-  O CSV inicial contém APENAS CABEÇALHO, sem medições fictícias.
+  preservada, e já produziu a série anual 1985–2025. A execução não substitui
+  a validação da AOI contra o máximo histórico de inundação.
+- **Ingestão automática no painel:** o CSV real de 41 anos está publicado em
+  `public/data/cuidai-agua-sao-jose-iii-mapbiomas.csv`. O painel carrega esse
+  arquivo na inicialização, sem upload manual dos visitantes; registros locais
+  continuam disponíveis para outras fontes.
 - **Importação manual opcional:** CSV via interface, com preservação local dos
   últimos dados importados. O carregamento automático nunca converte
   informação municipal agregada em estimativa do reservatório.
-- **NÃO concluído:** execução da exportação GEE, validação da geometria,
-  publicação dos 41 resultados, atualização automática em tempo real COGERH,
-  implantação de estação, estimativa calibrada de evaporação e nova publicação
-  do painel Firebase Hosting. Essas etapas não devem aparecer como operacionais
-  até testadas e comprovadas.
+- **Processamento concluído em 25/11/2026:** a operação autenticada
+  no Google Earth Engine confirmou o asset MapBiomas Água Coleção 5, a classe 1,
+  as bandas 1985–2025 e a AOI original de **411 vértices**. Foram exportados
+  **41 registros** e o CSV foi publicado em
+  `public/data/cuidai-agua-sao-jose-iii-mapbiomas.csv`.
+- **Consistência do CSV:** 41 anos consecutivos (1985–2025), sem valores ausentes,
+  negativos, anos duplicados ou áreas acima da AOI aproximada de **213,40 ha**.
+  Área anual mapeada de **2025: 148,12 ha**. Área máxima observada
+  na série: **184,38 ha (2004)**; mínima: **0,09 ha (1987)**.
+  O valor mínimo corresponde aproximadamente a um pixel de 30 m;
+  **não deve ser interpretado como prova de seca**.
+- **Proveniência do CSV:** SHA-256 do arquivo exportado:
+  `c02d6c86f34a0838cd28d800e849ad814a728005193a36f3e8a6b44fcd9ce82a`.
+- **Validação científica limitada:** consistência de estrutura e intervalo
+  confirmada, mas ainda falta conferir anos de cheia com cartografia oficial,
+  avaliar o viés da AOI ajustada à água de 2026 e quantificar incertezas.
+  Não utilizar a máscara binária MapBiomas como indicador de cobertura
+  observacional; pixels sem classificação positiva não comprovam ausência de água.
+- **NÃO concluído:** atualização ao vivo da COGERH, estação instalada,
+  estimação calibrada de evaporação, validação hidrológica de campo e publicação
+  independente no Firebase Hosting. A compilação por CI valida a aplicação,
+  não garante uma publicação do site.
 
 ### Integridade: fontes diferentes, grandezas diferentes
 

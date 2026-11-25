@@ -368,8 +368,46 @@ export default function AguaObservatorio() {
     ? [...cenas].sort((a, b) => b.data.localeCompare(a.data))[0]
     : null;
 
-  const cenaA = cenas.find(cena => cena.id === cenaAId) || null;
-  const cenaB = cenas.find(cena => cena.id === cenaBId) || null;
+  // O comparador sempre usa a fonte selecionada no gráfico.
+  const cenaA = cenasFiltradas.find(cena => cena.id === cenaAId) || cenasFiltradas[0] || null;
+  const cenaB = cenasFiltradas.find(cena => cena.id === cenaBId) || cenasFiltradas[cenasFiltradas.length - 1] || null;
+
+  // Triagem de qualidade, não sentença de que uma cena esteja errada.
+  // Checamos Landsat contra a mediana das cenas Sentinel-2 mais próximas
+  // (até 3 dias); diferenças grandes precisam de inspeção visual.
+  const alertasInterSensores = useMemo(() => {
+    const landsat = cenas.filter(cena => cena.satelite === 'Landsat');
+    const sentinel = cenas.filter(cena => cena.satelite === 'Sentinel-2');
+    return landsat.flatMap(cenaL => {
+      const diaL = Date.parse(cenaL.data + 'T00:00:00Z');
+      const proximas = sentinel.map(cenaS => ({
+        cena: cenaS,
+        dias: Math.abs(Date.parse(cenaS.data + 'T00:00:00Z') - diaL) / 86400000
+      })).filter(item => item.dias <= 3);
+      if (!proximas.length) return [];
+
+      const menorIntervalo = Math.min(...proximas.map(item => item.dias));
+      const valoresProximos = proximas.filter(item => item.dias === menorIntervalo)
+        .map(item => item.cena.areaHa).sort((a, b) => a - b);
+      const metade = Math.floor(valoresProximos.length / 2);
+      const areaS2 = valoresProximos.length % 2
+        ? valoresProximos[metade]
+        : (valoresProximos[metade - 1] + valoresProximos[metade]) / 2;
+      const maior = Math.max(cenaL.areaHa, areaS2);
+      const menor = Math.min(cenaL.areaHa, areaS2);
+
+      if (maior - menor <= 50 || menor / maior >= 0.6) return [];
+
+      const referencia = proximas.find(item => item.dias === menorIntervalo)!.cena;
+      return [{
+        landsatData: cenaL.data,
+        landsatHa: cenaL.areaHa,
+        sentinelData: referencia.data,
+        sentinelHa: areaS2,
+        dias: menorIntervalo
+      }];
+    }).sort((a, b) => a.landsatData.localeCompare(b.landsatData));
+  }, [cenas]);
   const diferencaArea = cenaA && cenaB
     ? cenaB.areaHa - cenaA.areaHa
     : null;
@@ -688,6 +726,20 @@ export default function AguaObservatorio() {
                 </div>
               </div>
 
+              {filtroSatelite !== 'MapBiomas Água' && alertasInterSensores.length > 0 && (
+                <details className="agua-verificacao-cenas">
+                  <summary><FiAlertCircle /> {alertasInterSensores.length} divergências relevantes entre Landsat e Sentinel-2 próximas no tempo · revisar antes de divulgar</summary>
+                  <p>As imagens diferem em mais de 50 ha, apesar do intervalo de no máximo três dias. Isso pode refletir erros de classificação, diferenças espectrais, pixels mistos ou outras condições das cenas. <strong>Nenhum registro foi excluído nem considerado correto automaticamente.</strong></p>
+                  <div className="agua-verificacao-cenas__lista">
+                    {alertasInterSensores.map(alerta => (
+                      <div key={alerta.landsatData}>
+                        <span>{formatarData(alerta.landsatData)} · Landsat {formatarNumero(alerta.landsatHa, 2)} ha</span>
+                        <span>{formatarData(alerta.sentinelData)} · Sentinel-2 {formatarNumero(alerta.sentinelHa, 2)} ha</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
               {serieSuperficial.length > 0 ? (
                 <div className="agua-grafico">
                   <ResponsiveContainer width="100%" height="100%">
@@ -749,17 +801,17 @@ export default function AguaObservatorio() {
               <div className="agua-painel__cabecalho">
                 <div><h3>Comparador temporal</h3><p>Compare dois registros e observe a variação da área mapeada; diferenças entre fontes exigem cautela.</p></div>
               </div>
-              {cenas.length >= 2 ? (
+              {cenasFiltradas.length >= 2 ? (
                 <>
                   <div className="agua-comparador-controles agua-no-print">
                     <label>{cenaA?.satelite === 'MapBiomas Água' ? 'Ano A' : 'Data A'}
-                      <select className="agua-seletor" value={cenaAId} onChange={event => setCenaAId(event.target.value)}>
-                        {cenas.map(cena => <option key={cena.id} value={cena.id}>{rotuloCena(cena)} · {cena.satelite}</option>)}
+                      <select className="agua-seletor" value={cenaA?.id || ''} onChange={event => setCenaAId(event.target.value)}>
+                        {cenasFiltradas.map(cena => <option key={cena.id} value={cena.id}>{rotuloCena(cena)} · {cena.satelite}</option>)}
                       </select>
                     </label>
                     <label>{cenaB?.satelite === 'MapBiomas Água' ? 'Ano B' : 'Data B'}
-                      <select className="agua-seletor" value={cenaBId} onChange={event => setCenaBId(event.target.value)}>
-                        {cenas.map(cena => <option key={cena.id} value={cena.id}>{rotuloCena(cena)} · {cena.satelite}</option>)}
+                      <select className="agua-seletor" value={cenaB?.id || ''} onChange={event => setCenaBId(event.target.value)}>
+                        {cenasFiltradas.map(cena => <option key={cena.id} value={cena.id}>{rotuloCena(cena)} · {cena.satelite}</option>)}
                       </select>
                     </label>
                   </div>
@@ -793,7 +845,7 @@ export default function AguaObservatorio() {
                 <div className="agua-vazio agua-vazio--compacto">
                   <FiCalendar />
                   <strong>São necessários pelo menos dois registros</strong>
-                  <p>Após importar ou publicar uma série com dois períodos, a comparação será habilitada automaticamente.</p>
+                  <p>Escolha uma fonte que tenha pelo menos duas cenas ou dois anos registrados. Comparações entre sensores diferentes não são misturadas automaticamente.</p>
                 </div>
               )}
             </section>

@@ -98,6 +98,12 @@ function formatarData(data: string): string {
   return partes[2] + '/' + partes[1] + '/' + partes[0];
 }
 
+function rotuloCena(cena: CenaSuperficie): string {
+  return cena.satelite === 'MapBiomas Água'
+    ? 'Ano ' + cena.data.slice(0, 4)
+    : formatarData(cena.data);
+}
+
 function exportarCSV(cenas: CenaSuperficie[]): void {
   const cabecalho = [
     'data',
@@ -233,6 +239,7 @@ export default function AguaObservatorio() {
       setCenas(anteriores => combinarSeries(anteriores, importadas));
       setSeriePublicada(true);
       setFiltroSatelite('MapBiomas Água');
+      setAgrupamento('anual');
     }).catch(() => {
       // Ainda não há exportação histórica publicada. Nunca inventar área.
     });
@@ -365,6 +372,9 @@ export default function AguaObservatorio() {
       setCenaAId(importadas[0].id);
       setCenaBId(importadas[importadas.length - 1].id);
       setFiltroSatelite(importadas[0].satelite);
+      if (importadas[0].satelite === 'MapBiomas Água') {
+        setAgrupamento('anual');
+      }
       try {
         window.localStorage.setItem(CHAVE_SERIE_LOCAL, conteudo);
         setMensagemImportacao(
@@ -443,7 +453,7 @@ export default function AguaObservatorio() {
 
             <section className="agua-indicadores">
               <Indicador titulo="Capacidade oficial" valor="9,12" unidade="hm³" nota="Ficha técnica da COGERH" tom="azul" />
-              <Indicador titulo="Volume armazenado" valor={formatarNumero(LEITURA_OFICIAL_SAO_JOSE_III.volumeHm3, 2)} unidade="hm³" nota={'COGERH · ' + formatarData(LEITURA_OFICIAL_SAO_JOSE_III.data) + ' (registro datado)'} tom="azul" />
+              <Indicador titulo="Volume armazenado" valor={formatarNumero(LEITURA_OFICIAL_SAO_JOSE_III.volumeHm3, 2)} unidade="hm³" nota={'COGERH · ' + formatarData(LEITURA_OFICIAL_SAO_JOSE_III.data) + ' · ' + formatarNumero(LEITURA_OFICIAL_SAO_JOSE_III.percentual, 2) + '% (histórico)'} tom="azul" />
               <Indicador titulo="Área superficial" valor={formatarNumero(cenaMaisRecente?.areaHa, 2)} unidade="ha" nota={cenaMaisRecente ? cenaMaisRecente.satelite + ' · ' + formatarData(cenaMaisRecente.data) + ' (classificação)' : 'Aguardando série do reservatório'} tom="neutro" />
               <Indicador titulo="Perda por evaporação" valor="—" unidade="m³/dia" nota="Aguardando estimativa validada" tom="laranja" />
             </section>
@@ -618,7 +628,7 @@ export default function AguaObservatorio() {
               <div className="agua-painel__cabecalho agua-painel__cabecalho--quebra">
                 <div>
                   <h3>Evolução da área inundada</h3>
-                  <p>Quando houver mais de uma cena no período, o gráfico utiliza a mediana das áreas observadas.</p>
+                  <p>MapBiomas: área de água mapeada por ano. Sentinel/Landsat: mediana das observações por período.</p>
                 </div>
                 <div className="agua-controles-serie agua-no-print">
                   <select
@@ -687,12 +697,12 @@ export default function AguaObservatorio() {
                   <div className="agua-comparador-controles agua-no-print">
                     <label>Data A
                       <select className="agua-seletor" value={cenaAId} onChange={event => setCenaAId(event.target.value)}>
-                        {cenas.map(cena => <option key={cena.id} value={cena.id}>{formatarData(cena.data)} · {cena.satelite}</option>)}
+                        {cenas.map(cena => <option key={cena.id} value={cena.id}>{rotuloCena(cena)} · {cena.satelite}</option>)}
                       </select>
                     </label>
                     <label>Data B
                       <select className="agua-seletor" value={cenaBId} onChange={event => setCenaBId(event.target.value)}>
-                        {cenas.map(cena => <option key={cena.id} value={cena.id}>{formatarData(cena.data)} · {cena.satelite}</option>)}
+                        {cenas.map(cena => <option key={cena.id} value={cena.id}>{rotuloCena(cena)} · {cena.satelite}</option>)}
                       </select>
                     </label>
                   </div>
@@ -713,7 +723,7 @@ export default function AguaObservatorio() {
                   <div className="agua-comparador-imagens">
                     {[{ cena: cenaA, titulo: 'Data A' }, { cena: cenaB, titulo: 'Data B' }].map(item => (
                       <div className="agua-previa-cena" key={item.titulo}>
-                        <div className="agua-previa-cena__topo"><strong>{item.titulo}</strong><span>{item.cena ? formatarData(item.cena.data) : '—'}</span></div>
+                        <div className="agua-previa-cena__topo"><strong>{item.titulo}</strong><span>{item.cena ? rotuloCena(item.cena) : '—'}</span></div>
                         {item.cena?.previewUrl
                           ? <img src={item.cena.previewUrl} alt={'Prévia da cena ' + item.titulo} />
                           : <div className="agua-previa-sem-imagem"><FiGlobe /><span>Prévia não vinculada a esta cena</span></div>}

@@ -29,6 +29,7 @@ import {
   FiExternalLink,
   FiFileText,
   FiInfo,
+  FiImage,
   FiLayers,
   FiMapPin,
   FiRadio,
@@ -148,6 +149,107 @@ function exportarCSV(cenas: CenaSuperficie[]): void {
   URL.revokeObjectURL(url);
 }
 
+const ROTA_PREVIAS = 'data/agua/previas/';
+
+function linkConsultaCena(cena: CenaSuperficie): string {
+  if (cena.satelite === 'MapBiomas Água') {
+    return 'https://plataforma.brasil.mapbiomas.org/agua';
+  }
+  if (cena.satelite === 'Landsat') {
+    // O catálogo USGS permite localizar a cena pelo ID mostrado na prévia.
+    return 'https://earthexplorer.usgs.gov/';
+  }
+
+  // Abre o Copernicus Browser na data e localização do reservatório.
+  // A cena selecionada no catálogo deve ser conferida pelo identificador.
+  const params = new URLSearchParams({
+    lat: String(RESERVATORIO_PILOTO.latitude),
+    lng: String(RESERVATORIO_PILOTO.longitude),
+    zoom: '13',
+    datasetId: 'S2_L2A_CDAS',
+    fromTime: cena.data + 'T00:00:00.000Z',
+    toTime: cena.data + 'T23:59:59.999Z',
+    dateMode: 'SINGLE'
+  });
+  return 'https://browser.dataspace.copernicus.eu/?' + params.toString();
+}
+
+function PreviaCena({
+  cena,
+  titulo,
+  imagem
+}: {
+  cena: CenaSuperficie | null;
+  titulo: string;
+  imagem: string | null;
+}) {
+  const [falhouImagem, setFalhouImagem] = useState(false);
+
+  useEffect(() => { setFalhouImagem(false); }, [imagem]);
+
+  const mostrarImagem = Boolean(imagem) && !falhouImagem;
+  const descricao = cena?.satelite === 'MapBiomas Água'
+    ? 'Mapa anual de água classificada'
+    : 'Imagem RGB da aquisição · não é o resultado NDWI';
+
+  return (
+    <section className="agua-previa-cena">
+      <div className="agua-previa-cena__topo">
+        <strong>{titulo}</strong>
+        <span>{cena ? rotuloCena(cena) : '—'}</span>
+      </div>
+      {mostrarImagem ? (
+        <figure className="agua-previa-figura">
+          <img
+            src={imagem!}
+            alt={'Imagem de referência da fonte ' + cena?.satelite + ', ' + (cena ? rotuloCena(cena) : titulo)}
+            loading="lazy"
+            onError={() => setFalhouImagem(true)}
+          />
+          <figcaption>{descricao} · verificar nuvens e margens</figcaption>
+        </figure>
+      ) : (
+        <div className="agua-previa-sem-imagem agua-previa-pendente">
+          <FiImage />
+          <strong>Imagem desta {cena?.satelite === 'MapBiomas Água' ? 'classificação anual' : 'aquisição'} ainda não publicada</strong>
+          <span>O valor de área foi processado, mas o recorte visual correspondente ainda precisa ser exportado da fonte original.</span>
+        </div>
+      )}
+      {cena && (
+        <div className="agua-previa-metadados">
+          <div><span>Área classificada</span><strong>{formatarNumero(cena.areaHa, 2)} ha</strong></div>
+          <div><span>Fonte / resolução</span><strong>{cena.satelite} · {cena.resolucaoM ? cena.resolucaoM + ' m' : 'resolução n/i'}</strong></div>
+          {cena.satelite !== 'MapBiomas Água' && (
+            <>
+              <div><span>Cobertura válida (AOI)</span><strong>{cena.coberturaValidaPct === null ? 'n/i' : formatarNumero(cena.coberturaValidaPct, 1) + '%'}</strong></div>
+              <div><span>Nuvens (cena)</span><strong>{cena.nuvensPct === null ? 'n/i' : formatarNumero(cena.nuvensPct, 1) + '%'}</strong></div>
+            </>
+          )}
+          <div className="agua-previa-metadados__id"><span>Identificador</span><code>{cena.cenaId || 'não informado'}</code></div>
+        </div>
+      )}
+      {cena && (
+        <a
+          className="agua-previa-consulta"
+          href={linkConsultaCena(cena)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {cena.satelite === 'MapBiomas Água'
+            ? 'Consultar MapBiomas'
+            : cena.satelite === 'Sentinel-2'
+              ? 'Pesquisar a data no Copernicus Browser'
+              : 'Pesquisar identificador no USGS EarthExplorer'}
+          <FiExternalLink />
+        </a>
+      )}
+      {cena?.satelite === 'MapBiomas Água' && (
+        <small className="agua-previa-nota">Classificação anual, não fotografia de 31/12.</small>
+      )}
+    </section>
+  );
+}
+
 function Indicador({
   titulo,
   valor,
@@ -203,6 +305,7 @@ export default function AguaObservatorio() {
 
   const [cenas, setCenas] = useState<CenaSuperficie[]>([]);
   const [seriePublicada, setSeriePublicada] = useState(false);
+  const [imagensPublicadas, setImagensPublicadas] = useState<Record<string, string>>({});
   const [mensagemImportacao, setMensagemImportacao] = useState<string | null>(null);
   const [cenaAId, setCenaAId] = useState('');
   const [cenaBId, setCenaBId] = useState('');
@@ -229,6 +332,28 @@ export default function AguaObservatorio() {
     }
 
     const base = import.meta.env.BASE_URL;
+
+    // Somente usa imagens realmente publicadas; sem fundos ou datas fictícios.
+    void fetch(base + 'data/cuidai-agua-sao-jose-iii-previas.json', {
+      cache: 'no-store'
+    }).then(async resposta => {
+      if (!resposta.ok) return null;
+      return resposta.json() as Promise<unknown>;
+    }).then(resposta => {
+      if (!ativo || !resposta || typeof resposta !== 'object' || !('previews' in resposta)) return;
+      const mapa = (resposta as { previews?: unknown }).previews;
+      if (!mapa || typeof mapa !== 'object' || Array.isArray(mapa)) return;
+      const validas: Record<string, string> = {};
+      for (const [id, arquivo] of Object.entries(mapa)) {
+        if (typeof arquivo === 'string' && /^data\/agua\/previas\/[a-zA-Z0-9_.-]+\.webp$/.test(arquivo)) {
+          validas[id] = base + arquivo;
+        }
+      }
+      setImagensPublicadas(validas);
+    }).catch(() => {
+      // Ausência de prévias não afeta os cálculos nem as séries.
+    });
+
     const url = base + CSV_MAPBIOMAS_PUBLICADO;
     void fetch(url, { cache: 'no-store' }).then(async resposta => {
       if (!resposta.ok) return null;
@@ -867,14 +992,15 @@ export default function AguaObservatorio() {
                     <div className="agua-mensagem-erro"><FiAlertCircle /> Uma das cenas tem menos de 80% de cobertura válida sobre a área de estudo. Revise a máscara de nuvens e a qualidade antes de usar o resultado.</div>
                   ) : null}
                   <div className="agua-comparador-imagens">
-                    {[{ cena: cenaA, titulo: 'Data A' }, { cena: cenaB, titulo: 'Data B' }].map(item => (
-                      <div className="agua-previa-cena" key={item.titulo}>
-                        <div className="agua-previa-cena__topo"><strong>{item.titulo}</strong><span>{item.cena ? rotuloCena(item.cena) : '—'}</span></div>
-                        {item.cena?.previewUrl
-                          ? <img src={item.cena.previewUrl} alt={'Prévia da cena ' + item.titulo} />
-                          : <div className="agua-previa-sem-imagem"><FiGlobe /><span>Prévia não vinculada a esta cena</span></div>}
-                        <small>{item.cena ? item.cena.satelite + ' · ' + formatarNumero(item.cena.areaHa, 2) + ' ha · ' + (item.cena.resolucaoM ? item.cena.resolucaoM + ' m' : 'resolução n/i') + (item.cena.satelite === 'MapBiomas Água' ? ' · classe anual de água; cobertura de observação não estimada' : ' · cobertura válida ' + (item.cena.coberturaValidaPct === null ? 'n/i' : formatarNumero(item.cena.coberturaValidaPct, 0) + '%')) + ' · nuvens ' + (item.cena.nuvensPct === null ? 'n/i' : formatarNumero(item.cena.nuvensPct, 0) + '%') + ' · NDWI ' + (item.cena.limiarNdwi === null ? 'n/i' : formatarNumero(item.cena.limiarNdwi, 2)) : 'Selecione uma cena'}</small>
-                      </div>
+                    {[{ cena: cenaA, titulo: 'Período A' }, { cena: cenaB, titulo: 'Período B' }].map(item => (
+                      <PreviaCena
+                        key={item.titulo}
+                        titulo={item.titulo}
+                        cena={item.cena}
+                        imagem={item.cena
+                          ? imagensPublicadas[item.cena.cenaId || ''] || item.cena.previewUrl
+                          : null}
+                      />
                     ))}
                   </div>
                 </>

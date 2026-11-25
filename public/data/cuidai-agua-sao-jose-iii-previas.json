@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "note": "Previews somente quando exportadas do Earth Engine e verificadas; chaves scene_id ou classification_ANO.",
+  "previews": {}
+}

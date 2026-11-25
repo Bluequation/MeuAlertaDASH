@@ -238,6 +238,8 @@ export default function AguaObservatorio() {
       if (!ativo || !importadas?.length) return;
       setCenas(anteriores => combinarSeries(anteriores, importadas));
       setSeriePublicada(true);
+      setCenaAId(anterior => anterior || importadas[0].id);
+      setCenaBId(anterior => anterior || importadas[importadas.length - 1].id);
       setFiltroSatelite('MapBiomas Água');
       setAgrupamento('anual');
     }).catch(() => {
@@ -454,7 +456,7 @@ export default function AguaObservatorio() {
             <section className="agua-indicadores">
               <Indicador titulo="Capacidade oficial" valor="9,12" unidade="hm³" nota="Ficha técnica da COGERH" tom="azul" />
               <Indicador titulo="Volume armazenado" valor={formatarNumero(LEITURA_OFICIAL_SAO_JOSE_III.volumeHm3, 2)} unidade="hm³" nota={'COGERH · ' + formatarData(LEITURA_OFICIAL_SAO_JOSE_III.data) + ' · ' + formatarNumero(LEITURA_OFICIAL_SAO_JOSE_III.percentual, 2) + '% (histórico)'} tom="azul" />
-              <Indicador titulo="Área superficial" valor={formatarNumero(cenaMaisRecente?.areaHa, 2)} unidade="ha" nota={cenaMaisRecente ? cenaMaisRecente.satelite + ' · ' + formatarData(cenaMaisRecente.data) + ' (classificação)' : 'Aguardando série do reservatório'} tom="neutro" />
+              <Indicador titulo="Área superficial" valor={formatarNumero(cenaMaisRecente?.areaHa, 2)} unidade="ha" nota={cenaMaisRecente ? (cenaMaisRecente.satelite === 'MapBiomas Água' ? 'MapBiomas Água · ano ' + cenaMaisRecente.data.slice(0, 4) + ' · classe anual (não é data de imagem)' : cenaMaisRecente.satelite + ' · ' + formatarData(cenaMaisRecente.data) + ' (classificação)') : 'Aguardando série do reservatório'} tom="neutro" />
               <Indicador titulo="Perda por evaporação" valor="—" unidade="m³/dia" nota="Aguardando estimativa validada" tom="laranja" />
             </section>
 
@@ -522,14 +524,14 @@ export default function AguaObservatorio() {
                     <span className="agua-fonte-icone"><FiGlobe /></span>
                     <div><strong>Sentinel-2 / Landsat</strong><small>Área superficial por cena processada e validada</small></div>
                     <span className="agua-status agua-status--pendente">
-                      {cenas.length ? cenas.length + ' cenas' : 'Aguardando'}
+                      {cenas.filter(c => c.satelite === 'Sentinel-2' || c.satelite === 'Landsat').length ? cenas.filter(c => c.satelite === 'Sentinel-2' || c.satelite === 'Landsat').length + ' cenas' : 'Aguardando'}
                     </span>
                   </div>
                   <div className="agua-fonte-linha">
                     <span className="agua-fonte-icone agua-fonte-icone--ok"><FiDatabase /></span>
-                    <div><strong>MapBiomas Água · Coleção 5</strong><small>Acervo de 1985–2025; recorte do açude em preparação</small></div>
+                    <div><strong>MapBiomas Água · Coleção 5</strong><small>Série do São José III · 1985–2025 · 30 m</small></div>
                     <span className={'agua-status ' + (cenas.some(c => c.satelite === 'MapBiomas Água') ? 'agua-status--ok' : 'agua-status--pendente')}>
-                      {cenas.some(c => c.satelite === 'MapBiomas Água') ? 'Série carregada' : 'Sem recorte'}
+                      {cenas.some(c => c.satelite === 'MapBiomas Água') ? 'Série carregada' : 'Sem série'}
                     </span>
                   </div>
                   <div className="agua-fonte-linha">
@@ -618,7 +620,7 @@ export default function AguaObservatorio() {
               <div><FiLayers /><span><strong>Landsat 8/9</strong><small>Complemento histórico · resolução de 30 m nas bandas usadas no NDWI</small></span></div>
               <div><FiDatabase /><span><strong>MapBiomas Água · Coleção 5</strong><small>Classificação anual 1985–2025 · 30 m · fonte pública</small></span></div>
             </div>
-            <p className="agua-nota-serie">As séries são filtradas por fonte. O MapBiomas representa a água mapeada em cada ano, não uma fotografia de 31/12. Não misturamos automaticamente a classificação anual com as cenas individuais Sentinel-2 e Landsat. <a href="https://brasil.mapbiomas.org/downloads/assets-no-google-earth-engine/" target="_blank" rel="noreferrer">Fonte MapBiomas <FiExternalLink /></a>{seriePublicada ? ' · Série publicada carregada automaticamente.' : ''}</p>
+            <p className="agua-nota-serie">As séries são filtradas por fonte. O MapBiomas Água · Coleção 5 classifica a água ao longo do ano (1985–2025, 30 m); na Caatinga, a classe anual considera água detectada em pelo menos seis meses. A área exibida é a classe 1 dentro do polígono original de 411 vértices. Pixels sem água mapeada não confirmam que o açude estava seco, e um polígono justo pode excluir áreas inundadas historicamente. A data 31/12 identifica o ano de referência, não uma fotografia daquele dia; a série não estima volume ou cota. Cenas Sentinel-2/Landsat permanecem separadas. <a href="https://brasil.mapbiomas.org/iniciativas-e-produtos/agua/mapeamento-anual/superficie-de-agua-anual/" target="_blank" rel="noreferrer">Método e fonte MapBiomas <FiExternalLink /></a>{seriePublicada ? ' · Série processada carregada automaticamente.' : ''}</p>
 
             {mensagemImportacao && (
               <div className="agua-mensagem-importacao"><FiInfo /> {mensagemImportacao}</div>
@@ -627,14 +629,18 @@ export default function AguaObservatorio() {
             <section className="agua-painel">
               <div className="agua-painel__cabecalho agua-painel__cabecalho--quebra">
                 <div>
-                  <h3>Evolução da área inundada</h3>
+                  <h3>Evolução da superfície de água</h3>
                   <p>MapBiomas: área de água mapeada por ano. Sentinel/Landsat: mediana das observações por período.</p>
                 </div>
                 <div className="agua-controles-serie agua-no-print">
                   <select
                     className="agua-seletor"
                     value={filtroSatelite}
-                    onChange={event => setFiltroSatelite(event.target.value as FiltroSatelite)}
+                    onChange={event => {
+                      const fonte = event.target.value as FiltroSatelite;
+                      setFiltroSatelite(fonte);
+                      if (fonte === 'MapBiomas Água') setAgrupamento('anual');
+                    }}
                     aria-label="Fonte da série"
                   >
                     <option value="Sentinel-2">Sentinel-2 · principal</option>
@@ -647,9 +653,9 @@ export default function AguaObservatorio() {
                   onChange={event => setAgrupamento(event.target.value as AgrupamentoSerie)}
                   aria-label="Agrupamento da série"
                 >
-                  <option value="diario">Diário · por aquisição</option>
-                  <option value="mensal">Mensal · mediana</option>
-                    <option value="anual">Anual · mediana</option>
+                  {filtroSatelite !== 'MapBiomas Água' && <option value="diario">Diário · por aquisição</option>}
+                  {filtroSatelite !== 'MapBiomas Água' && <option value="mensal">Mensal · mediana</option>}
+                    <option value="anual">{filtroSatelite === 'MapBiomas Água' ? 'Anual · classificação' : 'Anual · mediana'}</option>
                   </select>
                 </div>
               </div>
@@ -678,8 +684,8 @@ export default function AguaObservatorio() {
               ) : (
                 <div className="agua-vazio">
                   <FiGlobe />
-                  <strong>Nenhuma cena processada cadastrada</strong>
-                  <p>O acervo MapBiomas está disponível, mas a área histórica específica do São José III ainda precisa ser recortada. O painel carregará automaticamente a série assim que o CSV processado for publicado. <a href="https://plataforma.mapbiomas.org/water/" target="_blank" rel="noreferrer">Explorar o acervo oficial <FiExternalLink /></a></p>
+                  <strong>Nenhuma série de superfície carregada</strong>
+                  <p>A série processada do São José III ainda não foi carregada nesta sessão. O painel busca automaticamente o CSV publicado junto com a aplicação. <a href="https://plataforma.mapbiomas.org/water/" target="_blank" rel="noreferrer">Explorar o acervo oficial <FiExternalLink /></a></p>
                 </div>
               )}
               <div className="agua-rodape-grafico">
@@ -690,17 +696,17 @@ export default function AguaObservatorio() {
 
             <section className="agua-painel">
               <div className="agua-painel__cabecalho">
-                <div><h3>Comparador temporal</h3><p>Compare duas aquisições e veja a variação observada da superfície.</p></div>
+                <div><h3>Comparador temporal</h3><p>Compare dois registros e observe a variação da área mapeada; diferenças entre fontes exigem cautela.</p></div>
               </div>
               {cenas.length >= 2 ? (
                 <>
                   <div className="agua-comparador-controles agua-no-print">
-                    <label>Data A
+                    <label>{cenaA?.satelite === 'MapBiomas Água' ? 'Ano A' : 'Data A'}
                       <select className="agua-seletor" value={cenaAId} onChange={event => setCenaAId(event.target.value)}>
                         {cenas.map(cena => <option key={cena.id} value={cena.id}>{rotuloCena(cena)} · {cena.satelite}</option>)}
                       </select>
                     </label>
-                    <label>Data B
+                    <label>{cenaB?.satelite === 'MapBiomas Água' ? 'Ano B' : 'Data B'}
                       <select className="agua-seletor" value={cenaBId} onChange={event => setCenaBId(event.target.value)}>
                         {cenas.map(cena => <option key={cena.id} value={cena.id}>{rotuloCena(cena)} · {cena.satelite}</option>)}
                       </select>
@@ -709,7 +715,7 @@ export default function AguaObservatorio() {
                   <div className="agua-comparador-resultados">
                     <div><span>Área na data A</span><strong>{cenaA ? formatarNumero(cenaA.areaHa, 2) + ' ha' : '—'}</strong></div>
                     <div><span>Área na data B</span><strong>{cenaB ? formatarNumero(cenaB.areaHa, 2) + ' ha' : '—'}</strong></div>
-                    <div><span>Variação observada</span><strong className={diferencaArea !== null && diferencaArea < 0 ? 'agua-valor-negativo' : 'agua-valor-positivo'}>{diferencaArea === null ? '—' : (diferencaArea > 0 ? '+' : '') + formatarNumero(diferencaArea, 2) + ' ha'}</strong></div>
+                    <div><span>Variação da área mapeada</span><strong className={diferencaArea !== null && diferencaArea < 0 ? 'agua-valor-negativo' : 'agua-valor-positivo'}>{diferencaArea === null ? '—' : (diferencaArea > 0 ? '+' : '') + formatarNumero(diferencaArea, 2) + ' ha'}</strong></div>
                     <div><span>Variação percentual</span><strong>{variacaoPercentual === null ? '—' : (variacaoPercentual > 0 ? '+' : '') + formatarNumero(variacaoPercentual, 1) + '%'}</strong></div>
                   </div>
                   {cenaA && cenaB && cenaA.satelite !== cenaB.satelite && (
@@ -727,7 +733,7 @@ export default function AguaObservatorio() {
                         {item.cena?.previewUrl
                           ? <img src={item.cena.previewUrl} alt={'Prévia da cena ' + item.titulo} />
                           : <div className="agua-previa-sem-imagem"><FiGlobe /><span>Prévia não vinculada a esta cena</span></div>}
-                        <small>{item.cena ? item.cena.satelite + ' · ' + formatarNumero(item.cena.areaHa, 2) + ' ha · ' + (item.cena.resolucaoM ? item.cena.resolucaoM + ' m' : 'resolução n/i') + ' · cobertura válida ' + (item.cena.coberturaValidaPct === null ? 'n/i' : formatarNumero(item.cena.coberturaValidaPct, 0) + '%') + ' · nuvens ' + (item.cena.nuvensPct === null ? 'n/i' : formatarNumero(item.cena.nuvensPct, 0) + '%') + ' · NDWI ' + (item.cena.limiarNdwi === null ? 'n/i' : formatarNumero(item.cena.limiarNdwi, 2)) : 'Selecione uma cena'}</small>
+                        <small>{item.cena ? item.cena.satelite + ' · ' + formatarNumero(item.cena.areaHa, 2) + ' ha · ' + (item.cena.resolucaoM ? item.cena.resolucaoM + ' m' : 'resolução n/i') + (item.cena.satelite === 'MapBiomas Água' ? ' · classe anual de água; cobertura de observação não estimada' : ' · cobertura válida ' + (item.cena.coberturaValidaPct === null ? 'n/i' : formatarNumero(item.cena.coberturaValidaPct, 0) + '%')) + ' · nuvens ' + (item.cena.nuvensPct === null ? 'n/i' : formatarNumero(item.cena.nuvensPct, 0) + '%') + ' · NDWI ' + (item.cena.limiarNdwi === null ? 'n/i' : formatarNumero(item.cena.limiarNdwi, 2)) : 'Selecione uma cena'}</small>
                       </div>
                     ))}
                   </div>
@@ -882,14 +888,14 @@ export default function AguaObservatorio() {
               <article className="agua-painel agua-relatorio-card">
                 <span className="agua-relatorio-icone"><FiDatabase /></span>
                 <h3>Série de área superficial</h3>
-                <p>Exporta os registros carregados, com data, área, fonte, cobertura conhecida e identificação. Para o MapBiomas, a data é o fim do ano de referência, não a data da imagem.</p>
+                <p>Exporta os registros carregados, com data, área, fonte e identificação. Para o MapBiomas, a data marca o ano de referência, não uma cena de 31/12; a área corresponde à classe anual de água mapeada.</p>
                 <button
                   className="agua-botao agua-botao--secundario agua-no-print"
                   onClick={() => cenas.length ? exportarCSV(cenas) : window.alert('Importe primeiro uma série de cenas processadas.')}
                 >
                   <FiDownload /> Exportar CSV
                 </button>
-                <small>{cenas.length} cenas disponíveis nesta sessão</small>
+                <small>{cenas.length} registros disponíveis</small>
               </article>
             </section>
 

@@ -243,7 +243,21 @@ export default function AguaObservatorio() {
       setFiltroSatelite('MapBiomas Água');
       setAgrupamento('anual');
     }).catch(() => {
-      // Ainda não há exportação histórica publicada. Nunca inventar área.
+      // Se não houver série anual publicada, não gerar dados fictícios.
+    });
+
+    // A rotina 05 do Earth Engine produz um CSV com as duas fontes por cena.
+    // Quando publicado, Sentinel-2 e Landsat são carregados sem upload manual.
+    void fetch(base + 'data/cuidai-agua-sao-jose-iii-cenas-2023-2026.csv', {
+      cache: 'no-store'
+    }).then(async resposta => {
+      if (!resposta.ok) return null;
+      return importarSerieSuperficie(await resposta.text());
+    }).then(importadas => {
+      if (!ativo || !importadas?.length) return;
+      setCenas(anteriores => combinarSeries(anteriores, importadas));
+    }).catch(() => {
+      // CSV por cena ainda não publicado: seletores explicam a ausência dos dados.
     });
 
     return () => { ativo = false; };

@@ -46,6 +46,7 @@ import {
   consultarMeteorologiaReservatorio,
   type RespostaOpenMeteo
 } from './aguaMeteorologia';
+import { LEITURA_OFICIAL_SAO_JOSE_III } from './aguaOficial';
 import 'leaflet/dist/leaflet.css';
 import './agua.css';
 
@@ -58,7 +59,7 @@ type AbaAgua =
   | 'relatorios';
 
 type AgrupamentoSerie = 'diario' | 'mensal' | 'anual';
-type FiltroSatelite = 'Sentinel-2' | 'Landsat';
+type FiltroSatelite = 'Sentinel-2' | 'Landsat' | 'MapBiomas Água';
 
 const ABAS: { id: AbaAgua; nome: string; icone: ReactNode }[] = [
   { id: 'visao', nome: 'Visão geral', icone: <FiActivity /> },
@@ -68,6 +69,20 @@ const ABAS: { id: AbaAgua; nome: string; icone: ReactNode }[] = [
   { id: 'meteorologia', nome: 'Meteorologia', icone: <FiCloud /> },
   { id: 'relatorios', nome: 'Relatórios', icone: <FiFileText /> }
 ];
+
+// O painel lê automaticamente uma série oficial processada, quando publicada.
+ // Importações locais são preservadas no navegador para não refazer o trabalho.
+const CHAVE_SERIE_LOCAL = 'cuidai:agua:sao-jose-iii:serie:v1';
+const CSV_MAPBIOMAS_PUBLICADO = 'data/cuidai-agua-sao-jose-iii-mapbiomas.csv';
+
+function combinarSeries(atual: CenaSuperficie[], entrada: CenaSuperficie[]): CenaSuperficie[] {
+  const porChave = new Map<string, CenaSuperficie>();
+  for (const cena of [...atual, ...entrada]) {
+    const chave = [cena.satelite, cena.data, cena.cenaId || cena.id].join('|');
+    porChave.set(chave, cena);
+  }
+  return [...porChave.values()].sort((a, b) => a.data.localeCompare(b.data));
+}
 
 function formatarNumero(valor: number | null | undefined, casas = 1): string {
   if (valor === null || valor === undefined || !Number.isFinite(valor)) return '—';
@@ -181,6 +196,7 @@ export default function AguaObservatorio() {
   const [solicitarAtualizacao, setSolicitarAtualizacao] = useState(0);
 
   const [cenas, setCenas] = useState<CenaSuperficie[]>([]);
+  const [seriePublicada, setSeriePublicada] = useState(false);
   const [mensagemImportacao, setMensagemImportacao] = useState<string | null>(null);
   const [cenaAId, setCenaAId] = useState('');
   const [cenaBId, setCenaBId] = useState('');
@@ -190,6 +206,39 @@ export default function AguaObservatorio() {
   const [areaHa, setAreaHa] = useState('');
   const [evaporacaoMm, setEvaporacaoMm] = useState('');
   const [dias, setDias] = useState('1');
+
+  useEffect(() => {
+    let ativo = true;
+
+    try {
+      const salvo = window.localStorage.getItem(CHAVE_SERIE_LOCAL);
+      if (salvo) {
+        const seriesSalvas = importarSerieSuperficie(salvo);
+        setCenas(seriesSalvas);
+        setFiltroSatelite(seriesSalvas[0].satelite);
+        setMensagemImportacao('Série anterior recuperada deste navegador.');
+      }
+    } catch {
+      // Navegadores podem bloquear localStorage. A página continua funcional.
+    }
+
+    const base = import.meta.env.BASE_URL;
+    const url = base + CSV_MAPBIOMAS_PUBLICADO;
+    void fetch(url, { cache: 'no-store' }).then(async resposta => {
+      if (!resposta.ok) return null;
+      const conteudo = await resposta.text();
+      return importarSerieSuperficie(conteudo);
+    }).then(importadas => {
+      if (!ativo || !importadas?.length) return;
+      setCenas(anteriores => combinarSeries(anteriores, importadas));
+      setSeriePublicada(true);
+      setFiltroSatelite('MapBiomas Água');
+    }).catch(() => {
+      // Ainda não há exportação histórica publicada. Nunca inventar área.
+    });
+
+    return () => { ativo = false; };
+  }, []);
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -282,6 +331,10 @@ export default function AguaObservatorio() {
       });
   }, [cenasFiltradas, agrupamento]);
 
+  const cenaMaisRecente = cenas.length
+    ? [...cenas].sort((a, b) => b.data.localeCompare(a.data))[0]
+    : null;
+
   const cenaA = cenas.find(cena => cena.id === cenaAId) || null;
   const cenaB = cenas.find(cena => cena.id === cenaBId) || null;
   const diferencaArea = cenaA && cenaB
@@ -308,15 +361,25 @@ export default function AguaObservatorio() {
     try {
       const conteudo = await arquivo.text();
       const importadas = importarSerieSuperficie(conteudo);
-      setCenas(importadas);
+      setCenas(anteriores => combinarSeries(anteriores, importadas));
       setCenaAId(importadas[0].id);
       setCenaBId(importadas[importadas.length - 1].id);
-      setMensagemImportacao(
-        importadas.length + ' cenas importadas. Revise as datas, nuvens e fonte antes de usar nos relatórios.'
-      );
+      setFiltroSatelite(importadas[0].satelite);
+      try {
+        window.localStorage.setItem(CHAVE_SERIE_LOCAL, conteudo);
+        setMensagemImportacao(
+          importadas.length + ' registros importados e preservados neste navegador. Confira a fonte e a geometria.'
+        );
+      } catch {
+        setMensagemImportacao(
+          importadas.length + ' registros importados nesta sessão. O navegador não permitiu a persistência local.'
+        );
+      }
 
       const ultima = importadas[importadas.length - 1];
-      setAreaHa(String(ultima.areaHa).replace('.', ','));
+      if (ultima.satelite !== 'MapBiomas Água') {
+        setAreaHa(String(ultima.areaHa).replace('.', ','));
+      }
     } catch (erro) {
       setMensagemImportacao(
         erro instanceof Error ? erro.message : 'Não foi possível interpretar o arquivo.'
@@ -380,8 +443,8 @@ export default function AguaObservatorio() {
 
             <section className="agua-indicadores">
               <Indicador titulo="Capacidade oficial" valor="9,12" unidade="hm³" nota="Ficha técnica da COGERH" tom="azul" />
-              <Indicador titulo="Volume armazenado" valor="—" unidade="hm³" nota="Aguardando leitura oficial integrada" tom="neutro" />
-              <Indicador titulo="Área superficial" valor="—" unidade="ha" nota="Aguardando cena satelital processada" tom="neutro" />
+              <Indicador titulo="Volume armazenado" valor={formatarNumero(LEITURA_OFICIAL_SAO_JOSE_III.volumeHm3, 2)} unidade="hm³" nota={'COGERH · ' + formatarData(LEITURA_OFICIAL_SAO_JOSE_III.data) + ' (registro datado)'} tom="azul" />
+              <Indicador titulo="Área superficial" valor={formatarNumero(cenaMaisRecente?.areaHa, 2)} unidade="ha" nota={cenaMaisRecente ? cenaMaisRecente.satelite + ' · ' + formatarData(cenaMaisRecente.data) + ' (classificação)' : 'Aguardando série do reservatório'} tom="neutro" />
               <Indicador titulo="Perda por evaporação" valor="—" unidade="m³/dia" nota="Aguardando estimativa validada" tom="laranja" />
             </section>
 
@@ -435,7 +498,7 @@ export default function AguaObservatorio() {
                 <div className="agua-lista-fontes">
                   <div className="agua-fonte-linha">
                     <span className="agua-fonte-icone agua-fonte-icone--ok"><FiCheckCircle /></span>
-                    <div><strong>Cadastro COGERH</strong><small>Capacidade e características técnicas</small></div>
+                    <div><strong>COGERH · cadastro e volume</strong><small>Ficha técnica e boletim de 24/11/2026; não é leitura ao vivo</small></div>
                     <span className="agua-status agua-status--ok">Disponível</span>
                   </div>
                   <div className="agua-fonte-linha">
@@ -447,9 +510,16 @@ export default function AguaObservatorio() {
                   </div>
                   <div className="agua-fonte-linha">
                     <span className="agua-fonte-icone"><FiGlobe /></span>
-                    <div><strong>Sentinel-2 / Landsat</strong><small>Área superficial por cena válida</small></div>
+                    <div><strong>Sentinel-2 / Landsat</strong><small>Área superficial por cena processada e validada</small></div>
                     <span className="agua-status agua-status--pendente">
                       {cenas.length ? cenas.length + ' cenas' : 'Aguardando'}
+                    </span>
+                  </div>
+                  <div className="agua-fonte-linha">
+                    <span className="agua-fonte-icone agua-fonte-icone--ok"><FiDatabase /></span>
+                    <div><strong>MapBiomas Água · Coleção 5</strong><small>Acervo de 1985–2025; recorte do açude em preparação</small></div>
+                    <span className={'agua-status ' + (cenas.some(c => c.satelite === 'MapBiomas Água') ? 'agua-status--ok' : 'agua-status--pendente')}>
+                      {cenas.some(c => c.satelite === 'MapBiomas Água') ? 'Série carregada' : 'Sem recorte'}
                     </span>
                   </div>
                   <div className="agua-fonte-linha">
@@ -460,7 +530,7 @@ export default function AguaObservatorio() {
                 </div>
                 <div className="agua-aviso">
                   <FiAlertCircle />
-                  <p>Os indicadores sem valor ainda não possuem medição ou série processada. O painel não substitui ausência de dados por valores simulados.</p>
+                  <p>O volume acima é uma leitura oficial histórica, não o valor em tempo real. Indicadores sem valor permanecem indisponíveis até haver análise validada. <a href={LEITURA_OFICIAL_SAO_JOSE_III.pagina} target="_blank" rel="noreferrer">Consultar situação atual na COGERH <FiExternalLink /></a></p>
                 </div>
               </article>
             </section>
@@ -493,6 +563,12 @@ export default function AguaObservatorio() {
                 <div><span>Longitude de referência</span><strong>-40,7703</strong></div>
               </div>
             </section>
+            <div className="agua-nota-fonte">
+              <FiDatabase />
+              <p>Registro oficial de {formatarData(LEITURA_OFICIAL_SAO_JOSE_III.data)}: cota {formatarNumero(LEITURA_OFICIAL_SAO_JOSE_III.cotaM, 2)} m; volume {formatarNumero(LEITURA_OFICIAL_SAO_JOSE_III.volumeHm3, 2)} hm³; {formatarNumero(LEITURA_OFICIAL_SAO_JOSE_III.percentual, 2)}% da capacidade de referência. Fotografia histórica do boletim, não atualização em tempo real.</p>
+              <a href={LEITURA_OFICIAL_SAO_JOSE_III.pagina} target="_blank" rel="noreferrer">Abrir boletim COGERH <FiExternalLink /></a>
+            </div>
+
             <div className="agua-nota-fonte">
               <FiInfo />
               <p>As coordenadas são de referência do posto do reservatório no documento de planejamento hídrico. A delimitação precisa do espelho d’água será validada com cartografia e imagens de satélite.</p>
@@ -530,8 +606,9 @@ export default function AguaObservatorio() {
             <div className="agua-satelite-fontes">
               <div><FiGlobe /><span><strong>Sentinel-2</strong><small>Fonte principal · resolução de 10 m nas bandas usadas no NDWI</small></span></div>
               <div><FiLayers /><span><strong>Landsat 8/9</strong><small>Complemento histórico · resolução de 30 m nas bandas usadas no NDWI</small></span></div>
+              <div><FiDatabase /><span><strong>MapBiomas Água · Coleção 5</strong><small>Classificação anual 1985–2025 · 30 m · fonte pública</small></span></div>
             </div>
-            <p className="agua-nota-serie">As séries são filtradas por sensor. Não misturamos automaticamente as áreas Sentinel-2 e Landsat porque as resoluções e respostas espectrais são diferentes.</p>
+            <p className="agua-nota-serie">As séries são filtradas por fonte. O MapBiomas representa a água mapeada em cada ano, não uma fotografia de 31/12. Não misturamos automaticamente a classificação anual com as cenas individuais Sentinel-2 e Landsat. <a href="https://brasil.mapbiomas.org/downloads/assets-no-google-earth-engine/" target="_blank" rel="noreferrer">Fonte MapBiomas <FiExternalLink /></a>{seriePublicada ? ' · Série publicada carregada automaticamente.' : ''}</p>
 
             {mensagemImportacao && (
               <div className="agua-mensagem-importacao"><FiInfo /> {mensagemImportacao}</div>
@@ -551,7 +628,8 @@ export default function AguaObservatorio() {
                     aria-label="Fonte da série"
                   >
                     <option value="Sentinel-2">Sentinel-2 · principal</option>
-                    <option value="Landsat">Landsat · histórico</option>
+                    <option value="Landsat">Landsat · por cena</option>
+                     <option value="MapBiomas Água">MapBiomas Água · anual 1985–2025</option>
                   </select>
                   <select
                     className="agua-seletor"
@@ -591,11 +669,11 @@ export default function AguaObservatorio() {
                 <div className="agua-vazio">
                   <FiGlobe />
                   <strong>Nenhuma cena processada cadastrada</strong>
-                  <p>Exporte a tabela de aquisições pelo fluxo de processamento do Google Earth Engine e importe o CSV aqui. Nenhuma área será inventada para preencher o gráfico.</p>
+                  <p>O acervo MapBiomas está disponível, mas a área histórica específica do São José III ainda precisa ser recortada. O painel carregará automaticamente a série assim que o CSV processado for publicado. <a href="https://plataforma.mapbiomas.org/water/" target="_blank" rel="noreferrer">Explorar o acervo oficial <FiExternalLink /></a></p>
                 </div>
               )}
               <div className="agua-rodape-grafico">
-                <span>{cenasFiltradas.length} cenas {filtroSatelite} · {cenas.length} no total nesta sessão</span>
+                <span>{cenasFiltradas.length} registros · {filtroSatelite} · {cenas.length} no total</span>
                 <span>Unidade: hectares (ha)</span>
               </div>
             </section>
@@ -647,8 +725,8 @@ export default function AguaObservatorio() {
               ) : (
                 <div className="agua-vazio agua-vazio--compacto">
                   <FiCalendar />
-                  <strong>São necessárias pelo menos duas cenas</strong>
-                  <p>Importe um CSV com duas ou mais datas válidas para habilitar a comparação.</p>
+                  <strong>São necessários pelo menos dois registros</strong>
+                  <p>Após importar ou publicar uma série com dois períodos, a comparação será habilitada automaticamente.</p>
                 </div>
               )}
             </section>
@@ -794,7 +872,7 @@ export default function AguaObservatorio() {
               <article className="agua-painel agua-relatorio-card">
                 <span className="agua-relatorio-icone"><FiDatabase /></span>
                 <h3>Série de área superficial</h3>
-                <p>Exporta as cenas importadas, com data, área, satélite, cobertura de nuvens e identificador da cena.</p>
+                <p>Exporta os registros carregados, com data, área, fonte, cobertura conhecida e identificação. Para o MapBiomas, a data é o fim do ano de referência, não a data da imagem.</p>
                 <button
                   className="agua-botao agua-botao--secundario agua-no-print"
                   onClick={() => cenas.length ? exportarCSV(cenas) : window.alert('Importe primeiro uma série de cenas processadas.')}

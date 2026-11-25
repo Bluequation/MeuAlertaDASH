@@ -79,7 +79,7 @@
 .agua-nota-fonte--atencao { background: #FFF7EC; color: #86663C; }
 .agua-nota-fonte--atencao svg { color: #C58B3D; }
 .agua-nota-fonte--atencao a { color: #A36B27; }
-.agua-satelite-fontes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.agua-satelite-fontes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .agua-satelite-fontes > div { display: flex; align-items: center; gap: 11px; padding: 12px 14px; background: #F3F8FB; border: 1px solid #E6EFF5; border-radius: 12px; color: #168FC4; }
 .agua-satelite-fontes svg { font-size: 19px; flex: 0 0 auto; }
 .agua-satelite-fontes strong, .agua-satelite-fontes small { display: block; }
@@ -186,6 +186,7 @@
 .agua-rodape { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 13px; border-top: 1px solid #E5EDF3; color: #9AA8B5; font-size: 9px; }
 
 @media (max-width: 1050px) {
+  .agua-satelite-fontes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .agua-indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .agua-grade-visao { grid-template-columns: 1fr; }
   .agua-ficha-grade, .agua-evaporacao-grade { grid-template-columns: 1fr; }

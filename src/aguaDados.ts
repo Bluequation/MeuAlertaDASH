@@ -18,7 +18,7 @@ export type CenaSuperficie = {
   id: string;
   data: string;
   areaHa: number;
-  satelite: 'Sentinel-2' | 'Landsat';
+  satelite: 'Sentinel-2' | 'Landsat' | 'MapBiomas Água';
   nuvensPct: number | null;
   coberturaValidaPct: number | null;
   limiarNdwi: number | null;
@@ -170,7 +170,9 @@ export function importarSerieSuperficie(conteudo: string): CenaSuperficie[] {
     ]) || 'Sentinel-2').toLowerCase();
 
     const satelite: CenaSuperficie['satelite'] =
-      sateliteBruto.includes('landsat') ? 'Landsat' : 'Sentinel-2';
+      sateliteBruto.includes('mapbiomas') ? 'MapBiomas Água'
+        : sateliteBruto.includes('landsat') ? 'Landsat'
+        : 'Sentinel-2';
 
     const nuvensPct = numeroCSV(obterCampo(colunas, indices, [
       'cloud_pct', 'nuvens_pct', 'cloud_cover', 'nuvens'

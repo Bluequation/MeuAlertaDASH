@@ -348,6 +348,11 @@ export default function AguaObservatorio() {
 
         return {
           periodo,
+          instante: Date.parse(
+            (agrupamento === 'diario' ? periodo
+              : agrupamento === 'mensal' ? periodo + '-15'
+              : periodo + '-07-01') + 'T00:00:00Z'
+          ),
           areaHa: mediana,
           cenas: valores.length
         };
@@ -696,7 +701,11 @@ export default function AguaObservatorio() {
               <div className="agua-painel__cabecalho agua-painel__cabecalho--quebra">
                 <div>
                   <h3>{filtroSatelite === 'MapBiomas Água' ? 'Evolução anual da água mapeada' : 'Evolução da superfície de água por cena'}</h3>
-                  <p>{filtroSatelite === 'MapBiomas Água' ? 'Observações anuais discretas · 1985–2025 · classe de água MapBiomas' : 'Área classificada por imagem válida; mediana quando há mais de uma cena no período.'}</p>
+                  <p>{filtroSatelite === 'MapBiomas Água'
+                    ? 'Observações anuais discretas · 1985–2025 · classe de água MapBiomas'
+                    : agrupamento === 'diario'
+                      ? 'Um ponto por data observada · intervalo real entre imagens · NDWI experimental'
+                      : 'Mediana das cenas por ' + (agrupamento === 'mensal' ? 'mês' : 'ano') + ' · não representa uma medição contínua'}</p>
                 </div>
                 <div className="agua-controles-serie agua-no-print">
                   <select
@@ -705,7 +714,7 @@ export default function AguaObservatorio() {
                     onChange={event => {
                       const fonte = event.target.value as FiltroSatelite;
                       setFiltroSatelite(fonte);
-                      if (fonte === 'MapBiomas Água') setAgrupamento('anual');
+                      setAgrupamento(fonte === 'MapBiomas Água' ? 'anual' : 'diario');
                     }}
                     aria-label="Fonte da série"
                   >
@@ -751,19 +760,47 @@ export default function AguaObservatorio() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid stroke="#E8EFF5" strokeDasharray="3 4" vertical={false} />
-                      <XAxis dataKey="periodo" tick={{ fill: '#8292A3', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <XAxis
+                        type={filtroSatelite === 'MapBiomas Água' ? 'category' : 'number'}
+                        scale={filtroSatelite === 'MapBiomas Água' ? 'auto' : 'time'}
+                        dataKey={filtroSatelite === 'MapBiomas Água' ? 'periodo' : 'instante'}
+                        domain={filtroSatelite === 'MapBiomas Água' ? undefined : ['dataMin', 'dataMax']}
+                        tickFormatter={valor => filtroSatelite === 'MapBiomas Água'
+                          ? String(valor)
+                          : (agrupamento === 'anual'
+                            ? new Date(Number(valor)).getUTCFullYear().toString()
+                            : new Date(Number(valor)).toLocaleDateString('pt-BR', {
+                              month: '2-digit', year: '2-digit', timeZone: 'UTC'
+                            }))}
+                        tick={{ fill: '#8292A3', fontSize: 11 }}
+                        interval="preserveStartEnd"
+                        minTickGap={36}
+                        axisLine={false}
+                        tickLine={false}
+                      />
                       <YAxis tick={{ fill: '#8292A3', fontSize: 11 }} axisLine={false} tickLine={false} unit=" ha" />
                       <Tooltip
                         formatter={(valor: unknown) => [formatarNumero(Number(valor), 2) + ' ha', filtroSatelite === 'MapBiomas Água' ? 'Água classificada no ano' : 'Área superficial']}
-                        labelFormatter={label => (filtroSatelite === 'MapBiomas Água' ? 'Ano: ' : 'Período: ') + label}
+                        labelFormatter={label => filtroSatelite === 'MapBiomas Água'
+                          ? 'Ano: ' + label
+                          : (agrupamento === 'diario' ? 'Aquisição: ' : 'Período: ')
+                            + (agrupamento === 'diario'
+                              ? formatarData(new Date(Number(label)).toISOString().slice(0, 10))
+                              : agrupamento === 'anual'
+                                ? new Date(Number(label)).getUTCFullYear().toString()
+                                : new Date(Number(label)).toISOString().slice(0, 7))}
                       />
                       <Area
-                        type={filtroSatelite === 'MapBiomas Água' ? 'linear' : 'monotone'}
+                        type="linear"
                         dataKey="areaHa"
-                        stroke="#168FC4"
+                        stroke={filtroSatelite !== 'MapBiomas Água' && agrupamento === 'diario' ? 'none' : '#168FC4'}
                         strokeWidth={2.5}
-                        fill="url(#aguaAreaGradient)"
-                        dot={filtroSatelite === 'MapBiomas Água' ? { r: 2.5, fill: '#168FC4', strokeWidth: 0 } : false}
+                        fill={filtroSatelite !== 'MapBiomas Água' && agrupamento === 'diario' ? 'none' : 'url(#aguaAreaGradient)'}
+                        dot={filtroSatelite !== 'MapBiomas Água' && agrupamento === 'diario'
+                          ? { r: 4, fill: '#168FC4', stroke: '#FFFFFF', strokeWidth: 1 }
+                          : filtroSatelite === 'MapBiomas Água'
+                            ? { r: 2.5, fill: '#168FC4', strokeWidth: 0 }
+                            : { r: 3, fill: '#168FC4', strokeWidth: 0 }}
                         activeDot={{ r: 5, stroke: '#FFFFFF', strokeWidth: 2 }}
                         connectNulls={false}
                       />

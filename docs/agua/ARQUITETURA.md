@@ -70,3 +70,38 @@ A estação não será considerada operacional até instalação, calibração e
 - Comparação de duas cenas.
 - Calculadora transparente de conversão de lâmina evaporada em volume.
 - Exportação CSV e impressão para PDF.
+
+## Entrega acelerada — integração MapBiomas Água e COGERH (25/11/2026)
+
+- **COGERH:** o painel mostra uma leitura **datada** do São José III (24/11/2026):
+  cota de referência 98,82 m, volume 6,54 hm³, 71,72% da capacidade,
+  consultada no Portal Hidrológico do Ceará. NÃO é atualização em tempo real.
+  Fonte: https://www.hidro.ce.gov.br/
+- **MapBiomas Água:** a Coleção 5 fornece classificação **anual de água
+  1985–2025**, com resolução de 30 m. A fonte oficial está documentada em
+  https://brasil.mapbiomas.org/iniciativas-e-produtos/agua/mapeamento-anual/tempo-desde-a-ultima-ocorrencia-de-superficie-de-agua/ .
+- **Exportação com uma única análise no Earth Engine:** o script
+  `scripts/earth-engine/04-mapbiomas-agua-serie-anual.js` usa a AOI `geometry`
+  que a usuária já salvou para calcular 41 anos em um único processamento.
+  Isso **não substitui** a validação da AOI em imagens de cheias históricas.
+- **Ingestão automática no painel:** quando um CSV gerado e revisado for
+  publicado em `public/data/cuidai-agua-sao-jose-iii-mapbiomas.csv`,
+  o painel lerá o arquivo na inicialização, sem exigir upload dos visitantes.
+  O CSV inicial contém APENAS CABEÇALHO, sem medições fictícias.
+- **Importação manual opcional:** CSV via interface, com preservação local dos
+  últimos dados importados. O carregamento automático nunca converte
+  informação municipal agregada em estimativa do reservatório.
+- **NÃO concluído:** execução da exportação GEE, validação da geometria,
+  publicação dos 41 resultados, atualização automática em tempo real COGERH,
+  implantação de estação, estimativa calibrada de evaporação e nova publicação
+  do painel Firebase Hosting. Essas etapas não devem aparecer como operacionais
+  até testadas e comprovadas.
+
+### Integridade: fontes diferentes, grandezas diferentes
+
+- MapBiomas Água: área anual classificada como água (ha); data `YYYY-12-31`
+  no CSV é apenas MARCADOR DO ANO, não data de aquisição de uma cena.
+- Sentinel-2: área observada na data específica, sob máscara de nuvens.
+- COGERH: volume armazenado (hm³), nível/cota (m), percentual (%).
+- Open-Meteo: informações meteorológicas estimadas por modelo.
+- Evaporação: aguarda taxa tecnicamente validada para superfície de água livre.

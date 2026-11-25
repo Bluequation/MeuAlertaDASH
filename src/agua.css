@@ -143,6 +143,20 @@
 .agua-previa-sem-imagem { height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #8DA2B3; background: #F4F8FB; font-size: 10px; }
 .agua-previa-sem-imagem svg { font-size: 22px; }
 .agua-previa-cena > small { display: block; padding: 8px 11px; color: #8292A3; font-size: 9px; }
+.agua-previa-figura { position: relative; margin: 0; }
+.agua-previa-figura > figcaption { padding: 7px 11px; background: #F1F7FA; color: #5A7388; font-size: 10px; line-height: 1.4; }
+.agua-previa-pendente { height: auto; min-height: 170px; padding: 18px 22px; text-align: center; gap: 8px; }
+.agua-previa-pendente strong { font-size: 11px; color: #506C80; font-weight: 650; }
+.agua-previa-pendente span { max-width: 330px; line-height: 1.55; }
+.agua-previa-metadados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 15px; padding: 13px 12px 10px; border-top: 1px solid #EDF2F6; }
+.agua-previa-metadados > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.agua-previa-metadados span { color: #8091A2; font-size: 10px; }
+.agua-previa-metadados strong { color: #3A576B; font-size: 11px; font-weight: 650; }
+.agua-previa-metadados__id { grid-column: 1 / -1; }
+.agua-previa-metadados code { display: block; overflow-wrap: anywhere; color: #647E94; font-size: 9px; line-height: 1.45; }
+.agua-previa-consulta { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 12px; color: #168FC4; font-size: 10px; font-weight: 650; text-decoration: none; }
+.agua-previa-consulta:hover { text-decoration: underline; }
+.agua-previa-nota { border-top: 1px solid #EDF2F6; }
 .agua-evaporacao-grade { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .8fr); gap: 15px; }
 .agua-formulario { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
 .agua-formulario input { width: 100%; font-size: 12px; }

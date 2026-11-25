@@ -340,6 +340,16 @@ export default function AguaObservatorio() {
       });
   }, [cenasFiltradas, agrupamento]);
 
+  const destaquesAnuais = useMemo(() => {
+    if (filtroSatelite !== 'MapBiomas Água' || !serieSuperficial.length) return null;
+    const ordenados = [...serieSuperficial].sort((a, b) => a.areaHa - b.areaHa);
+    return {
+      menor: ordenados[0],
+      maior: ordenados[ordenados.length - 1],
+      recente: serieSuperficial[serieSuperficial.length - 1]
+    };
+  }, [serieSuperficial, filtroSatelite]);
+
   const cenaMaisRecente = cenas.length
     ? [...cenas].sort((a, b) => b.data.localeCompare(a.data))[0]
     : null;
@@ -620,7 +630,10 @@ export default function AguaObservatorio() {
               <div><FiLayers /><span><strong>Landsat 8/9</strong><small>Complemento histórico · resolução de 30 m nas bandas usadas no NDWI</small></span></div>
               <div><FiDatabase /><span><strong>MapBiomas Água · Coleção 5</strong><small>Classificação anual 1985–2025 · 30 m · fonte pública</small></span></div>
             </div>
-            <p className="agua-nota-serie">As séries são filtradas por fonte. O MapBiomas Água · Coleção 5 classifica a água ao longo do ano (1985–2025, 30 m); na Caatinga, a classe anual considera água detectada em pelo menos seis meses. A área exibida é a classe 1 dentro do polígono original de 411 vértices. Pixels sem água mapeada não confirmam que o açude estava seco, e um polígono justo pode excluir áreas inundadas historicamente. A data 31/12 identifica o ano de referência, não uma fotografia daquele dia; a série não estima volume ou cota. Cenas Sentinel-2/Landsat permanecem separadas. <a href="https://brasil.mapbiomas.org/iniciativas-e-produtos/agua/mapeamento-anual/superficie-de-agua-anual/" target="_blank" rel="noreferrer">Método e fonte MapBiomas <FiExternalLink /></a>{seriePublicada ? ' · Série processada carregada automaticamente.' : ''}</p>
+            <details className="agua-metodologia">
+              <summary><FiInfo /> Como interpretar os dados e suas limitações {seriePublicada && <span>· Série MapBiomas carregada</span>}</summary>
+              <p>MapBiomas Água, Coleção 5 (1985–2025; 30 m): na Caatinga, a classe anual considera água detectada em pelo menos seis meses. O valor representa a área classificada como água dentro do polígono original de 411 vértices. Ausência de pixels classificados não comprova seca; a geometria pode deixar de fora água de cheias históricas. A data de 31/12 indica o ano de referência, não uma imagem daquele dia. A série não mede volume nem nível. Sentinel-2 e Landsat são análises por cena, com outros métodos e resoluções. <a href="https://brasil.mapbiomas.org/iniciativas-e-produtos/agua/mapeamento-anual/superficie-de-agua-anual/" target="_blank" rel="noreferrer">Método e fonte MapBiomas <FiExternalLink /></a>.</p>
+            </details>
 
             {mensagemImportacao && (
               <div className="agua-mensagem-importacao"><FiInfo /> {mensagemImportacao}</div>
@@ -629,8 +642,8 @@ export default function AguaObservatorio() {
             <section className="agua-painel">
               <div className="agua-painel__cabecalho agua-painel__cabecalho--quebra">
                 <div>
-                  <h3>Evolução da superfície de água</h3>
-                  <p>MapBiomas: área de água mapeada por ano. Sentinel/Landsat: mediana das observações por período.</p>
+                  <h3>{filtroSatelite === 'MapBiomas Água' ? 'Evolução anual da água mapeada' : 'Evolução da superfície de água por cena'}</h3>
+                  <p>{filtroSatelite === 'MapBiomas Água' ? 'Observações anuais discretas · 1985–2025 · classe de água MapBiomas' : 'Área classificada por imagem válida; mediana quando há mais de uma cena no período.'}</p>
                 </div>
                 <div className="agua-controles-serie agua-no-print">
                   <select
@@ -674,23 +687,46 @@ export default function AguaObservatorio() {
                       <XAxis dataKey="periodo" tick={{ fill: '#8292A3', fontSize: 11 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: '#8292A3', fontSize: 11 }} axisLine={false} tickLine={false} unit=" ha" />
                       <Tooltip
-                        formatter={(valor: unknown) => [formatarNumero(Number(valor), 2) + ' ha', 'Área superficial']}
-                        labelFormatter={label => 'Período: ' + label}
+                        formatter={(valor: unknown) => [formatarNumero(Number(valor), 2) + ' ha', filtroSatelite === 'MapBiomas Água' ? 'Água classificada no ano' : 'Área superficial']}
+                        labelFormatter={label => (filtroSatelite === 'MapBiomas Água' ? 'Ano: ' : 'Período: ') + label}
                       />
-                      <Area type="monotone" dataKey="areaHa" stroke="#168FC4" strokeWidth={2.5} fill="url(#aguaAreaGradient)" />
+                      <Area
+                        type={filtroSatelite === 'MapBiomas Água' ? 'linear' : 'monotone'}
+                        dataKey="areaHa"
+                        stroke="#168FC4"
+                        strokeWidth={2.5}
+                        fill="url(#aguaAreaGradient)"
+                        dot={filtroSatelite === 'MapBiomas Água' ? { r: 2.5, fill: '#168FC4', strokeWidth: 0 } : false}
+                        activeDot={{ r: 5, stroke: '#FFFFFF', strokeWidth: 2 }}
+                        connectNulls={false}
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
                 <div className="agua-vazio">
                   <FiGlobe />
-                  <strong>Nenhuma série de superfície carregada</strong>
-                  <p>A série processada do São José III ainda não foi carregada nesta sessão. O painel busca automaticamente o CSV publicado junto com a aplicação. <a href="https://plataforma.mapbiomas.org/water/" target="_blank" rel="noreferrer">Explorar o acervo oficial <FiExternalLink /></a></p>
+                  <strong>{filtroSatelite === 'MapBiomas Água' ? 'Série anual não carregada' : 'Sem dados processados de ' + filtroSatelite}</strong>
+                  <p>{filtroSatelite === 'MapBiomas Água'
+                    ? 'Não foi possível carregar o CSV público do MapBiomas. Confira a disponibilidade do arquivo.'
+                    : 'O seletor está funcionando, mas ainda não existe uma série de cenas calculadas para este sensor. O MapBiomas não substitui medições individuais de ' + filtroSatelite + '. A rotina para gerar os dados reais já está preparada.'}</p>
+                  {filtroSatelite !== 'MapBiomas Água' && (
+                    <a href="https://github.com/Bluequation/MeuAlertaDASH/blob/feat/cuidai-agua-sao-jose-iii/scripts/earth-engine/05-cenas-sentinel-landsat-2023-2026.js" target="_blank" rel="noreferrer">
+                      Ver rotina de processamento dos sensores <FiExternalLink />
+                    </a>
+                  )}
+                </div>
+              )}
+              {destaquesAnuais && (
+                <div className="agua-serie-destaques" aria-label="Destaques históricos do MapBiomas">
+                  <div><span>Maior área mapeada</span><strong>{formatarNumero(destaquesAnuais.maior.areaHa, 2)} ha</strong><small>{destaquesAnuais.maior.periodo}</small></div>
+                  <div><span>Menor área mapeada</span><strong>{formatarNumero(destaquesAnuais.menor.areaHa, 2)} ha</strong><small>{destaquesAnuais.menor.periodo} · não comprova seca</small></div>
+                  <div><span>Último ano disponível</span><strong>{formatarNumero(destaquesAnuais.recente.areaHa, 2)} ha</strong><small>{destaquesAnuais.recente.periodo}</small></div>
                 </div>
               )}
               <div className="agua-rodape-grafico">
                 <span>{cenasFiltradas.length} registros · {filtroSatelite} · {cenas.length} no total</span>
-                <span>Unidade: hectares (ha)</span>
+                <span>{filtroSatelite === 'MapBiomas Água' ? 'Classificação anual · hectares (ha)' : 'Área por cena · hectares (ha)'}</span>
               </div>
             </section>
 

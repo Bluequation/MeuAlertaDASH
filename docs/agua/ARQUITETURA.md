@@ -122,3 +122,30 @@ A estação não será considerada operacional até instalação, calibração e
 - COGERH: volume armazenado (hm³), nível/cota (m), percentual (%).
 - Open-Meteo: informações meteorológicas estimadas por modelo.
 - Evaporação: aguarda taxa tecnicamente validada para superfície de água livre.
+
+## Históricos por fonte e experiência de leitura (25/11/2026)
+
+- **MapBiomas anual** já publicado: a linha usa segmentos retos e marcadores
+  em cada um dos 41 anos. O gráfico destaca a maior área, a menor área e
+  a observação mais recente, deixando explícito que valores mínimos pequenos
+  (por exemplo, 1987) não comprovam seca completa do reservatório.
+- **Metodologia** em seção expansível para reduzir excesso de texto sem
+  esconder limites científicos da classificação anual.
+- **Sentinel-2 e Landsat não são sinônimos de MapBiomas:** seus seletores
+  permanecem disponíveis, mas mostram mensagem de ausência enquanto não
+  houver cálculos individuais validados. Não são preenchidos com valores
+  MapBiomas nem com séries sintéticas.
+- **Nova rotina unificada:** `scripts/earth-engine/05-cenas-sentinel-landsat-2023-2026.js`
+  calcula áreas provisórias com NDWI > 0 nas cenas reais de 2023 a
+  25/11/2026 e exporta os registros de ambas as fontes em um único CSV.
+  São usados controle de nuvens/sombras e cobertura espacial mínima de 85%
+  dentro da AOI. O limiar NDWI e as áreas carecem de calibração e validação.
+  Não interpretar anos/cenas sem observação como área zero.
+- **Carregamento futuro:** publicar o arquivo resultante em
+  `public/data/cuidai-agua-sao-jose-iii-cenas-2023-2026.csv`.
+  O painel já busca essa URL ao iniciar, combina os registros com o histórico
+  MapBiomas e mantém filtros independentes.
+- **Pendência externa:** o script 05 foi preparado no GitHub, mas não foi
+  executado numa sessão autenticada do Earth Engine nesta implementação.
+  Portanto, ainda não há série Sentinel-2/Landsat publicada; o build não
+  implica processamento satelital.
